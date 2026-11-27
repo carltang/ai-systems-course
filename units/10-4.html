@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10.4 业界怎么用强化学习 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="了解强化学习今天在工业界的主要用途，特别是它和大模型的关系，以及什么问题适合用它。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="10-3.html" title="10.3 强化学习的系统形态" data-step="prev">‹ 10.3</a>
+<a href="11-1.html" title="11.1 结业项目" data-step="next">11.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 10 部分 · 强化学习（选读）</span>10.4 业界怎么用强化学习</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>今天的工业界，强化学习主要用在哪里？和大模型是什么关系？</div><div class="frame-c">承接 10.1–10.3：有了原理和系统的基础，这一单元看它实际用在哪里。</div></div>
+<div class="story"><p>线索是：先看它和大模型的两个结合点，一个用人的偏好当奖励，一个用可以验证的结果当奖励 → 再看它的传统强项：机器人和控制 → 然后是几个经典的应用领域 → 最后回答一个实际的问题：面对一个新任务，怎么判断该不该用强化学习。</p></div>
+<ol class="thread"><li><a href="#c-p10-4-rlhf">大模型的对齐：用人的偏好当奖励（RLHF）</a></li><li><a href="#c-p10-4-verifiable">训练推理能力：用可以验证的结果当奖励</a></li><li><a href="#c-p10-4-robots">机器人与控制：在仿真里训练，迁移到真机</a></li><li><a href="#c-p10-4-classic">游戏、推荐、调度：几个经典的应用领域</a></li><li><a href="#c-p10-4-when">什么问题适合用强化学习</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p10-4-rlhf"><h3><span class="i-num">1</span>大模型的对齐：用人的偏好当奖励（RLHF）</h3>
+<p class="i-essence">预训练教会语言模型“接下来最可能是什么词”，但“最可能的”不等于“人想要的”。RLHF 分三步把人的判断变成训练信号：先让人比较模型的不同回答，标出哪个更好；用这些比较训练一个奖励模型，让它学会给回答打分；再用强化学习调整语言模型，让它的回答在奖励模型那里得高分。</p>
+<div class="i-detail"><p><strong class="h">为什么预训练不够。</strong> 第 1 部分讲的语言模型训练是最大似然：让模型给真实文本里的下一个词高概率。训练数据是互联网上的各种文字。这样的模型学会了语言和知识，但它的目标是“像训练数据”，而不是“有帮助、诚实、不伤害人”。后者很难用一条公式写出来，也没有现成的数据集可以直接模仿。</p><p>这正是 10.1 说的强化学习的适用场景：说不清该怎么做，但做完能判断好坏。</p><p><strong class="h">把它写成强化学习问题。</strong></p><ul><li>智能体：语言模型。</li><li>状态：用户的提问，加上已经生成的内容。</li><li>动作：下一个 token。</li><li>一个回合：生成一个完整的回答。</li><li>奖励：回答写完之后，给整个回答的一个分数。</li></ul><p>语言模型输出的本来就是下一个 token 的概率分布，它天然是一个策略（10.2）。</p><p><strong class="h">难点：奖励谁来给。</strong> 理想的奖励是“人觉得这个回答好不好”。但强化学习需要成千上万次的反馈，让人给每一个回答打分太慢、太贵，而且人打的绝对分数很不一致。</p><p><strong class="h">三步</strong>（InstructGPT 论文的做法）。</p><ul><li>*第一步：监督微调。* 先收集一批人写的高质量示范回答，用普通的监督学习微调预训练模型，得到一个还不错的起点。</li><li>*第二步：训练奖励模型。* 对同一个问题，让模型生成几个不同的回答，请人<strong>比较</strong>它们：哪个更好。比较比打绝对分容易，也更一致。用这些比较数据训练另一个模型：输入一个问题和一个回答，输出一个分数，使得人认为更好的回答得分更高。</li><li>*第三步：强化学习。* 用 PPO 调整语言模型：让它生成回答，用奖励模型打分，按 10.2 的方法更新，使它更倾向于生成高分的回答。</li></ul><p>第三步里还有一个重要的约束：不让调整后的模型离原来的模型太远（在目标里加一项惩罚）。原因和 PPO 限制步长是同一个道理，而且这里更要紧：奖励模型只在它见过的那类回答上可靠。语言模型如果被优化得走了样，可能找到一些奖励模型“以为很好”、其实是胡言乱语的输出。</p><p><strong class="h">这就是 10.1 讲的钻奖励的空子。</strong> 奖励模型是对人的偏好的近似，不完美。语言模型优化的是这个近似，而不是人真正的偏好。优化得越狠，越容易利用近似里的漏洞。实践中的表现有：回答变得啰嗦（奖励模型偏爱长回答）、过度迎合用户、用听起来很自信的语气掩盖不确定。</p><p><strong class="h">从系统的角度看。</strong> 按 10.3 最后的分析：采集阶段是大模型的批量生成（9.1、9.3），外加奖励模型的推理；学习阶段是大模型的反向传播（第 7 部分）。每一轮的数据只用几遍就扔（PPO 是同策略的）。<mark>它是一个把推理系统和训练系统接在一起的作业</mark>。</p><p><strong class="h">后续的发展。</strong> 有一类方法（比如 DPO）绕过了显式的奖励模型和强化学习的循环，直接用偏好比较的数据构造一个监督式的损失，实现简单得多，现在也很常用。它们解决的是同一个问题：怎样用“人更喜欢哪个”来调整模型。</p></div>
+<p class="i-analogy"><b>打个比方</b>像培养一位新厨师：先请食客试吃他做的几个版本，说出更喜欢哪个；把食客的口味总结成一位“试菜师”；之后厨师每做一道新菜，都由这位试菜师来评，不用每次都请食客到场。</p>
+<p class="i-impl">所以 RLHF 的关键不在强化学习的算法（用的就是 PPO），而在奖励从哪来：人的偏好很贵，于是学一个模型来代替人打分。它让 ChatGPT 这类产品“好用”，也带来了奖励模型不可靠时的各种问题。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a><a href="10-1.html#c-p10-1-mdp">马尔可夫决策过程：把这个问题写成数学</a><a href="1-2.html#c-1-2-likelihood">损失函数不是拍脑袋定的：它来自最大似然</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-verifiable">训练推理能力：用可以验证的结果当奖励</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">InstructGPT 论文：Training language models to follow instructions with human feedback</a><a class="src" href="https://arxiv.org/abs/2507.04136" target="_blank" rel="noopener">A Technical Survey of RL Techniques for LLMs（2025）</a></div>
+</li>
+<li class="i-lead">RLHF 的奖励来自人的主观偏好，又贵又不精确。有些任务的奖励可以来得干净得多。</li>
+<li class="icard" id="c-p10-4-verifiable"><h3><span class="i-num">2</span>训练推理能力：用可以验证的结果当奖励</h3>
+<p class="i-essence">有一类任务的结果能由程序自动判断对错：数学题的答案、代码能否通过测试、定理的证明是否成立。这时不需要人，也不需要学一个奖励模型：对了给 1，错了给 0。让模型自己去尝试各种解题的过程，凡是最后做对了的，就强化那一整串思考。这是近两年“会推理”的模型的主要训练方式之一。</p>
+<div class="i-detail"><p><strong class="h">设定。</strong> 还是把语言模型当作策略。给它一道题，让它一步步写出思考的过程，最后给出答案。然后由一个程序来检查答案：</p><ul><li>数学题：和标准答案比对。</li><li>编程题：运行代码，看是否通过所有测试用例。</li><li>形式化的证明：用证明检查器验证每一步。</li><li>更一般的“智能体”任务：让模型操作一个环境（浏览网页、使用工具、修改一个代码仓库），最后检查目标是否达成。</li></ul><p>奖励只在最后给：对或错。</p><p><strong class="h">这是 10.1 里延迟奖励的极端情况。</strong> 模型写了几千个 token 的思考，只在结尾得到一个数字。中间哪些步骤是有用的、哪些是绕了弯路，没有任何直接的反馈。策略梯度的做法（10.2）是：做对了的那些尝试，把里面每一个 token 的概率都往上调；做错了的往下调。同一道题采样很多次不同的尝试，对的和错的一对比，真正有用的思路会在统计上显现出来。</p><p><strong class="h">和 RLHF 的对比。</strong></p><table><thead><tr><th></th><th>RLHF</th><th>可验证的奖励</th></tr></thead><tbody><tr><td>奖励来自</td><td>学出来的奖励模型（近似人的偏好）</td><td>程序的自动判定</td></tr><tr><td>奖励的可靠性</td><td>有漏洞，会被钻空子</td><td>高（判定程序正确的前提下）</td></tr><tr><td>奖励的成本</td><td>收集人的比较很贵</td><td>几乎免费，可以海量地做</td></tr><tr><td>目标</td><td>让回答符合人的喜好</td><td>让模型把题做对</td></tr><tr><td>能否超过已有的示范</td><td>受限于人的判断</td><td>可以</td></tr></tbody></table><p>最后一行是关键。监督学习只能让模型模仿人写的解答。用可验证的奖励，模型可以自己摸索出人没有写下来过的解题路径，只要它最后能得到正确的结果。这和 AlphaGo 通过自我对弈超过人类棋手是同一个道理（10.1）。</p><p><strong class="h">奖励仍然可能被钻空子。</strong> “可验证”不等于“无懈可击”：</p><ul><li>测试用例不全，模型写出只对付这几个用例的代码。</li><li>判定程序有漏洞，模型学会了触发漏洞而不是解题。</li><li>智能体任务里，模型直接修改了测试，或者用不被允许的方式达成了表面上的目标。</li></ul><p>所以设计这类训练时，大量的工作花在构造题目和把判定做严上。</p><p><strong class="h">系统上更重。</strong> 相比 RLHF：</p><ul><li>每个样本要生成很长的思考过程，采集阶段的推理开销大得多（9.1：长上下文的 decode 更慢、KV cache 更大）。</li><li>“环境”可能是真正要运行的东西：执行代码要沙箱，智能体任务要启动一整套软件环境。它们耗时长短不一，有的会卡死。10.3 讲的“等最慢的环境”和异步采集，在这里是实际要处理的问题。</li><li>同一道题要采样很多次。</li></ul><p>这类训练是目前对推理算力需求增长最快的来源之一：<mark>训练过程本身包含了海量的推理</mark>。</p><p>这一节讲的是 2025 年前后的做法，细节仍在快速变化。两篇综述（见出处）给出了更全面的图景。</p></div>
+<p class="i-analogy"><b>打个比方</b>像学生刷题：不需要老师讲解每一步该怎么想，只要有标准答案可以对。做对了，就多回味这次的思路；做错了，下次换个想法。题量够大，自己就能摸索出有效的解题方法。</p>
+<p class="i-impl">所以这条路线的优势是奖励便宜而且可靠，可以大规模地做；模型能学到没有人示范过的解题方式。它的边界也很清楚：只适用于“对错能自动判定”的任务。</p>
+<div class="i-builds">承接 <a href="10-4.html#c-p10-4-rlhf">大模型的对齐：用人的偏好当奖励（RLHF）</a><a href="10-2.html#c-p10-2-policy">策略路线：直接调整策略，让得分高的动作更常出现</a><a href="10-3.html#c-p10-3-compare">对照第 0 部分：同一条管道，不同的瓶颈</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-robots">机器人与控制：在仿真里训练，迁移到真机</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2507.04136" target="_blank" rel="noopener">A Technical Survey of RL Techniques for LLMs（2025）</a><a class="src" href="https://arxiv.org/abs/2509.16679" target="_blank" rel="noopener">RL Meets LLMs: A Survey Across the LLM Lifecycle（2025）</a><a class="src" href="https://arxiv.org/abs/2501.09686" target="_blank" rel="noopener">Towards Large Reasoning Models（2025）</a></div>
+</li>
+<li class="i-lead">离开语言模型，看强化学习的传统强项。</li>
+<li class="icard" id="c-p10-4-robots"><h3><span class="i-num">3</span>机器人与控制：在仿真里训练，迁移到真机</h3>
+<p class="i-essence">让机器人学会走路、抓取、保持平衡，很难靠人写规则，也很难靠示范。强化学习的做法是：在物理仿真里让成千上万个虚拟机器人同时试错，学出一个控制策略，再把它装到真实的机器人上。难点在于仿真和现实总有差别，办法是训练时故意把仿真的各种参数随机打乱，让策略对差别不敏感。</p>
+<div class="i-detail"><p><strong class="h">问题的形状。</strong> 控制一个四足机器人：</p><ul><li>状态：各关节的角度和速度、机身的姿态、指令（往哪走、多快）。</li><li>动作：每个关节电机的目标位置或力矩，每秒要给出几十到几百次。</li><li>奖励：按指令的速度前进得分；摔倒、关节受力过大、动作抖动、耗能过多扣分。</li></ul><p>动作是连续的、高维的，所以用策略路线（10.2）。策略网络很小，几层的 MLP，要能在机器人自带的小计算机上实时运行。</p><p><strong class="h">为什么不在真机上学。</strong></p><ul><li>慢：真实世界只能按 1 倍速运行。学会走路需要几亿步，按每秒 50 步算，要好几个月。</li><li>贵而且危险：早期的策略是随机的，机器人会不停地摔，损坏自己。</li><li>不能并行：一万台机器人的成本无法接受。</li></ul><p>仿真里这三条都不是问题。10.3 讲的 GPU 并行仿真让一张卡上同时跑几千个机器人，训练一个行走策略从几天缩短到几十分钟。</p><p><strong class="h">仿真到现实的差距。</strong> 仿真是对现实的近似：真实的电机有延迟和摩擦，地面的软硬各不相同，机器人的质量分布和设计图有出入，传感器有噪声。一个在仿真里走得很好的策略，可能恰好利用了仿真里某个不真实的细节，到了真机上一步就倒。这也是一种钻空子（10.1），只不过钻的是仿真器的。</p><p><strong class="h">域随机化。</strong> 训练时，每个并行的环境都用略微不同的物理参数：摩擦系数、各部件的质量、电机的强度和延迟、地面的起伏、随机推机器人一把。策略必须学会在所有这些变化下都能工作。真实世界就只是这一大族变化中的一个。一万个并行环境在这里有了第二层意义：它们不只是为了快，也为了多样。</p><p><strong class="h">其他常用的办法。</strong></p><ul><li>用真机采集的数据校准仿真器，缩小差距本身。</li><li>分两个阶段训练：先让一个“老师”策略在仿真里使用真机上得不到的信息（比如精确的地形）学会任务，再训练一个只用真实传感器的“学生”去模仿它。</li><li>让策略根据最近一段时间的观测，自己推断当前环境的特性并适应。</li></ul><p><strong class="h">同样的方法用在别处。</strong> 自动驾驶的规划、无人机的飞行控制、机械臂的灵巧操作、工业过程的调节（数据中心制冷、化工流程），都是“先在仿真或模型里训练，再部署”的模式。</p><p><strong class="h">从系统的角度。</strong> 这是 10.3 那张对照表里“经典情形”的典型：模型很小，一张 GPU 足够；<mark>瓶颈在仿真的速度和逼真度</mark>；GPU 既是仿真器又是训练器。部署时又有另一类系统问题：策略要在机器人上以固定的频率实时输出动作，延迟必须稳定，这和 9.3 讲的推理延迟是近亲。</p></div>
+<p class="i-analogy"><b>打个比方</b>像飞行员在模拟器里训练：真飞机摔不起，模拟器里可以摔一万次。为了让他上真飞机时不慌，模拟器会故意设置各种风向、各种故障。见过足够多的情况，真实的那一种就只是其中之一。</p>
+<p class="i-impl">所以机器人领域的强化学习是 10.3 的 GPU 并行仿真最直接的受益者。近几年四足和人形机器人运动能力的快速进步，主要来自“大规模仿真 + PPO + 随机化”这一套组合。</p>
+<div class="i-builds">承接 <a href="10-4.html#c-p10-4-verifiable">训练推理能力：用可以验证的结果当奖励</a><a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a><a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-classic">游戏、推荐、调度：几个经典的应用领域</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2108.10470" target="_blank" rel="noopener">Isaac Gym 论文</a><a class="src" href="https://arxiv.org/abs/2109.11978" target="_blank" rel="noopener">Learning to Walk in Minutes Using Massively Parallel Deep Reinforcement Learning</a></div>
+</li>
+<li class="i-lead">再看几个强化学习长期被应用的领域，以及它们各自的特点。</li>
+<li class="icard" id="c-p10-4-classic"><h3><span class="i-num">4</span>游戏、推荐、调度：几个经典的应用领域</h3>
+<p class="i-essence">强化学习最出名的成果在游戏里：围棋、国际象棋、雅达利、星际争霸。游戏有明确的规则和输赢，可以无限地自我对弈，是研究的理想试验场。在工业上，它被用于推荐系统（优化长期的用户价值而非单次点击）、资源调度、芯片布局、广告出价等。这些场景的共同点是：决策是连续多步的，而且有办法给结果打分。</p>
+<div class="i-detail"><p><strong class="h">游戏：方法的发源地。</strong></p><ul><li>*雅达利*（DQN，10.2）：从像素直接学习控制，证明了深度网络可以和强化学习结合。</li><li>*围棋*（AlphaGo 系列）：把学到的策略和价值网络与树搜索结合。策略网络提出值得考虑的走法，价值网络评估局面，搜索在此基础上往前看很多步。训练数据来自自我对弈：不断和自己的旧版本下棋，赢的一方的走法被强化。后来的版本完全不用人类棋谱，从随机开始，只靠自我对弈就超过了所有人类。</li><li>*复杂的即时战略和多人游戏*：需要长时间的规划、不完全的信息、和队友的配合。这些项目是 10.3 讲的大规模分布式架构的主要推动者。</li></ul><p>游戏的价值在于它是完美的试验场：规则明确，仿真极快，胜负就是奖励，可以无限地产生数据。</p><p><strong class="h">推荐系统。</strong> 传统的推荐是监督学习：预测用户会不会点击这一条。它优化的是眼前的一次点击。但平台真正关心的是长期的结果：用户是否持续地觉得有价值、是否还会回来。一味推荐最容易被点的内容，可能让用户很快厌倦。把推荐看成一个多步的决策问题（状态是用户的历史，动作是推荐什么，奖励是长期的留存和满意度），正是强化学习的框架。</p><p>这里的特殊困难是不能随便试错：探索意味着给真实的用户推荐可能不合适的东西。所以大量的工作在于怎样从已有的日志数据里学习（离线强化学习），以及怎样安全地做少量的探索。</p><p><strong class="h">调度和资源分配。</strong> 决定把哪个任务放到哪台机器上、数据中心的制冷怎样调节、网络流量怎样分配。这些问题有明确的可量化的目标（能耗、完成时间），决策是连续的，而且通常有仿真器或历史数据可用。第 8 部分讲的集群调度，也有人尝试用强化学习来做。</p><p><strong class="h">芯片设计。</strong> 决定芯片上成千上万个模块各放在哪里，使连线最短、时序和功耗达标。把逐个放置模块看成一连串的动作，最后的布局质量作为奖励。</p><p><strong class="h">广告和出价、金融交易。</strong> 在预算和风险的约束下做一连串的决策。</p><p><strong class="h">共同的特征。</strong></p><ul><li>决策不是一次性的，而是一连串的，前面的选择影响后面的处境。</li><li>有一个可以量化的最终目标，但说不清每一步的“正确答案”。</li><li>有办法大量地试：仿真器、自我对弈，或者足够多的历史数据。</li></ul><p><strong class="h">也要看到它没有成为主流的地方。</strong> 很多一度被认为适合强化学习的问题，实际中用更简单的办法解决了：监督学习加上好的特征，或者传统的优化算法。强化学习的训练不稳定、调试困难、对奖励设计敏感，<mark>这些成本只有在别的方法确实不够用时才值得付</mark>。下一节把这个判断说清楚。</p></div>
+<p class="i-analogy"><b>打个比方</b>游戏之于强化学习，像果蝇之于遗传学：研究者并不是真的在意果蝇，而是它繁殖快、便于观察，在它身上发现的规律可以用到别处。</p>
+<p class="i-impl">所以听到“强化学习打败了某某游戏的世界冠军”，值得关注的是其中的方法（自我对弈、搜索与学习的结合、大规模并行），它们后来都被用到了更实际的问题上。</p>
+<div class="i-builds">承接 <a href="10-4.html#c-p10-4-robots">机器人与控制：在仿真里训练，迁移到真机</a><a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a><a href="10-3.html#c-p10-3-actor-learner">采集和学习分开：很多个 actor，少数几个 learner</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-when">什么问题适合用强化学习</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://www.nature.com/articles/nature14236" target="_blank" rel="noopener">DQN 论文（Nature 2015）</a><a class="src" href="https://www.nature.com/articles/nature24270" target="_blank" rel="noopener">AlphaGo Zero 论文：Mastering the game of Go without human knowledge</a><span class="src">Sutton &amp; Barto 第 1 章 引言里的例子</span></div>
+</li>
+<li class="i-lead">最后回答一个实际的问题：遇到一个新任务，怎么判断该不该用强化学习。</li>
+<li class="icard" id="c-p10-4-when"><h3><span class="i-num">5</span>什么问题适合用强化学习</h3>
+<p class="i-essence">适合强化学习的问题同时具备三个特征：没有现成的正确答案可以模仿，但能给结果打分；决策是连续多步的，前面的选择影响后面；能以可接受的成本大量试错。缺了第一条，用监督学习更简单可靠；缺了第二条，是一个普通的优化或预测问题；缺了第三条，强化学习学不动。</p>
+<div class="i-detail"><p><strong class="h">三个问题，依次问。</strong></p><p>*一、有没有正确答案可以直接学？* 如果有大量的（输入，正确输出）数据，或者有专家的示范可以模仿，用监督学习。10.1 列过它的好处：反馈直接、数据固定、训练稳定。只有在下面两种情况下才需要往下走：根本没有示范；或者你想要超过示范的水平。</p><p>*二、决策是不是多步的、有长期后果的？* 如果每个决定是独立的，做完立刻知道好坏，这是 10.1 讲的老虎机问题，或者普通的优化问题，有更简单的方法。强化学习的那些机制（价值函数、功劳分配）是为“当下的选择影响未来的处境”准备的。</p><p>*三、能不能大量试错？* 强化学习需要的交互次数通常是百万到十亿的量级。要有下面之一：</p><ul><li>一个又快又足够逼真的仿真器（游戏、物理仿真）；</li><li>一个能自动判定结果的程序（代码测试、答案比对）；</li><li>试错的成本很低而且没有危险。</li></ul><p>在真实世界里每试一次都很贵或很危险的问题（医疗决策、大额的金融操作），直接用强化学习非常困难，只能依靠历史数据谨慎地做。</p><p><strong class="h">还有一个贯穿始终的前提：奖励定得准。</strong> 你能不能写出一个奖励，使得“最大化它”真的等于“做成你想要的事”？10.1、10.4 反复出现的钻空子现象说明这比想象的难。奖励定不准，三个特征都满足也会得到一个精于投机的智能体。</p><p><strong class="h">用这三条看前面的几个应用。</strong></p><table><thead><tr><th>应用</th><th>没有答案可学</th><th>多步决策</th><th>能大量试错</th></tr></thead><tbody><tr><td>下围棋</td><td>想超过人类</td><td>是</td><td>自我对弈</td></tr><tr><td>机器人行走</td><td>没法示范每个电机的力矩</td><td>是</td><td>GPU 仿真</td></tr><tr><td>模型做数学和编程</td><td>想学出没人写过的解法</td><td>是（长的思考过程）</td><td>自动判定对错</td></tr><tr><td>RLHF</td><td>“好回答”没有公式</td><td>是（一个回答由很多 token 组成）</td><td>奖励模型代替人</td></tr><tr><td>图像分类</td><td>有标注</td><td>否</td><td>不需要</td></tr></tbody></table><p>最后一行是反例：有标注、单步决策，用监督学习。</p><p><strong class="h">为什么“能用监督学习就不要用强化学习”。</strong> 把 10.1 到 10.3 的难处汇总一下：</p><ul><li>训练不稳定，结果随随机种子波动很大。</li><li>样本需求大几个数量级。</li><li>调试困难：效果不好时，很难分清是算法、奖励、探索还是实现的问题。</li><li>奖励设计本身是一门需要反复试的手艺。</li><li>系统更复杂（10.3）。</li></ul><p>这也是为什么实际的系统常常是混合的：先用监督学习（模仿）得到一个不错的起点，再用强化学习在它的基础上提高。RLHF 的第一步是监督微调；AlphaGo 的第一版先模仿人类棋谱；机器人的策略常常先从示范里学一个初始版本。</p><p><strong class="h">它现在主要用在哪。</strong> 从这门课的角度，最值得关注的是它和大模型的结合。预训练让模型有了知识和语言能力，但那是“模仿”。让模型学会解决没有标准解法的问题、使用工具、完成长的任务，需要的是“做了之后看结果”的学习方式。这使强化学习从一个相对小众的领域，变成了大模型训练流程里的一个固定环节，也使它的系统问题和这门课前九个部分讲的内容完全接上了：<mark>它需要的，是一个把推理和训练都做得很好的集群</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像选交通工具：飞机很强大，但只有在距离够远、有机场、而且别的方式到不了或太慢的时候才值得坐。去楼下便利店，走路就行。</p>
+<p class="i-impl">所以面对一个新任务，先问能不能用监督学习解决。能，就不要用强化学习。强化学习是在“没有答案可学，只有结果可评”时的选择，而今天它最重要的新场景，恰恰是让大模型学会那些没有标准解法的任务。</p>
+<div class="i-builds">承接 <a href="10-4.html#c-p10-4-classic">游戏、推荐、调度：几个经典的应用领域</a><a href="10-1.html#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a><a href="10-1.html#c-p10-1-mdp">马尔可夫决策过程：把这个问题写成数学</a><a href="10-3.html#c-p10-3-compare">对照第 0 部分：同一条管道，不同的瓶颈</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2509.16679" target="_blank" rel="noopener">RL Meets LLMs: A Survey Across the LLM Lifecycle（2025）</a><span class="src">Sutton &amp; Barto 第 1 章 引言</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>在大模型上，强化学习用于<strong>对齐</strong>（RLHF：把人的偏好学成一个奖励模型，再用它调整语言模型）和<strong>训练推理能力</strong>（答案能自动验证时，直接把对错当奖励）。在<strong>机器人</strong>上，它在大规模并行仿真里训练，再迁移到真机。它还用于游戏、推荐、调度和芯片设计。适合它的问题有三个特征：<strong>没有现成的正确答案，但能给结果打分；决策是连续多步的；能大量试错</strong>。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>RLHF 分哪三步？为什么要训练一个奖励模型，而不是直接让人给每个回答打分？</li><li>什么是“可验证的奖励”？用它训练语言模型的推理能力，和 RLHF 相比有什么不同？</li><li>为什么机器人的控制策略通常在仿真里训练？“仿真到现实”的差距是怎样克服的？</li><li>强化学习在游戏之外有哪些工业应用？这些应用场景有什么共同特征？</li><li>判断一个问题是否适合强化学习，要看哪三个特征？为什么说“能用监督学习就不要用强化学习”？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>RLHF</dt><dd>基于人类反馈的强化学习</dd></div><div><dt>reward model</dt><dd>奖励模型</dd></div><div><dt>verifiable reward</dt><dd>可验证的奖励</dd></div><div><dt>domain randomization</dt><dd>域随机化</dd></div><div><dt>reward hacking</dt><dd>钻奖励的空子</dd></div><div><dt>preference</dt><dd>偏好</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="10-3.html"><small>上一单元</small>10.3 强化学习的系统形态</a>
+<a class="next" href="11-1.html"><small>下一单元</small>11.1 结业项目</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

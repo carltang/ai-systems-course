@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3.6 stream、异步与 CUDA Graph · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清 CPU 给 GPU 发任务的机制：异步队列、stream、同步点，以及怎样减少发令的开销。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="3-5.html" title="3.5 并行模式：归约与扫描" data-step="prev">‹ 3.5</a>
+<a href="4-1.html" title="4.1 Transformer 的算子拆解" data-step="next">4.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 3 部分 · GPU 与 CUDA 执行模型</span>3.6 stream、异步与 CUDA Graph</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>CPU 给 GPU 发任务的这条“指挥链”是怎样工作的？怎样减少发令的开销？</div><div class="frame-c">承接 3.1 的“计时前要同步”：那里只说了 GPU 是异步的，这一单元讲清它异步到什么程度。</div></div>
+<div class="story"><p>线索是：CPU 和 GPU 之间隔着一条任务队列，这就是异步的来历 → 队列可以不止一条，每一条叫一个 stream，多条之间可以并发 → 有些操作会让 CPU 不得不停下来等队列清空，这些同步点常常藏在不起眼的代码里 → 发令本身的开销，可以用“录下来重放”的办法压到最低 → 最后看几个进程共用一张卡时的情况。前面很多单元用到过这些机制（异步拷贝、DDP 的重叠、编译后的低开销模式），这里把它们的共同基础讲清楚。</p></div>
+<ol class="thread"><li><a href="#c-p3-6-queue">CPU 和 GPU 之间隔着一条队列：发出任务不等于任务做完</a></li><li><a href="#c-p3-6-streams">stream：一条队列里按顺序做，不同的队列之间可以同时做</a></li><li><a href="#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a></li><li><a href="#c-p3-6-graphs">CUDA Graph：把一串 kernel 的启动录下来，以后一次重放</a></li><li><a href="#c-p3-6-sharing">几个进程共用一张卡：默认是轮流用，不是同时用</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p3-6-queue"><h3><span class="i-num">1</span>CPU 和 GPU 之间隔着一条队列：发出任务不等于任务做完</h3>
+<p class="i-essence">CPU 上的程序调用 CUDA 启动一个 kernel 或一次拷贝，实际做的只是把这个任务放进 GPU 的队列，然后立刻返回。GPU 按顺序从队列里取任务执行。CPU 和 GPU 各干各的，只在队列这里交接。</p>
+<div class="i-detail"><p><strong class="h">一次调用的时间线。</strong> 执行 <code>y = model(x)</code> 里的某个算子时（2.3 的第五层）：</p><ul><li>CPU：准备好参数，调用 CUDA 的接口，把“运行这个 kernel”放进队列。用时几微秒。返回。</li><li>GPU：某个时刻轮到这个任务，执行它。用时可能是几微秒，也可能是几十毫秒。</li></ul><p>CPU 返回时，GPU 多半还没开始做这个任务，前面可能还排着好几个。</p><p><strong class="h">好处一：CPU 不用等。</strong> 它可以立刻去发下一个任务。<mark>只要 CPU 发得比 GPU 做得快，队列里就总有任务在等，GPU 一刻不闲</mark>。反过来，如果 CPU 发得慢，队列经常是空的，GPU 就在等发令（2.3）。</p><p><strong class="h">好处二：可以重叠。</strong> GPU 在处理队列里的任务时，CPU 可以去做完全不相干的事：准备下一个 batch、记日志、做 Python 的垃圾回收。这些时间被“藏”在了 GPU 的计算后面。</p><p><strong class="h">麻烦一：计时错位。</strong> 3.1 讲过：在一个算子前后用 CPU 的时钟计时，量到的只是“放进队列”的几微秒。要量真实的耗时，得先让 CPU 等队列清空（同步）再读时钟。profiler 能分别给出 CPU 时间和 GPU 时间，就是因为它知道这一点。</p><p><strong class="h">麻烦二：报错错位。</strong> 一个 kernel 在 GPU 上出错（比如下标越界）时，CPU 早就往前执行了很多行。错误要等到 CPU 下一次和 GPU 打交道时才被发现，于是 Python 报错指向的那一行，往往不是真正出错的那一行。排查这类错误时，可以设置环境变量 <code>CUDA_LAUNCH_BLOCKING=1</code>，让每次调用都等 kernel 做完再返回。程序会慢很多，但报错的位置是准的。它也说明了异步有多重要：打开这个开关后训练明显变慢，变慢的那部分就是平时靠异步省下来的。</p></div>
+<p class="i-analogy"><b>打个比方</b>像餐厅的出菜单夹：服务员把单子夹上去就转身去接下一桌，厨师按顺序取单做菜。服务员写单的速度和厨师做菜的速度是两回事。</p>
+<p class="i-impl">所以一行 PyTorch 代码“执行完了”，只说明任务已经排上队。它带来两个好处和一个麻烦：CPU 可以趁机准备后面的任务；CPU 和 GPU 的工作可以重叠；麻烦是计时和报错的位置都会“错位”。</p>
+<div class="i-builds">承接 <a href="3-1.html#c-2-1-async">Python 只是在点单：GPU 是异步执行的</a><a href="2-3.html#c-p2-3-journey">一次算子调用要穿过五层：绑定、dispatcher、autograd、后端实现、CUDA</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="3-6.html#c-p3-6-streams">stream：一条队列里按顺序做，不同的队列之间可以同时做</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Best Practices §8.1 计时：CUDA 调用是异步的</span><a class="src" href="https://docs.pytorch.org/docs/stable/notes/cuda.html" target="_blank" rel="noopener">PyTorch 文档：CUDA semantics（Asynchronous execution）</a></div>
+</li>
+<li class="i-lead">队列不一定只有一条。</li>
+<li class="icard" id="c-p3-6-streams"><h3><span class="i-num">2</span>stream：一条队列里按顺序做，不同的队列之间可以同时做</h3>
+<p class="i-essence">stream 就是上一节说的队列。同一条 stream 里的任务严格按放入的顺序一个接一个执行；不同 stream 里的任务之间没有先后的约束，GPU 可以让它们同时进行。PyTorch 默认把所有任务都放进同一条 stream。</p>
+<div class="i-detail"><p><strong class="h">同一条 stream：顺序。</strong> 任务按放进去的先后执行，前一个做完才开始下一个。这个保证很重要：2.4 讲过，<code>x = x.to(device, non_blocking=True)</code> 发起异步拷贝后马上调用 <code>model(x)</code>，模型的第一个 kernel 不会读到没拷完的数据，因为它和那次拷贝在同一条 stream 上，排在后面。</p><p><strong class="h">不同的 stream：可以并发。</strong> GPU 有独立的硬件来做不同种类的事：执行 kernel 的计算单元，和负责主机与设备之间传数据的拷贝引擎。把一次拷贝放在 stream A、一个 kernel 放在 stream B，两者可以真正同时进行。Best Practices Guide 里那个经典的例子就是这样：把数据分成几段，每段的“拷贝”和“计算”放进各自的 stream，第 k 段的计算和第 k+1 段的拷贝重叠起来。</p><p>两个 kernel 分别放在两条 stream 上，也可以同时执行，但它们共享同一批 SM。如果一个 kernel 已经把 GPU 占满了，另一个并不能让总吞吐变高，只是两者交错着做。只有当单个 kernel 用不满 GPU 时（很小的 kernel），多条 stream 才能提高利用率。</p><p><strong class="h">stream 之间怎样协调。</strong> 有时 stream B 的某个任务必须等 stream A 的某个任务做完。办法是在 A 上放一个标记（event），让 B 等这个标记。CPU 也可以等一个标记，或者等一整条 stream 清空。</p><p><strong class="h">它在你用过的东西里。</strong></p><ul><li>*NCCL。* 7.1 的源码导读提到：DDP 把 all-reduce 放在单独的一条 stream 上。所以梯度同步的 kernel 可以和反向计算的 kernel 同时在 GPU 上跑，这才有了“通信和计算重叠”。6.2 讲的“通道占用 SM”，就是这两条 stream 在分享计算单元。</li><li>*FSDP 的预取。* 提前发起的 all-gather 也在自己的 stream 上，和当前层的计算并行。</li><li>*profiler 的时间线。* GPU 那一部分会按 stream 分成几行。看到计算的 kernel 在一行、NCCL 的 kernel 在另一行、时间上有重叠，就是上面说的情况。</li></ul><p><strong class="h">在 PyTorch 里自己用。</strong> 可以用 <code>torch.cuda.Stream()</code> 创建一条 stream，用 <code>with torch.cuda.stream(s):</code> 让一段代码里的任务进入它。日常很少需要：<mark>单卡训练是一条顺序的管道，放在一条 stream 上正合适</mark>。需要它的多半是框架和库的作者。要小心的是显存：分配器是按 stream 管理空闲块的，跨 stream 使用同一个张量时要自己保证先后顺序。</p></div>
+<p class="i-analogy"><b>打个比方</b>像超市的收银通道：同一条通道里的人按顺序结账；开了第二条通道，两条可以同时结。但收银员（GPU 的硬件资源）总数没变，两条通道是在分享他们。</p>
+<p class="i-impl">所以默认情况下 GPU 上的任务是一个接一个的，不需要你操心顺序。想让两件事真正重叠（拷贝和计算、通信和计算），就要把它们放进不同的 stream；NCCL 和 PyTorch 的一些内部机制正是这样做的。</p>
+<div class="i-builds">承接 <a href="3-6.html#c-p3-6-queue">CPU 和 GPU 之间隔着一条队列：发出任务不等于任务做完</a><a href="2-4.html#c-p2-4-overlap">pin_memory 加 non_blocking：让“拷上 GPU”和计算重叠</a></div>
+<div class="i-builds">后面会用到 <a href="3-6.html#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a><a href="3-6.html#c-p3-6-sharing">几个进程共用一张卡：默认是轮流用，不是同时用</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Best Practices §9.1.2 异步传输与计算重叠</span><span class="src">Best Practices 分段的并发拷贝与执行</span><a class="src" href="https://docs.pytorch.org/docs/stable/notes/cuda.html" target="_blank" rel="noopener">PyTorch 文档：CUDA semantics（CUDA streams）</a></div>
+</li>
+<li class="i-lead">异步的好处来自“CPU 不用等”。但有些代码会让它不得不等。</li>
+<li class="icard" id="c-p3-6-sync"><h3><span class="i-num">3</span>同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</h3>
+<p class="i-essence">大多数时候 CPU 只管往队列里放任务。但有些操作需要把 GPU 上的计算结果拿回 CPU 才能继续：把张量转成 Python 数字、打印它的内容、拷回主内存、根据它的值做判断。这时 CPU 必须等队列里排在前面的任务全部做完。这样的地方叫同步点。</p>
+<div class="i-detail"><p><strong class="h">哪些操作会同步。</strong> 判断的标准只有一条：CPU 是否需要知道 GPU 上某个张量的<strong>内容</strong>（而不只是形状）。</p><ul><li><code>loss.item()</code>、<code>float(loss)</code>、<code>loss.tolist()</code>：把数值取成 Python 对象。</li><li><code>print(tensor)</code>：要打印内容。</li><li><code>tensor.cpu()</code>、<code>tensor.numpy()</code>、没有 <code>non_blocking</code> 的 <code>.to("cpu")</code>：把数据拷回主内存。</li><li><code>if tensor &gt; 0:</code>、<code>while tensor.any():</code>：Python 要拿到真假值才能决定走哪个分支。</li><li>结果的大小取决于数据的算子：<code>torch.nonzero</code>、用布尔掩码做索引、<code>torch.unique</code>。CPU 要先知道结果有多少个元素，才能给输出分配空间。</li><li><code>torch.cuda.synchronize()</code>：明确要求同步。</li></ul><p>相对地，只用到形状的操作（<code>x.shape</code>、<code>x.size(0)</code>、<code>len(x)</code>）不会同步：形状是元数据，一直在 CPU 这边（2.1）。</p><p><strong class="h">为什么慢。</strong> 同步本身不是额外的计算：那些任务迟早要做。损失在于两点：</p><ul><li>CPU 在等待期间不能发后面的任务。同步结束时队列是空的，GPU 要等 CPU 重新把队列填起来。对发令本来就紧张的模型（2.3），这段空档直接变成 GPU 的空闲。</li><li>CPU 本可以利用这段时间做别的事（准备数据、处理上一步的日志），现在只能干等。</li></ul><p><strong class="h">训练循环里最常见的一处。</strong></p><pre>for x, y in loader:
+    loss = model(x, y)
+    loss.backward(); opt.step(); opt.zero_grad()
+    running += loss.item()          # 每一步都同步</pre><p>改法：不取数值，只在 GPU 上累加，隔若干步再取一次。</p><pre>    running += loss.detach()        # 仍在 GPU 上，不同步
+    if step % 100 == 0:
+        print(running.item() / 100) # 每 100 步同步一次
+        running.zero_()</pre><p>（<code>detach</code> 是必需的，否则会像 2.2 讲的那样把每一步的计算图都留住。）</p><p><strong class="h">其他常见来源。</strong> 调试时留下的 <code>print</code>；每一步都把指标拷回 CPU 算准确率；为了“保险”到处调用的 <code>torch.cuda.synchronize()</code>；用张量的值做 Python 的控制流（这同时也是 2.5 里图断点的来源，两件事的根源相同）。</p><p><strong class="h">怎么发现。</strong> 在 profiler 的结果里找 <code>aten::item</code>、<code>aten::_local_scalar_dense</code>、从设备到主机的 <code>Memcpy</code>。它们的 CPU 时间特别长，不是因为它们自己慢，而是 CPU 在这里等前面所有的 GPU 任务。所以也要小心误判：<mark>一个同步点会把它之前所有异步任务的时间都“算”在自己头上</mark>。</p><p><strong class="h">多卡时同步点更贵。</strong> 7.1 的排查里提到过：一个进程因为同步点慢了一拍，其余的进程会在下一次集合通信处等它。</p></div>
+<p class="i-analogy"><b>打个比方</b>像服务员一直在下单，突然有一桌问“我们的菜做到哪了”。他只能站在出菜口等厨师把前面的单子都做完，才能回答，这期间不能接新单。</p>
+<p class="i-impl">所以同步点打断了 CPU 和 GPU 的重叠。训练循环里每一步都有一个同步点，异步的好处就丢了一部分。它们往往藏在记日志、调试用的代码里。</p>
+<div class="i-builds">承接 <a href="3-6.html#c-p3-6-streams">stream：一条队列里按顺序做，不同的队列之间可以同时做</a><a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="2-2.html#c-p2-2-modes">不记账、剪断、和改了被记下的东西：no_grad、detach 与原地操作</a></div>
+<div class="i-builds">后面会用到 <a href="3-6.html#c-p3-6-graphs">CUDA Graph：把一串 kernel 的启动录下来，以后一次重放</a><a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a><a href="11-1.html#c-p11-1-case-single">案例一：单卡训练，GPU 利用率只有四成</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.pytorch.org/docs/stable/notes/cuda.html" target="_blank" rel="noopener">PyTorch 文档：CUDA semantics（Asynchronous execution）</a><a class="src" href="https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html" target="_blank" rel="noopener">PyTorch Performance Tuning Guide（避免不必要的 CPU-GPU 同步）</a></div>
+</li>
+<li class="i-lead">同步点是让 CPU 等。即使没有同步点，CPU 发令本身也有开销。2.3 说过这个开销，这里给出把它压到最低的办法。</li>
+<li class="icard" id="c-p3-6-graphs"><h3><span class="i-num">4</span>CUDA Graph：把一串 kernel 的启动录下来，以后一次重放</h3>
+<p class="i-essence">每启动一个 kernel，CPU 和驱动都要做一些固定的工作。一步训练有几千个 kernel，每一步启动的序列又完全相同。CUDA Graph 把这一整串启动“录”成一个对象；之后每一步只需要对驱动说一次“重放”，几千次启动的开销变成一次。</p>
+<div class="i-detail"><p><strong class="h">回到 2.3 的那笔账。</strong> 一个算子在 CPU 上的开销可以分成两层：</p><ul><li>框架这一层：Python、dispatcher、准备输出。</li><li>驱动这一层：把一次 kernel 启动交给 GPU 所需的工作。</li></ul><p>torch.compile（2.5）主要削减第一层。<mark>CUDA Graph 削减的是第二层</mark>，并且因为重放时根本不执行框架的代码，第一层也一起省了。</p><p><strong class="h">怎么工作。</strong></p><ul><li>*录制。* 让一条 stream 进入“捕获”状态，然后照常执行一遍要录的代码。这一遍里，kernel 并不真的执行，驱动只是把“启动了哪些 kernel、参数是什么、彼此的先后依赖”记下来，形成一张图。</li><li>*重放。* 之后每次调用“重放这张图”，驱动把图里所有的 kernel 按记录的依赖关系一次性提交给 GPU。</li></ul><p>因为图里记着依赖关系，驱动还能看出哪些 kernel 互不依赖、可以并行，这是逐个启动时做不到的。</p><p><strong class="h">限制，都来自“录下来的东西是固定的”。</strong></p><ul><li>*参数是固定的。* 图里记录的是当时每个 kernel 的参数，包括输入输出张量的<strong>显存地址</strong>。所以重放时，数据必须放在和录制时相同的地址上。做法是：录制前分配好输入张量；每一步把新数据<strong>拷进</strong>这些张量（而不是换一个新张量），重放，再从固定的输出张量里读结果。</li><li>*形状是固定的。* 形状变了，kernel 的参数就不同了，要另录一张。</li><li>*不能有同步点和依赖数据的控制流。* 录制时 kernel 没有真的执行，拿不到任何结果；Python 的 <code>if</code> 走了哪个分支，也被录死了。</li><li>*占显存。* 为了保证地址固定，图用到的中间张量由一个专用的内存池管理，不和别的张量共享。</li></ul><p><strong class="h">在 PyTorch 里。</strong></p><ul><li>直接用：<code>torch.cuda.CUDAGraph()</code> 配合 <code>with torch.cuda.graph(g):</code> 录制，<code>g.replay()</code> 重放。官方博客有完整的训练循环例子。</li><li>间接用：<code>torch.compile(model, mode="reduce-overhead")</code>（2.5）。编译器替你处理地址固定和重新录制这些事，条件不满足时自动退回普通方式。对大多数人，这是更省事的用法。</li></ul><p><strong class="h">什么时候值得。</strong> 回到 2.3 的判断方法：加倍 batch，时间几乎不变，说明是开销受限，这时 CUDA Graph 最有效。典型的受益者是小 batch 的推理、强化学习里的小网络、以及模型里 kernel 特别碎的部分。大模型大 batch 的训练里，kernel 本身的执行时间远大于启动开销，收益很小。</p></div>
+<p class="i-analogy"><b>打个比方</b>像餐厅里的套餐：熟客每次点的都是同样的八道菜。与其每次报八遍菜名、写八张单子，不如定成一个套餐，说一句“老样子”，后厨照着固定的单子做。</p>
+<p class="i-impl">所以它对付的是发令的开销，对 kernel 小而多的模型效果明显。条件是每一步做的事必须完全一样：同样的 kernel、同样的形状、数据放在同样的地址。</p>
+<div class="i-builds">承接 <a href="3-6.html#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a><a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="2-5.html#c-p2-5-limits">编译对付的是开销和带宽，不是算力</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/" target="_blank" rel="noopener">PyTorch 博客：Accelerating PyTorch with CUDA Graphs</a><a class="src" href="https://docs.nvidia.com/cuda/cuda-programming-guide/" target="_blank" rel="noopener">CUDA Programming Guide（CUDA Graphs）</a><a class="src" href="https://docs.pytorch.org/docs/stable/notes/cuda.html" target="_blank" rel="noopener">PyTorch 文档：CUDA semantics（CUDA Graphs）</a></div>
+</li>
+<li class="i-lead">前面说的都是一个进程里的事。最后看多个进程同时使用一张卡的情况，这在共享的集群里很常见。</li>
+<li class="icard" id="c-p3-6-sharing"><h3><span class="i-num">5</span>几个进程共用一张卡：默认是轮流用，不是同时用</h3>
+<p class="i-essence">每个使用 GPU 的进程有自己的一套上下文（context）。默认情况下，一张卡在任一时刻只执行一个上下文的任务，几个进程按时间片轮流。所以两个进程各占 50% 的时间，而不是各用一半的计算单元；切换本身还有开销。要让多个进程真正同时使用一张卡，需要 MPS 这样的机制。</p>
+<div class="i-detail"><p><strong class="h">上下文。</strong> 一个进程第一次使用某张 GPU 时，驱动为它创建一个上下文：它在这张卡上的全部状态，包括显存映射、加载的 kernel 代码、它的那些 stream。2.1 提到过每个进程固定占用的几百 MB 显存，主要就是它。</p><p><strong class="h">默认：时间片轮转。</strong> <mark>一张卡同一时刻只运行一个上下文的任务</mark>。有两个进程时，GPU 给进程 A 跑一小段时间，切换到进程 B 跑一小段，再切回来。</p><ul><li>两个进程各得到大约一半的<strong>时间</strong>。</li><li>轮到 A 时，哪怕 A 的 kernel 只用了一小部分 SM，其余的 SM 也空着，B 用不上。</li><li>每次切换有开销。</li><li><code>nvidia-smi</code> 显示的利用率是整张卡的，看起来可能很高，而每个进程的实际吞吐都不到独占时的一半。</li></ul><p>显存则是真的分开占用：两个进程的显存加起来不能超过这张卡的容量。</p><p><strong class="h">MPS（多进程服务）。</strong> NVIDIA 提供的一个服务进程。开启后，各个进程的任务都交给它，由它合并到同一个上下文里提交给 GPU。于是不同进程的 kernel 可以真正同时执行，共享 SM。对很多个各自用不满 GPU 的小任务（小模型推理、超参数搜索里的小实验），总吞吐能明显提高。代价是进程之间的隔离变弱：一个进程出了严重错误，可能影响到其他进程。</p><p><strong class="h">还有两种更“硬”的切分。</strong></p><ul><li>MIG：把一张卡在硬件层面切成几个互相隔离的小实例，各有固定份额的计算单元和显存。隔离好，但份额是固定的，不够灵活。</li><li>集群调度层面的时间片共享：调度系统把同一张卡分配给多个容器，底下还是轮转。8.2 讲 Kubernetes 上的 GPU 时会回到这几种方式。</li></ul><p><strong class="h">和训练的关系。</strong></p><ul><li>多卡训练时每个进程独占一张卡，不存在这个问题。但如果因为配置错误让两个训练进程落到了同一张卡上（比如进程和卡的对应关系设错了），表现是那张卡的显存占用翻倍、两个进程都只有一半速度，并且通过同步拖慢所有其他进程（7.1）。</li><li>排查“突然变慢”时，先用 <code>nvidia-smi</code> 看一眼每张卡上有哪些进程。发现不属于你的进程，原因就找到了。</li><li>在同一张卡上同时跑训练和评估、或者同时开着一个占用 GPU 的 notebook，也是同样的情况。</li></ul></div>
+<p class="i-analogy"><b>打个比方</b>像一间会议室被两个团队共用：默认是轮流进去，一个团队用的时候另一个在门外等。哪怕里面只坐了三个人、还有一半座位空着，另一个团队也进不来。</p>
+<p class="i-impl">所以两个各自只能用满一半 GPU 的小任务，放在同一张卡上并不会把它用满。在共享的集群里，“我的任务变慢了”有时只是因为同一张卡上多了一个邻居。</p>
+<div class="i-builds">承接 <a href="3-6.html#c-p3-6-streams">stream：一条队列里按顺序做，不同的队列之间可以同时做</a><a href="0-2.html#c-p0-2-util">GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</a></div>
+<div class="i-builds">后面会用到 <a href="8-2.html#c-p8-2-sharing">卡不够分时：共享一张卡的三种方式，以及抢占</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.nvidia.com/deploy/mps/index.html" target="_blank" rel="noopener">NVIDIA 文档：Multi-Process Service</a><a class="src" href="https://docs.nvidia.com/cuda/cuda-programming-guide/" target="_blank" rel="noopener">CUDA Programming Guide</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>CPU 调用 CUDA 只是把任务<strong>放进队列</strong>。一条队列叫一个 <strong>stream</strong>，里面按顺序执行；不同的 stream 可以并发，拷贝与计算重叠、通信与计算重叠靠的都是它。需要<strong>把结果拿回 CPU</strong> 的操作是同步点，会让 CPU 等队列清空。<strong>CUDA Graph</strong> 把一串 kernel 的启动录下来整体重放，省掉逐个发令的开销。多个进程共用一张卡时默认是<strong>轮流</strong>使用。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>“CUDA 调用是异步的”具体是什么意思？它带来哪些好处和麻烦？</li><li>什么是 CUDA stream？同一条 stream 和不同 stream 上的任务，执行顺序各有什么保证？</li><li>哪些常见的 PyTorch 操作是同步点？为什么它们会拖慢训练？怎样减少它们的影响？</li><li>CUDA Graph 省掉的是哪一部分开销？使用它有哪些限制？</li><li>多个进程同时使用一张 GPU 时，默认是怎样调度的？MPS 改变了什么？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>stream</dt><dd>流（GPU 上的一条任务队列）</dd></div><div><dt>synchronization point</dt><dd>同步点</dd></div><div><dt>CUDA Graph</dt><dd>CUDA 图</dd></div><div><dt>event</dt><dd>事件（stream 上的一个标记）</dd></div><div><dt>time slicing</dt><dd>时间片轮转</dd></div><div><dt>MPS</dt><dd>多进程服务</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="3-5.html"><small>上一单元</small>3.5 并行模式：归约与扫描</a>
+<a class="next" href="4-1.html"><small>下一单元</small>4.1 Transformer 的算子拆解</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

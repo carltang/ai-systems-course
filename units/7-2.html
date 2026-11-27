@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>7.2 ZeRO 与 FSDP · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="理解把优化器状态、梯度、参数分片的思路，能用 FSDP 训练单卡放不下的模型。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="7-1.html" title="7.1 数据并行 DDP" data-step="prev">‹ 7.1</a>
+<a href="7-3.html" title="7.3 模型并行与 TorchTitan" data-step="next">7.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 7 部分 · 分布式训练</span>7.2 ZeRO 与 FSDP</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>模型大到一张卡放不下时，怎么办？</div><div class="frame-c">承接 7.1：DDP 里每张卡都存了一模一样的东西，这份冗余可以省掉。</div></div>
+<div class="story"><p>线索是：先算清楚训练时每个参数到底占多少显存，大头在哪 → DDP 里每张卡存的东西一模一样，ZeRO 把这份冗余分三级切掉 → FSDP 是 PyTorch 对最彻底那一级的实现，关键在于“什么时候把参数拼完整、什么时候放掉”的节奏。这一单元用到 6.1 的一个结论：all-reduce 可以拆成 reduce-scatter 和 all-gather 两半。</p></div>
+<ol class="thread"><li><a href="#c-5-3-16-bytes">混合精度 + Adam：每个参数要占 16 字节</a></li><li><a href="#c-5-3-zero">ZeRO：把冗余切开，每张卡只管 1/N</a></li><li><a href="#c-5-3-fsdp">FSDP 的节奏：用到哪一层才把它拼完整，用完就放掉</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-5-3-16-bytes"><h3><span class="i-num">1</span>混合精度 + Adam：每个参数要占 16 字节</h3>
+<p class="i-essence">16 位的参数 2 字节、16 位的梯度 2 字节，再加上 fp32 的参数主副本 4 字节、Adam 的两份状态各 4 字节，一共 16 字节。一个 7B 的模型，光这些就要约 112 GB，还没算激活值。</p>
+<div class="i-detail"><p>把训练时和一个参数有关的所有东西列出来（ZeRO 论文的算法）：</p><table><thead><tr><th>内容</th><th>精度</th><th>字节</th></tr></thead><tbody><tr><td>参数（前向和反向计算用）</td><td>16 位</td><td>2</td></tr><tr><td>梯度</td><td>16 位</td><td>2</td></tr><tr><td>参数的主副本（优化器更新用）</td><td>32 位</td><td>4</td></tr><tr><td>Adam 的一阶矩（动量）</td><td>32 位</td><td>4</td></tr><tr><td>Adam 的二阶矩</td><td>32 位</td><td>4</td></tr></tbody></table><p>合计 16 字节。后三行是优化器这一侧的，共 12 字节，占了四分之三。</p><p><strong class="h">为什么优化器要用 32 位。</strong> 每一步的更新量相对于参数本身很小。用 16 位存参数，很多次小的更新会因为精度不够而直接丢失，累积起来训练就不对了。所以混合精度的通常做法是：计算用 16 位的副本（快，1.5 讲过），更新作用在 32 位的主副本上，Adam 的两份状态也用 32 位。</p><p><strong class="h">代入一个数。</strong> 7.5B 参数的模型：16 × 7.5×10⁹ = 120 GB。这还只是“模型状态”，没有算激活值。一张 80 GB 的卡放不下。</p><p><strong class="h">这个算法的用处。</strong> 遇到显存不够，先分清是哪一类：</p><ul><li>模型状态（上面这 16 字节 × 参数量）：和 batch 大小无关，调小 batch 没用。要靠这一单元的办法。</li><li>激活值：和 batch 大小、序列长度成正比。调小 batch、用重算换显存有用。</li><li>临时缓冲区和碎片：和分配的模式有关（2.1）。</li></ul><p>一个简单的判断方法：<mark>把 batch 减半，显存占用降了多少</mark>。几乎没降，大头就是模型状态。</p></div>
+<p class="i-analogy"><b>打个比方</b>像搬家时发现：家具本身不多，真正占地方的是各种备份和包装。</p>
+<p class="i-impl">所以显存的大头不是参数本身，而是优化器状态；这就是 ZeRO 先从切分优化器状态开始的原因。</p>
+<div class="i-builds">承接 <a href="1-2.html#c-1-2-adam">Adam = 动量 + 每个参数各自的步长</a><a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a></div>
+<div class="i-builds">后面会用到 <a href="7-4.html#c-p7-4-contents">检查点里要存四样：模型、优化器、进度、随机状态</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noopener">ZeRO 论文</a><span class="src">ZeRO 论文 第 8 页 §3.1 模型状态：16Ψ 的来历</span><span class="src">ZeRO 论文 第 3 页 图 1 三级切分的显存对比</span></div>
+</li>
+<li class="i-lead">16 字节里，哪些是每张卡必须自己留一份的，哪些不是？</li>
+<li class="icard" id="c-5-3-zero"><h3><span class="i-num">2</span>ZeRO：把冗余切开，每张卡只管 1/N</h3>
+<p class="i-essence">DDP 里每张卡存着一样的东西。ZeRO 第 1 级把优化器状态切成 N 份，每张卡只存一份；第 2 级再切梯度；第 3 级连参数也切开。每张卡的显存占用大约随卡数成反比下降。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/zero-levels.svg" alt="上面是上一节的 16 字节，下面是三级各自切掉什么" loading="lazy"><figcaption>上面是上一节的 16 字节，下面是三级各自切掉什么</figcaption></figure><p>ZeRO 的观察是：数据并行里，每张卡在一步训练中并不是每时每刻都需要全部的 16 字节。按“需要的时间有多短”从易到难切。</p><p><strong class="h">第一级：切优化器状态（12 字节那部分）。</strong> 优化器状态只在更新参数的那一刻用到。把参数分成 N 段，每张卡只负责更新其中一段，也就只需要存那一段的优化器状态。</p><ul><li>显存：每个参数从 16 字节降到 4 + 12/N 字节，卡多时接近 4 字节，约为原来的四分之一。</li><li>通信：梯度照常同步。每张卡更新完自己那一段参数后，要把更新后的参数分发给大家，这是一次 all-gather。6.1 讲过，“reduce-scatter 梯度，再 all-gather 参数”的通信量和一次 all-reduce 相同，所以总通信量没变。</li></ul><p><strong class="h">第二级：再切梯度。</strong> 既然每张卡只更新自己那一段，它也只需要那一段的梯度总和。梯度的同步从 all-reduce 改成 reduce-scatter，每张卡只留下自己那一段，别的段算完就可以丢掉。</p><ul><li>显存：每个参数降到 2 + 14/N 字节，接近 2 字节，约为原来的八分之一。</li><li>通信：仍然和数据并行相同。</li></ul><p><strong class="h">第三级：连参数也切。</strong> 平时每张卡只存 1/N 的参数。前向或反向算到需要某部分参数时，临时从其他卡把它收集过来（all-gather），用完就丢。</p><ul><li>显存：每个参数降到 16/N 字节，随卡数成反比下降。理论上只要卡够多，多大的模型都放得下。</li><li>通信：前向要 all-gather 一遍参数，反向又要一遍，再加上梯度的 reduce-scatter。论文算出总量是数据并行的 1.5 倍。</li></ul><table><thead><tr><th>级别</th><th>切分</th><th>每个参数约占</th><th>通信量</th></tr></thead><tbody><tr><td>数据并行</td><td>无</td><td>16 字节</td><td>1 倍</td></tr><tr><td>第一级</td><td>优化器状态</td><td>4 字节</td><td>1 倍</td></tr><tr><td>第二级</td><td>再加梯度</td><td>2 字节</td><td>1 倍</td></tr><tr><td>第三级</td><td>再加参数</td><td>16/N 字节</td><td>1.5 倍</td></tr></tbody></table><p>这是 0.1 里“用通信换存储”的典型：不存，用到时再从别处取。</p><p><strong class="h">怎么选。</strong> <mark>前两级几乎是白拿的，通信没有增加</mark>。第三级用 1.5 倍的通信换来随卡数下降的显存，值不值取决于通信能不能藏在计算后面，这正是下一节 FSDP 要解决的工程问题。</p></div>
+<p class="i-analogy"><b>打个比方</b>像几个人合租：与其每人买一整套家具，不如每人买一件，需要时互相借用。</p>
+<p class="i-impl">所以卡越多，能训练的模型越大；代价是通信：第 1、2 级的通信量和 DDP 相同，第 3 级大约是 DDP 的 1.5 倍。</p>
+<div class="i-builds">承接 <a href="7-1.html#c-5-2-memory-wall">DDP 的代价：每张卡都存一整份模型和优化器状态</a><a href="6-1.html#c-5-1-decompose">all-reduce = reduce-scatter + all-gather</a></div>
+<div class="i-builds">后面会用到 <a href="7-2.html#c-5-3-fsdp">FSDP 的节奏：用到哪一层才把它拼完整，用完就放掉</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/1910.02054" target="_blank" rel="noopener">ZeRO 论文</a><span class="src">ZeRO 论文 第 2 页 三级切分的概要</span><span class="src">ZeRO 论文 第 10 页 §5 切优化器状态与梯度</span><span class="src">ZeRO 论文 第 11 页 §5.3 切参数</span><span class="src">ZeRO 论文 第 14 页 §7 通信量分析：1.5 倍的来历</span></div>
+</li>
+<li class="i-lead">第三级的想法简单，做起来有一个关键问题：参数什么时候收集、什么时候释放，才能既省显存又不拖慢训练。</li>
+<li class="icard" id="c-5-3-fsdp"><h3><span class="i-num">3</span>FSDP 的节奏：用到哪一层才把它拼完整，用完就放掉</h3>
+<p class="i-essence">平时每张卡只存自己那一份参数。前向算到某一层时，先 all-gather 拼出这一层的完整参数，算完立刻释放；反向时再拼一次，算出梯度后用 reduce-scatter 把梯度汇总并切回各自那一份。下一层的参数会提前预取。</p>
+<div class="i-detail"><p>FSDP 是 PyTorch 对 ZeRO 第三级的实现。它把模型分成若干个“单元”（通常一个 Transformer 层是一个单元），以单元为单位收集和释放参数。</p><p><strong class="h">一步训练的节奏</strong>（以其中一层为例）：</p><ul><li>平时：每张卡只存这一层参数的 1/N。</li><li>前向到这一层之前：all-gather，拼出这一层的完整参数。</li><li>这一层的前向计算。</li><li>算完：释放刚拼出来的完整参数，只留自己那 1/N。</li><li>反向回到这一层之前：再 all-gather 一次。</li><li>这一层的反向计算，得到完整的梯度。</li><li>reduce-scatter：梯度求和并切开，每张卡只留自己那 1/N；同时释放完整参数。</li><li>所有层做完后，每张卡用自己那一段梯度更新自己那一段参数。</li></ul><figure class="fig"><img src="../assets/figures/fsdp-rhythm.svg" alt="同一层在前向和反向时各拼一次" loading="lazy"><figcaption>同一层在前向和反向时各拼一次</figcaption></figure><p>于是显存的峰值 ≈ 自己那 1/N 的全部模型状态 + 正在使用的那一两层的完整参数 + 激活值。模型的总大小不再受单卡显存限制。</p><p><strong class="h">单元的粒度是一个权衡。</strong> 单元越小，同时“拼完整”的参数越少，显存峰值越低；但通信的次数越多，每次的数据越小，固定延迟的占比越高。把整个模型当成一个单元，就退化成了“前向前一次性拼出全部参数”，显存上没有任何好处。</p><p><strong class="h">怎么不拖慢训练。</strong> 每一层都要等一次 all-gather 才能开始算，如果老老实实地等，通信就完全串在了计算的路径上。FSDP 的办法是<strong>预取</strong>：</p><ul><li>前向时，在计算第 k 层的同时，提前发起第 k+1 层的 all-gather。等第 k 层算完，下一层的参数多半已经到了。</li><li>反向时同理，提前收集下一个要用的层。这里有个难点：PyTorch 是即时执行的，FSDP 事先并不知道反向会按什么顺序经过各层。它的办法是记下前向时各层的执行顺序，把它倒过来，当作反向顺序的估计。</li></ul><p>预取也不能太激进。一口气提前收集很多层，显存又涨上去了。所以 FSDP 有一个限流器，控制同时“在途”的完整参数的数量。</p><p><strong class="h">和 DDP 的对比。</strong></p><table><thead><tr><th></th><th>DDP</th><th>FSDP</th></tr></thead><tbody><tr><td>每张卡存的模型状态</td><td>全部</td><td>1/N</td></tr><tr><td>每步的通信</td><td>梯度的 all-reduce</td><td>每层：两次 all-gather，一次 reduce-scatter</td></tr><tr><td>通信量</td><td>1 倍</td><td>约 1.5 倍</td></tr><tr><td>通信怎样和计算重叠</td><td>梯度分桶，和反向重叠</td><td>预取下一层的参数</td></tr><tr><td>适合</td><td>单卡放得下的模型</td><td>单卡放不下的模型</td></tr></tbody></table><p>所以排查 FSDP 的性能时，看的东西和 DDP 类似但多一样：<mark>all-gather 有没有被预取藏住</mark>。时间线上如果每一层的计算前面都有一段在等 all-gather，就是预取没起作用或者通信太慢。</p></div>
+<details class="i-more"><summary>源码导读：FSDP 的收集和释放挂在哪里</summary><div class="i-detail"><p>PyTorch 里有两代 FSDP 的实现，读源码前先分清你用的是哪一个。路径是 PyTorch 2.x 的，以你手头的版本为准。</p><p><strong class="h">第一代：<code>torch/distributed/fsdp/</code></strong>，用法是 <code>FullyShardedDataParallel(model, ...)</code> 把模块包起来。FSDP 论文描述的是它。</p><ul><li>核心数据结构是 <code>FlatParameter</code>（<code>_flat_param.py</code>）：把一个单元里的所有参数张量拉平、拼接成一个一维的大张量，再切成 N 份。这样一个单元只需要一次 all-gather，而不是每个张量一次。读这个文件能看到“拼接、补齐、切分”是怎么做的。</li><li>时机挂在模块的钩子上（<code>_runtime_utils.py</code>）：前向之前的钩子里收集参数（unshard），前向之后的钩子里释放（reshard），反向的钩子里收集参数、做 reduce-scatter。函数名里带 <code>pre_forward</code>、<code>post_forward</code>、<code>pre_backward</code>、<code>post_backward</code> 的就是这几处。</li><li>预取和限流的逻辑也在这个文件里，搜 <code>prefetch</code>。</li></ul><p><strong class="h">第二代（常叫 FSDP2）：<code>torch/distributed/_composable/fsdp/</code></strong>，用法是 <code>fully_shard(module)</code>。TorchTitan 用的是它。</p><ul><li>不再把参数拼成一个大张量，而是每个参数各自切分，用 PyTorch 的“分布式张量”（DTensor）表示。好处是每个参数保留了自己的身份，和其他并行方式（张量并行）更容易组合，显存的释放也更确定。</li><li>收集和释放的时机同样挂在模块的前向、反向钩子上，思路没变。</li></ul><p><strong class="h">带着这几个问题读：</strong></p><ul><li>一个单元的 all-gather 是在哪条 CUDA stream 上发起的？它怎样做到不堵住计算？</li><li>释放完整参数后，那块显存马上还给分配器了吗？（这关系到 2.1 讲的显存缓存和碎片；论文专门讨论了这一点，也是限流器存在的原因。）</li><li>混合精度时，all-gather 传的是 32 位的主副本还是 16 位的副本？（传 16 位的可以让通信量减半。）</li></ul><p>这份导读依据的是论文和对代码结构的了解，没有对照具体的 PyTorch 版本逐行核对。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像图书馆借书：要读哪一章才把那一章借来，读完马上归还，自己的书架上只放负责保管的那一部分。</p>
+<p class="i-impl">所以显存峰值只取决于“自己那份 + 当前这一层的完整参数”；预取让通信和计算重叠，不至于拖慢训练。</p>
+<div class="i-builds">承接 <a href="7-2.html#c-5-3-zero">ZeRO：把冗余切开，每张卡只管 1/N</a><a href="6-1.html#c-5-1-decompose">all-reduce = reduce-scatter + all-gather</a></div>
+<div class="i-builds">后面会用到 <a href="7-3.html#c-5-4-compose">并行方式按带宽分层组合</a><a href="7-4.html#c-p7-4-distributed">分布式的检查点：每个进程各存各的，而且不让训练停下来等</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2304.11277" target="_blank" rel="noopener">PyTorch FSDP 论文</a><span class="src">FSDP 论文 第 3 页 图 1 一步训练里的收集与释放</span><span class="src">FSDP 论文 第 5 页 FlatParameter 与切分</span><span class="src">FSDP 论文 第 6 页 §3.3 重叠通信与计算</span><span class="src">FSDP 论文 第 7 页 反向预取与限流器</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>混合精度加 Adam 时，<strong>每个参数占 16 字节</strong>，其中 12 字节是优化器状态。<strong>ZeRO</strong> 把优化器状态、梯度、参数依次切成 N 份，每张卡只存一份，显存随卡数下降，通信量最多变成原来的 1.5 倍。<strong>FSDP</strong> 按层工作：用到哪一层才 all-gather 拼完整，用完就释放，梯度用 reduce-scatter 切回去；靠预取让这些通信和计算重叠。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>混合精度加 Adam 训练时，每个参数为什么要占 16 字节？其中最大的一块是什么？</li><li>ZeRO 的三级分别切分什么？各自省多少显存、增加多少通信？</li><li>FSDP 在一步训练里，对每一层做了哪些通信？它靠什么让这些通信不拖慢训练？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>ZeRO</dt><dd>零冗余优化器</dd></div><div><dt>sharding</dt><dd>分片</dd></div><div><dt>optimizer state</dt><dd>优化器状态</dd></div><div><dt>FSDP</dt><dd>全分片数据并行</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="7-1.html"><small>上一单元</small>7.1 数据并行 DDP</a>
+<a class="next" href="7-3.html"><small>下一单元</small>7.3 模型并行与 TorchTitan</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

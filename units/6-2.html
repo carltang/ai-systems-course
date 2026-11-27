@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>6.2 NCCL 内部：拓扑、通道与协议 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清一次 all-reduce 在 NCCL 内部经过了什么，为读 NCCL 的日志和源码打底。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="6-1.html" title="6.1 集合通信与 NCCL" data-step="prev">‹ 6.1</a>
+<a href="6-3.html" title="6.3 通信的测量与排查" data-step="next">6.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 6 部分 · 集合通信与 NCCL</span>6.2 NCCL 内部：拓扑、通道与协议</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>调用一次 all-reduce，NCCL 在里面做了什么？</div><div class="frame-c">承接 6.1（集合通信是什么）和第 5 部分（链路）：这一单元看 NCCL 怎样把一次集合通信安排到具体的链路上。</div></div>
+<div class="story"><p>线索是：大部分工作在初始化时就做完了 → 每次操作被切成几路“通道”并行执行 → 数据在通道里以哪种方式交接，有三种协议可选 → 几张卡之间按什么图形传递，有环和树两种算法 → 最底下，数据经由哪种传输方式离开这张卡。这五层从上到下一一对应着 NCCL 日志里的信息和源码的目录，读懂了这一单元，6.3 的排查就有了依据。</p></div>
+<ol class="thread"><li><a href="#c-p6-2-init">大部分工作在初始化时一次做完：探测拓扑、建环和树、连好每一对卡</a></li><li><a href="#c-p6-2-channels">通道：把一次操作切成几路并行，每一路占用 GPU 的一个计算单元</a></li><li><a href="#c-p6-2-protocols">三种协议：Simple 要带宽，LL 要低延迟，LL128 两头兼顾</a></li><li><a href="#c-p6-2-algorithms">算法决定数据在卡之间的走法：环的带宽最好，树的步数最少</a></li><li><a href="#c-p6-2-transports">传输层：机内走 P2P 或共享内存，跨机走 IB verbs 或 socket</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p6-2-init"><h3><span class="i-num">1</span>大部分工作在初始化时一次做完：探测拓扑、建环和树、连好每一对卡</h3>
+<p class="i-essence">创建通信器（communicator）时，NCCL 先摸清这台机器的硬件拓扑，再和其他进程交换信息，据此为所有卡建好环形和树形两种通信图，并把图上相邻的每一对卡连接好。之后每一次集合通信都重复使用这些图和连接。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/nccl-stack.svg" alt="这一单元后面四节各讲一层" loading="lazy"><figcaption>这一单元后面四节各讲一层</figcaption></figure><p>通信器是 NCCL 里“一组要互相通信的 GPU”的句柄。每张卡在其中有一个编号（rank），从 0 到 N−1。PyTorch 在多卡训练启动时为你创建它。创建的过程大致分四步。</p><p><strong class="h">一、带外握手（bootstrap）。</strong> 各个进程先通过一条普通的 TCP 连接找到彼此，交换各自的信息。这条连接只用来建立通信器，不传训练数据。它走哪个网络接口，由 <code>NCCL_SOCKET_IFNAME</code> 决定。</p><p><strong class="h">二、探测拓扑。</strong> 每个进程读系统的 <code>/sys</code> 目录，弄清本机的 PCIe 树：有哪些 GPU 和网卡，它们各在哪个交换芯片、哪个 CPU 插槽下，GPU 之间有没有 NVLink，各条链路多宽。这就是 5.1 讲的那张“距离”图，NCCL 把它建成了一个内部的数据结构。</p><p><strong class="h">三、建图。</strong> 根据拓扑，为所有卡排出通信的顺序：</p><ul><li>环：每张卡记住自己的上家和下家。排的时候尽量让机内相邻的卡走 NVLink，让跨机的那几跳落在合适的网卡上。</li><li>树：每张卡记住自己的父节点和子节点。NCCL 用两棵互补的二叉树：一棵树里的中间节点，在另一棵树里是叶子，这样每张卡的收发负担是均衡的。</li></ul><p>这些图在初始化时建好，之后所有的集合通信都复用。</p><p><strong class="h">四、建连接。</strong> 对图上每一对相邻的卡，选一种传输方式并建立连接：机内的映射对方的显存，跨机的注册内存、建立 QP（5.2 讲的那些慢操作）。</p><p><strong class="h">为什么排查要先看这里。</strong> 因为“走哪条路”是在这个阶段定下来的。训练过程中 NCCL 不会再换路。如果它在初始化时选了 TCP 而不是 InfiniBand，或者选了一块不该用的网卡，<mark>后面每一步通信都会慢，而且不会再有任何提示</mark>。好在这些选择都会打印在日志里（6.3）。</p><p>还可以让 NCCL 把它探测到的拓扑写出来看：设置 <code>NCCL_TOPO_DUMP_FILE</code> 为一个文件路径，初始化后会得到一份 XML。在容器或虚拟机里怀疑 NCCL “看错了”硬件时，这份文件是直接的证据。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一场接力赛：赛前排好棒次、每个人认准下一棒是谁、试跑确认交接没问题。发令枪响之后，只管跑和交棒，不再商量。</p>
+<p class="i-impl">所以多机训练启动慢、启动时卡住或报错，问题几乎都在这个阶段；而它在这个阶段做出的选择（用哪张网卡、哪种传输），会一直影响到训练结束。</p>
+<div class="i-builds">承接 <a href="6-1.html#c-5-1-ring">Ring all-reduce：卡再多，每张卡的通信量也几乎不变</a><a href="5-1.html#c-p5-1-distance">两个设备的“距离”，决定数据走哪条路</a><a href="5-2.html#c-p5-2-verbs">RDMA 的四样东西：注册内存、队列对、工作请求、完成队列</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-channels">通道：把一次操作切成几路并行，每一路占用 GPU 的一个计算单元</a><a href="6-3.html#c-p6-3-log">NCCL 的初始化日志回答三个问题：用了哪张网、每对卡走哪条路、建了几个通道</a><a href="8-1.html#c-p8-1-distributed">一个分布式训练作业，是一组互相认识的 Pod</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 2 页 通信器与启动方式</span><span class="src">Demystifying NCCL 第 3 页 环与双二叉树</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/gpu_troubleshooting.html" target="_blank" rel="noopener">NCCL 用户指南：拓扑检测</a></div>
+</li>
+<li class="i-lead">连接建好了。现在来了一次 all-reduce 的调用，NCCL 首先要决定：用多少“人手”来搬。</li>
+<li class="icard" id="c-p6-2-channels"><h3><span class="i-num">2</span>通道：把一次操作切成几路并行，每一路占用 GPU 的一个计算单元</h3>
+<p class="i-essence">搬数据、做加法的是 GPU 上的 kernel。只用一个计算单元（SM）来做，既喂不满 NVLink 或网卡，也浪费了其他计算单元。所以 NCCL 把每次操作的数据切成几份，每份交给一个“通道”；每个通道是 kernel 里的一个 block，各占一个 SM，并行工作。</p>
+<div class="i-detail"><p><strong class="h">为什么要并行。</strong> 集合通信在 GPU 上是一个 kernel：从发送缓冲区读数据，必要时和本地数据相加，写到接收缓冲区或中转缓冲区。这是纯粹的搬运和逐元素运算，受带宽限制。一个 SM 能驱动的带宽是有限的，远小于一组 NVLink 或一块高速网卡的带宽。</p><p><strong class="h">通道是什么。</strong> 每个通道负责输入数据的一段连续区域，互不重叠。在 CUDA 的层次上（3.2 讲过 grid 和 block）：</p><ul><li>NCCL 的 kernel 启动时，grid 的大小就是通道数。</li><li>每个 block 对应一个通道，跑在一个 SM 上。</li><li>block 内部按 warp 分工：头两个 warp 负责把这次操作需要的信息装进共享内存，其余的 warp 负责搬数据和做运算。</li></ul><p>每个通道还各有一份自己的环或树，所以不同的通道可以走不同的链路。在一台有多块网卡的机器上，各个通道可以从不同的网卡出去，把几块网卡都用上。</p><p><strong class="h">通道里的数据怎么流。</strong> 每个通道有一块固定大小的中转缓冲区（Simple 协议下默认 4 MiB），分成 8 格。数据一块一块地流过这些格子：有的格子正在被 kernel 写入，有的在等网卡发走，有的正在网络上，有的已经可以被对端读取。这样发送、传输、接收是流水线式重叠进行的，而不是“整批发完再处理下一批”。这是 0.1 里“用别的活把等待填满”在通信内部的样子。</p><p><strong class="h">通道数的权衡。</strong></p><ul><li>太少：GPU 这一侧成为瓶颈，链路喂不满。</li><li>太多：每个通道分到的数据块变小。跨机传输时，如果每次交给网卡的块小于中转缓冲区的一格（512 KiB），网卡就在发一个个没装满的块，传输效率下降。所以消息小的时候，NCCL 会主动减少通道数。</li><li>还有一个容易忽略的代价：<mark>通道占用的 SM 是从训练的计算那里拿走的</mark>。通信和计算重叠进行时（7.1），它们在抢同一批 SM。</li></ul><p>NCCL 在初始化时按拓扑建好一批通道，每次操作再根据消息大小和所选的算法、协议决定实际用几个。这些都由它内部的调优模型决定，官方不建议手动设置。</p></div>
+<p class="i-analogy"><b>打个比方</b>像搬家时一条传送带不够快，就并排开几条，每条负责一部分箱子。但传送带不是越多越好：箱子太少时，每条带上稀稀拉拉，反而不划算。</p>
+<p class="i-impl">所以通道数是一个权衡：多了，GPU 这一侧并行度高、能同时用上多块网卡；但每个通道分到的数据变少，网络传输的效率下降，还要从训练的计算那里抢走更多的 SM。</p>
+<div class="i-builds">承接 <a href="6-2.html#c-p6-2-init">大部分工作在初始化时一次做完：探测拓扑、建环和树、连好每一对卡</a><a href="3-2.html#c-2-2-index">线程的门牌号：blockIdx × blockDim + threadIdx</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-protocols">三种协议：Simple 要带宽，LL 要低延迟，LL128 两头兼顾</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 2 页 通信通道</span><span class="src">Demystifying NCCL 第 7 页 通道缓冲区与数据划分</span><span class="src">Demystifying NCCL 第 8 页 通道到 CUDA 层次的映射</span></div>
+</li>
+<li class="i-lead">数据切好了，要在卡与卡之间一跳一跳地传。每一跳怎样交接，NCCL 准备了三种方式。</li>
+<li class="icard" id="c-p6-2-protocols"><h3><span class="i-num">3</span>三种协议：Simple 要带宽，LL 要低延迟，LL128 两头兼顾</h3>
+<p class="i-essence">数据从一张卡交到下一张卡时，接收方怎么知道“这一块已经写完，可以读了”？这个交接方式就是协议。Simple 用大块数据加较重的同步，带宽最高但每一跳的延迟大；LL 把每 4 个字节的数据和一个标志一起写，延迟最低但带宽只有一小半；LL128 以 128 字节为单位，接近满带宽，延迟也低，但对硬件有要求。</p>
+<div class="i-detail"><p>三种协议要解决的是同一个问题：发送方往一块共享的缓冲区里写数据，接收方怎样确定自己读到的是完整、有效的数据。</p><p><strong class="h">Simple：为带宽而设计。</strong> 数据按大块（默认每块 512 KiB）写入。写完一整块后，用内存屏障保证这块数据对接收方可见，再更新一个计数告诉对方“又有一块好了”。接收方必须等一整块到齐才能读。同步的动作比较重，但摊到 512 KiB 上微不足道，所以带宽接近链路的上限。对很小的消息，这个同步的代价就占了主要部分：论文给出的每一跳延迟约 6 微秒。</p><p><strong class="h">LL（low latency）：为延迟而设计。</strong> 每次写 8 个字节：4 字节数据，加 4 字节标志。这 8 个字节是一次原子写入，接收方只要看到标志变成预期的值，就知道旁边的 4 字节数据是有效的，不需要别的同步。每一跳约 1 微秒。代价有两个：一半的空间给了标志；而且为了让主机上的线程能轮询标志，中转缓冲区必须放在主内存里，这就用不了 GPUDirect RDMA。所以它的带宽只有峰值的四分之一到一半。</p><p><strong class="h">LL128：兼顾。</strong> 思路和 LL 相同，但单位是 128 字节：120 字节数据加 8 字节标志，带宽能到峰值的 95% 左右，每一跳约 2 微秒。它要求这 128 字节的写入不会被拆开或打乱顺序，NVLink 能保证这一点，其他一些路径不能。所以 NCCL 只在确认硬件支持时才启用它，否则会有数据损坏的风险。</p><table><thead><tr><th></th><th>Simple</th><th>LL</th><th>LL128</th></tr></thead><tbody><tr><td>目标</td><td>高带宽</td><td>低延迟</td><td>低延迟且高带宽</td></tr><tr><td>每次写入</td><td>大块数据</td><td>4 字节数据 + 4 字节标志</td><td>120 字节数据 + 8 字节标志</td></tr><tr><td>带宽</td><td>接近峰值</td><td>峰值的 25%–50%</td><td>约峰值的 95%</td></tr><tr><td>每跳延迟</td><td>约 6 微秒</td><td>约 1 微秒</td><td>约 2 微秒</td></tr></tbody></table><p>（数字来自 Demystifying NCCL 的表 1，是论文作者引用和测量的量级，不同硬件会有出入。）</p><p><strong class="h">这正是 6.1 那个时间公式的两项。</strong> <mark>小消息的时间由“固定延迟 × 步数”决定，所以选延迟最低的协议；大消息由“数据量 ÷ 带宽”决定，所以选带宽最高的协议</mark>。</p><p>可以用环境变量 <code>NCCL_PROTO</code> 指定或排除某种协议。官方文档的态度很明确：不建议设置，只在怀疑某种协议有 bug 时用来排除它。</p></div>
+<p class="i-analogy"><b>打个比方</b>像交接货物：Simple 是装满一整车再签收，单趟手续重，但运量大；LL 是每件小货都附一张签收条，随到随签，快但装不了多少；LL128 是一箱一签，介于两者之间。</p>
+<p class="i-impl">所以小消息用 LL 或 LL128，大消息用 Simple，NCCL 会按消息大小自动切换。同一个训练里，不同大小的张量可能走的是不同的协议。</p>
+<div class="i-builds">承接 <a href="6-2.html#c-p6-2-channels">通道：把一次操作切成几路并行，每一路占用 GPU 的一个计算单元</a><a href="6-1.html#c-5-1-alpha-beta">通信时间 = 固定延迟 + 数据量 ÷ 带宽</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-algorithms">算法决定数据在卡之间的走法：环的带宽最好，树的步数最少</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 3 页 三种协议与表 1</span><span class="src">Demystifying NCCL 第 7 页 表 4 各协议的缓冲区大小</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html" target="_blank" rel="noopener">NCCL 环境变量：NCCL_PROTO</a></div>
+</li>
+<li class="i-lead">协议管的是“一跳”。几张卡之间总共要怎么传，是另一个层面的选择。</li>
+<li class="icard" id="c-p6-2-algorithms"><h3><span class="i-num">4</span>算法决定数据在卡之间的走法：环的带宽最好，树的步数最少</h3>
+<p class="i-essence">同一个 all-reduce，可以让数据沿着环一站一站传，也可以沿着树先向上汇总、再向下分发。环让每条链路都满负荷，带宽利用最好，但步数随卡数线性增长；树的步数只随卡数的对数增长，适合消息小、卡多的情况。算法和上一节的协议是两个独立的选择，可以任意搭配。</p>
+<div class="i-detail"><p><strong class="h">环。</strong> 就是 6.1 讲的算法：N 张卡排成环，all-reduce 要 2(N−1) 步。它的好处是每张卡只和上下家通信，环上每条链路的负载完全相同，大消息时带宽利用率最高。弱点是步数：卡数翻倍，步数也翻倍，每一步的延迟累加起来。</p><p><strong class="h">树。</strong> 数据先从叶子向根逐级汇总，根得到总和后再逐级向下分发。步数大约是树的深度的两倍，也就是和 log N 成正比。<mark>1024 张卡，环要两千多步，树只要二十步左右</mark>。</p><p>普通的树有一个缺点：叶子节点只发不转，中间节点既收又发，负担不均，带宽浪费了一半。NCCL 用的是<strong>双二叉树</strong>：同时建两棵树，让一棵树里的中间节点在另一棵树里当叶子，各传一半的数据。这样每张卡的收发总量是均衡的，带宽利用也接近环。</p><p><strong class="h">还有几种依赖特定硬件的算法</strong>，知道名字、在日志里认得出就够了：</p><ul><li>NVLS：利用 NVSwitch 芯片自身的能力在机内做合并。</li><li>CollNet：让支持这项功能的 InfiniBand 交换机参与合并。</li><li>PAT：较新版本加入的一种树形算法。</li></ul><p><strong class="h">算法和协议的关系。</strong> 它们是正交的：算法决定“谁发给谁、按什么顺序”，协议决定“每一跳怎么交接”。环和树都可以配 Simple、LL、LL128 中的任何一种。一次操作实际用的是一个“算法 + 协议”的组合。</p><p><strong class="h">怎么选。</strong> NCCL 内部有一个调优模型：对每种可用的组合，根据卡数、消息大小、探测到的链路带宽和延迟，估算这次操作的耗时，选最小的。同时决定用几个通道。大致的规律是：</p><ul><li>消息小：树，配低延迟的协议。</li><li>消息大：环，配 Simple。</li><li>卡数很多时，“大”的门槛会提高，因为环的步数代价更大了。</li></ul><p>可以用 <code>NCCL_ALGO</code> 强制指定算法。它的正当用途是诊断：比如怀疑某种算法在你的网络上表现异常，强制换一种对比一下。平台上长期存在的特殊情况，官方推荐写一个调优插件来修正模型的选择，而不是把环境变量固定在脚本里。Meta 的论文里就提到，他们针对自己的网络调整了这个选择，比如在更大的消息上仍然使用树。</p></div>
+<p class="i-analogy"><b>打个比方</b>像通知全公司一件事：一个传一个（环），每个人只用说一次，但传完要很久；按组织架构逐级传达（树），几层就到了所有人。</p>
+<p class="i-impl">所以 NCCL 每次操作都要回答两个问题：走什么图形（算法），每一跳怎么交接（协议）。它内部有一个模型，按卡数、消息大小和链路情况估算每种组合的耗时，选最快的。</p>
+<div class="i-builds">承接 <a href="6-2.html#c-p6-2-protocols">三种协议：Simple 要带宽，LL 要低延迟，LL128 两头兼顾</a><a href="6-1.html#c-5-1-ring">Ring all-reduce：卡再多，每张卡的通信量也几乎不变</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-transports">传输层：机内走 P2P 或共享内存，跨机走 IB verbs 或 socket</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 3 页 环与双二叉树</span><span class="src">Demystifying NCCL 第 6 页 表 3 各操作支持的算法与协议</span><a class="src" href="https://developer.nvidia.com/blog/understanding-nccl-tuning-to-accelerate-gpu-to-gpu-communication" target="_blank" rel="noopener">NVIDIA 博客：Understanding NCCL Tuning</a></div>
+</li>
+<li class="i-lead">最后一层：数据真正离开这张卡的方式。前面第 5 部分讲的所有硬件，在这里和 NCCL 接上了。</li>
+<li class="icard" id="c-p6-2-transports"><h3><span class="i-num">5</span>传输层：机内走 P2P 或共享内存，跨机走 IB verbs 或 socket</h3>
+<p class="i-essence">图上相邻的两张卡之间，数据实际怎么过去，由传输层决定。同一台机器内，优先让一张卡直接写另一张卡的显存（P2P，走 NVLink 或 PCIe），不行就经主内存里的共享内存中转。跨机器时，有 RDMA 网卡就用 IB verbs，否则退回普通的 TCP socket。</p>
+<div class="i-detail"><p><strong class="h">机内。</strong></p><ul><li><strong>P2P</strong>：一张卡的 kernel 直接把数据写到另一张卡的显存里，不经过 CPU。有 NVLink 就走 NVLink，没有就走 PCIe。如果两张卡属于同一个进程，NCCL 还能省掉中转缓冲区，直接从源缓冲区写到目的缓冲区。</li><li><strong>SHM（共享内存）</strong>：经主内存里的一块共享内存中转。当 P2P 不可用，或者 P2P 反而更差时使用。后一种情况的例子：两张卡分属两个 CPU 插槽、只能通过 PCIe 互通，这时设备间直传的流量 CPU 处理得并不好，经主内存反而顺畅。</li></ul><p><strong class="h">跨机。</strong> 这时 GPU 上的 kernel 不能直接把数据送到另一台机器，需要主机上的一个<strong>代理线程</strong>（proxy）来驱动网卡。分工是：</p><ul><li>kernel：把数据写进中转缓冲区的一格，更新计数。</li><li>代理线程：发现有一格写好了，就填一张 RDMA 的工作请求交给网卡（5.2 里的 <code>ibv_post_send</code>），然后轮询完成队列。</li><li>对端的代理线程：发现数据到了，更新计数，通知对端的 kernel 来读。</li></ul><p>跨机的传输方式有两种：</p><ul><li><strong>NET/IB</strong>：用 verbs，InfiniBand 和 RoCE 都走它。中转缓冲区放在哪，取决于能不能用 GPUDirect RDMA（5.2）：能用，缓冲区就在显存里，网卡直接读写；不能用，缓冲区在主内存里，两端各多一次显存和主内存之间的拷贝。</li><li><strong>NET/Socket</strong>：普通的 TCP。数据要先拷到主内存，再经过内核的网络栈（0.3 讲过它的开销）。这是没有 RDMA 可用时的退路，慢得多。</li></ul><p>收发双方每次传输前都要先“会合”：接收方准备好缓冲区并告知发送方，发送方才开始发。这就是 5.2 和 5.3 提到的“可以发了”那条消息。</p><p><strong class="h">代理线程值得留意。</strong> 它是一个跑在 CPU 上的普通线程，要不停地轮询。它如果被调度到了离网卡很远的核上（5.1 的 NUMA），或者 CPU 被数据加载的进程占满了，跨机通信就会变慢，而 GPU 和网络看起来都没有问题。这是“通信慢，但原因在 CPU”的一类情况。</p><p><strong class="h">降级是静默的。</strong> 把上面的选择串起来，跨机的一跳从好到差有三档：IB 加 GPUDirect RDMA、IB 经主内存中转、TCP socket。掉到哪一档完全取决于初始化时的条件是否满足。<mark>NCCL 不会因为“没用上最好的”而报错，它只会在日志里如实写出自己用了什么</mark>。</p><figure class="fig"><img src="../assets/figures/nccl-proxy.svg" alt="跨机一跳的分工，和它可能落到的三档" loading="lazy"><figcaption>跨机一跳的分工，和它可能落到的三档</figcaption></figure></div>
+<details class="i-more"><summary>源码导读：从 ncclAllReduce 到通道上的 kernel</summary><div class="i-detail"><p>目的不是读懂每一行，而是知道 NCCL 仓库里每个目录管什么，遇到问题时能找到该看的文件。下面的文件名来自 Demystifying NCCL 对 2.19 版的分析和仓库的目录结构，新版本可能有调整，以你手头的版本为准。</p><p><strong class="h">一次 all-reduce 的调用链，从上到下：</strong></p><ul><li><code>src/collectives.cc</code>：对外的接口。<code>ncclAllReduce</code> 在这里，它只是把参数打包成一个任务描述。</li><li><code>src/enqueue.cc</code>：调度的核心。在这里为这次操作选算法和协议、决定用几个通道、计算每块数据的大小，然后启动 kernel。6.2 讲的“每次操作都要做的选择”都发生在这个文件里。</li><li><code>src/graph/tuning.cc</code>：调优模型。各种“算法 + 协议”组合的带宽和延迟估算在这里。想知道 NCCL 为什么选了某个组合，看这里。</li><li><code>src/device/</code>：在 GPU 上运行的代码。<code>all_reduce.h</code> 等文件里是每种操作、每种算法的步骤（6.1 里那串 <code>recvReduceSend</code>）；<code>prims_simple.h</code>、<code>prims_ll.h</code>、<code>prims_ll128.h</code> 是三种协议各自对这些步骤的实现。</li></ul><p><strong class="h">初始化相关：</strong></p><ul><li><code>src/init.cc</code>：创建通信器的主流程。</li><li><code>src/bootstrap.cc</code>：带外握手。</li><li><code>src/graph/topo.cc</code>：探测硬件拓扑。<code>rings.cc</code>、<code>trees.cc</code>、<code>connect.cc</code>：建环、建树、把图连起来。</li></ul><p><strong class="h">传输层：</strong></p><ul><li><code>src/transport/p2p.cc</code>、<code>shm.cc</code>：机内的两种传输。</li><li><code>src/transport/net.cc</code>：跨机传输的通用部分；<code>net_ib.cc</code> 是 verbs 的实现，<code>net_socket.cc</code> 是 TCP 的实现。</li><li><code>src/proxy.cc</code>：代理线程。</li></ul><p><strong class="h">怎么用这张地图。</strong> 举三个例子：</p><ul><li>日志里某条 <code>NCCL WARN</code> 带着文件名和行号（比如来自 <code>net_ib.cc</code>），你立刻知道它出在 verbs 这一层，回到 5.2 的骨架去对是哪一步失败了。</li><li>想知道 GPUDirect RDMA 的启用条件到底是怎么判断的，去 <code>net_ib.cc</code> 和 <code>graph/</code> 里搜 <code>GDR</code>。</li><li>想知道某个环境变量实际影响什么，在仓库里搜它的名字（去掉 <code>NCCL_</code> 前缀也搜一下），通常能直接找到读取它的那一处。</li></ul><p>写到这里要说明一点：这份导读是依据论文和文档写的，没有逐行对照具体的 NCCL 版本，读的时候以你手上的版本为准。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像寄东西：同一栋楼直接送过去；同城走专线快递；实在没有专线，才用普通邮政，慢得多。</p>
+<p class="i-impl">所以同一个 all-reduce，因为底下走的传输不同，速度可以差几十倍。而选哪一种是 NCCL 在初始化时根据硬件自动决定的：条件不满足时它会悄悄降级，不会报错。</p>
+<div class="i-builds">承接 <a href="6-2.html#c-p6-2-algorithms">算法决定数据在卡之间的走法：环的带宽最好，树的步数最少</a><a href="5-2.html#c-p5-2-gdr">GPUDirect RDMA：注册的不是主内存，而是显存</a><a href="5-1.html#c-p5-1-numa">NUMA：进程、内存和设备要放在同一侧</a><a href="0-3.html#c-p0-3-kernel-net">走操作系统的网络栈，每个包都要过很多道手续</a></div>
+<div class="i-builds">后面会用到 <a href="6-3.html#c-p6-3-log">NCCL 的初始化日志回答三个问题：用了哪张网、每对卡走哪条路、建了几个通道</a><a href="11-1.html#c-p11-1-case-network">案例三：换了一批机器，多机训练慢了三倍</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 4 页 表 2 与机内传输</span><span class="src">Demystifying NCCL 第 5 页 跨机传输与 GPUDirect RDMA</span><a class="src" href="https://github.com/NVIDIA/nccl" target="_blank" rel="noopener">NCCL 源码仓库</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>NCCL 在<strong>初始化</strong>时探测拓扑、建好环和树、连好每一对卡。之后每次操作：先选<strong>算法</strong>（环或树，决定数据在卡之间的走法）和<strong>协议</strong>（Simple、LL、LL128，决定带宽和延迟的取舍），再把数据切给若干<strong>通道</strong>并行处理，每个通道经由<strong>传输层</strong>（机内 P2P 或共享内存，跨机 IB verbs 或 socket）把数据送出去。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>NCCL 在创建通信器时做了哪些事？为什么说排查通信问题要先看初始化？</li><li>NCCL 的“通道”是什么？通道数多和少各有什么代价？</li><li>NCCL 的 Simple、LL、LL128 三种协议各自的特点是什么？分别适合什么场景？</li><li>NCCL 的环形和树形算法各有什么优劣？“算法”和“协议”是什么关系？</li><li>NCCL 在机内和跨机分别有哪些传输方式？跨机传输时，主机上的“代理线程”起什么作用？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>communicator</dt><dd>通信器</dd></div><div><dt>channel</dt><dd>通道</dd></div><div><dt>proxy thread</dt><dd>代理线程</dd></div><div><dt>double binary tree</dt><dd>双二叉树</dd></div><div><dt>rendezvous</dt><dd>会合（收发双方先协调再传输）</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="6-1.html"><small>上一单元</small>6.1 集合通信与 NCCL</a>
+<a class="next" href="6-3.html"><small>下一单元</small>6.3 通信的测量与排查</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

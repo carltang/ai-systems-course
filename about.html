@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>关于 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="一门讲清原理的课：训练的一步在机器里到底经过了什么，慢的时候慢在哪里，怎样从现象一层层追到原因。从神经网络和 PyTorch 讲起，经过 GPU 与 CUDA、算子与 kernel、高速互联、NCCL，到分布式训练；集群、推理和强化学习三个部分是选读。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page"><div class="unit-nav"><a class="learn-meta" href="index.html">← 目录</a></div>
+<section class="essence about">
+<h1 class="unit-title"><span>关于</span>这门课是怎么来的</h1>
+<div class="i-detail">
+<p><strong class="h">它是什么。</strong> 一份给有工程背景、想系统弄懂 AI 训练系统的人写的讲义：重原理，重联系，尽量用简单的例子和比方。动手练习都是可选的。</p>
+<p><strong class="h">它是怎么写的。</strong> 讲解的文字和所有的图是在 AI（Anthropic 的 Claude）协助下、按一位学习者提出的标准逐轮写成和修改的。内容依据公开的书、论文和官方文档，用自己的话重新讲述；每条原理下面的“出处”列出了它依据的资料。书和论文只给出名称与章节，请阅读你自己合法取得的版本。</p>
+<p><strong class="h">哪些地方要留个心眼。</strong></p>
+<ul>
+<li>源码导读（PyTorch、NCCL）是依据论文和文档写的，没有对着某个具体版本逐行核对。读源码时以你手上的版本为准。</li>
+<li>各处的数量级数字（延迟、带宽、加速倍数）是量级，不是某台机器的实测值。</li>
+<li>第 11 部分的四个排查案例是为了把方法串起来而编写的综合案例，数字自洽，但不是实测记录。</li>
+<li>第 8 部分的 YAML 是示意，字段以你的集群版本为准；讲大模型与强化学习结合的部分反映的是 2025 年前后的做法，变化很快。</li>
+</ul>
+<p>发现错误的话，很可能是真的错了。</p>
+<p><strong class="h">名称与商标。</strong> NVIDIA、CUDA、NCCL、PyTorch、Kubernetes 等名称属于各自的权利人。这门课和它们的所有者没有关系，也未获其认可。</p>
+<p><strong class="h">离线阅读。</strong> 在手机浏览器里选择“添加到主屏幕”，读过的页面没有网络时也能打开。</p>
+</div></section></div>
+</main>
+<footer class="foot"><a href="index.html">目录</a> · <a href="about.html">关于这门课</a></footer>
+<script src="assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});</script>
+</body>
+</html>

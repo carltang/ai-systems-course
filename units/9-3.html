@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>9.3 推理引擎：批处理、显存与调度 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清推理引擎在模型之外做了什么，为什么同一个模型换一个引擎，吞吐能差好几倍。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="9-2.html" title="9.2 量化与低精度" data-step="prev">‹ 9.2</a>
+<a href="10-1.html" title="10.1 强化学习是什么" data-step="next">10.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 9 部分 · 推理系统（选读）</span>9.3 推理引擎：批处理、显存与调度</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>同一个模型，为什么换一个推理引擎，吞吐能差好几倍？</div><div class="frame-c">承接 9.1（推理的算术）：那里讲一个请求怎么算，这一单元讲很多请求同时来时怎么安排。</div></div>
+<div class="story"><p>线索是：先说清楚推理服务追求的是什么，它有三个互相牵制的指标 → 提高吞吐的核心手段是连续批处理 → 但 9.1 讲过 prefill 和 decode 性格不同，把它们混在一个 batch 里会出问题 → 于是调度变成了在吞吐和延迟之间找平衡 → 最后是两种“少算一些”的办法。这一单元和训练的调度（第 8 部分）对照着看很有意思：同样是把工作安排到 GPU 上，训练追求总量，推理还要顾及每个用户的等待。</p></div>
+<ol class="thread"><li><a href="#c-p9-3-metrics">三个指标：吞吐、首个 token 的延迟、每个 token 的延迟</a></li><li><a href="#c-p9-3-continuous">连续批处理：请求随到随进，做完就走</a></li><li><a href="#c-p9-3-interference">prefill 和 decode 混在一起，会互相拖累</a></li><li><a href="#c-p9-3-scheduling">调度是在吞吐和延迟之间做取舍</a></li><li><a href="#c-p9-3-less-work">少算一些：前缀缓存与投机解码</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p9-3-metrics"><h3><span class="i-num">1</span>三个指标：吞吐、首个 token 的延迟、每个 token 的延迟</h3>
+<p class="i-essence">推理服务不能只看“每秒生成多少 token”。用户感受到的是两种等待：发出请求到看见第一个字要多久（首 token 延迟），之后每个字出来得多快（每 token 延迟）。服务方关心的是在满足这两种延迟要求的前提下，一张卡能同时服务多少请求。</p>
+<div class="i-detail"><p><strong class="h">三个指标。</strong></p><ul><li>*吞吐。* 整个系统每秒生成的 token 数，或者每秒完成的请求数。它决定了成本：同样的硬件服务多少用户。</li><li>*首 token 延迟（TTFT）。* 从请求到达，到第一个输出 token 产生。它包括排队的时间和 prefill 的时间（9.1）。提示词越长，prefill 越久。</li><li>*每 token 延迟（TPOT）。* 相邻两个输出 token 之间的间隔，也就是 decode 每一步的时间。它决定了文字“流出来”的速度。</li></ul><p>一个请求的总时间 ≈ 首 token 延迟 + 输出的 token 数 × 每 token 延迟。</p><figure class="fig"><img src="../assets/figures/serving-metrics.svg" alt="两个延迟各量的是哪一段" loading="lazy"><figcaption>两个延迟各量的是哪一段</figcaption></figure><p><strong class="h">不同的应用看重的不一样。</strong></p><ul><li>聊天：首 token 要快（用户在等回应），每 token 的速度只要超过人的阅读速度就够了。</li><li>代码补全：两者都要很快，否则打断思路。</li><li>离线批处理（给一百万篇文档做摘要）：只看吞吐，单个请求等多久无所谓。</li></ul><p><strong class="h">为什么互相牵制。</strong> 9.1 讲过，decode 是带宽受限的，把更多请求放进一个 batch，读一遍权重能服务更多人，吞吐几乎成比例地上升。但 batch 越大，每一步的时间也越长，每个用户的每 token 延迟随之变差；新来的请求要等的时间也可能更长。吞吐和延迟在这里是此消彼长的。</p><p>所以实际的目标通常这样表述：设定延迟的上限（比如首 token 不超过 1 秒、每 token 不超过 50 毫秒），在绝大多数请求都满足它的前提下，让吞吐尽量高。有的论文把“满足延迟要求的那部分吞吐”单独叫作有效吞吐（goodput）。</p><p><strong class="h">和训练对比。</strong> 训练只有一个指标：吞吐（0.2）。所有的样本都在手里，可以任意安排顺序和 batch。推理的请求是陆续到达的，长度各不相同、事先也不知道会生成多长，而且每个请求背后有一个人在等。<mark>所以推理系统多了一整层训练系统没有的东西：调度</mark>。这一单元后面讲的都是它。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一家餐厅：老板看的是一晚上翻了多少桌（吞吐）；客人在意的是坐下后多久上第一道菜、之后每道菜隔多久。只追求翻台数，把所有菜攒到一起做，每位客人都会等得不耐烦。</p>
+<p class="i-impl">所以推理系统的优化目标是带约束的：在延迟不超标的前提下把吞吐做到最大。很多设计在不同的场景下结论相反，就是因为它们对延迟的要求不同。</p>
+<div class="i-builds">承接 <a href="9-1.html#c-6-1-prefill-decode">prefill 受算力限制，decode 受带宽限制</a><a href="0-2.html#c-p0-2-throughput">目标是吞吐：每秒处理多少样本、多少 token</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-continuous">连续批处理：请求随到随进，做完就走</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How to Scale Your Model：Inference</a><a class="src" href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe 论文（TTFT、TPOT 与 goodput）</a></div>
+</li>
+<li class="i-lead">9.1 讲过批处理为什么能提高吞吐。问题是，生成任务的批处理比训练难得多。</li>
+<li class="icard" id="c-p9-3-continuous"><h3><span class="i-num">2</span>连续批处理：请求随到随进，做完就走</h3>
+<p class="i-essence">传统的批处理要等一批请求凑齐，一起开始、一起结束。生成任务的长度各不相同，短的请求做完了也得陪着长的等。连续批处理把调度的粒度从“一个请求”缩小到“一步”：每生成一个 token 之后，就检查一次，把已经结束的请求移出去，把新到的请求加进来。</p>
+<div class="i-detail"><p><strong class="h">静态批处理的浪费。</strong> 把 8 个请求组成一个 batch 开始生成。其中一个只需要 10 个 token，另一个需要 1000 个。</p><ul><li>那个短请求在第 10 步就做完了，但 batch 要等最长的那个结束。之后的 990 步里，它的位置空着（或者在算没用的填充）。</li><li>这期间新到的请求只能排队，等这一批全部结束才能开始。</li></ul><p>batch 的有效大小随时间不断缩小，新请求的首 token 延迟又很长。两头都不讨好。</p><figure class="fig"><img src="../assets/figures/continuous-batching.svg" alt="同样四个位置，两种调度（示意）" loading="lazy"><figcaption>同样四个位置，两种调度（示意）</figcaption></figure><p><strong class="h">连续批处理（也叫迭代级调度）。</strong> 关键的观察是：decode 的每一步对所有请求都是一样的操作（各自算一个新 token），步与步之间没有必须绑在一起的理由。所以调度可以每一步做一次：</p><ul><li>这一步结束后，哪些请求生成了结束符或者达到了长度上限：把它们的结果返回，从 batch 里移除，释放它们的 KV cache。</li><li>等待队列里有没有新请求、显存放不放得下：有就加进来。</li><li>用新的这组请求做下一步。</li></ul><p>Orca 这篇论文最早系统地提出了这个做法。现在的推理引擎（vLLM、TGI、SGLang 等）都是这样工作的。</p><p><strong class="h">新请求怎么“插进来”。</strong> 新加入的请求要先做 prefill（处理它的整段提示词），而 batch 里的老请求在做 decode（各算一个 token）。最直接的办法是把它们放在同一次前向里：老请求每个贡献 1 个位置，新请求贡献它提示词的全部位置。这带来下一节要讲的问题。</p><p><strong class="h">它对显存管理提出了要求。</strong> 请求进进出出，每个请求的 KV cache 又随着生成不断增长，而且事先不知道会长到多大。按最大长度为每个请求预留显存，大部分会浪费；不预留，又要能随时给它追加。9.1 讲的 PagedAttention 就是为此设计的：把 KV cache 切成固定大小的块，用到多少分配多少。<mark>连续批处理和分页的显存管理是配套的</mark>。</p><p><strong class="h">一张卡能放多少并发。</strong> 上限通常由 KV cache 决定（4.1、9.1）：显存总量减去模型权重，剩下的除以每个请求平均的 KV cache 大小。达到这个上限后，新请求只能排队，首 token 延迟开始上升。这是判断“该加机器了”的信号。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一辆不停站的环线公交和一辆旅游大巴的区别：大巴要等所有人到齐才发车，到了终点一起下；环线公交每到一站都有人上、有人下，车上始终是满的。</p>
+<p class="i-impl">所以 GPU 上的 batch 始终保持在高位，新请求也不用等上一批结束。它是现代推理引擎吞吐高的第一个原因，也是 9.1 讲的“批处理提高算术强度”能真正用起来的前提。</p>
+<div class="i-builds">承接 <a href="9-3.html#c-p9-3-metrics">三个指标：吞吐、首个 token 的延迟、每个 token 的延迟</a><a href="9-1.html#c-6-1-batching">批处理：读一次权重，服务一批请求</a><a href="9-1.html#c-6-1-paged">PagedAttention：像操作系统管内存一样管 KV cache</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-interference">prefill 和 decode 混在一起，会互相拖累</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://www.usenix.org/conference/osdi22/presentation/yu" target="_blank" rel="noopener">Orca 论文（OSDI 2022）：迭代级调度</a><a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM 论文：PagedAttention</a></div>
+</li>
+<li class="i-lead">上一节说，新请求的 prefill 可以和老请求的 decode 放在同一步里。这样做有一个副作用。</li>
+<li class="icard" id="c-p9-3-interference"><h3><span class="i-num">3</span>prefill 和 decode 混在一起，会互相拖累</h3>
+<p class="i-essence">一次 prefill 要处理几百上千个位置，是一大块算力受限的计算；一步 decode 每个请求只算一个位置，本来很快。把一个长的 prefill 和一批 decode 放进同一次前向，这一步的时间就由 prefill 决定。所有正在生成的用户，都要等这个新来的请求处理完提示词，才能拿到下一个 token。</p>
+<div class="i-detail"><p><strong class="h">两个阶段的差别</strong>（9.1）。</p><table><thead><tr><th></th><th>prefill</th><th>decode</th></tr></thead><tbody><tr><td>一次处理</td><td>提示词的所有位置（几百到几万个）</td><td>每个请求 1 个位置</td></tr><tr><td>运算</td><td>大矩阵乘大矩阵</td><td>矩阵乘向量（批起来后是矩阵乘小矩阵）</td></tr><tr><td>瓶颈</td><td>算力</td><td>显存带宽</td></tr><tr><td>影响的指标</td><td>首 token 延迟</td><td>每 token 延迟</td></tr></tbody></table><p><strong class="h">干扰是怎么发生的。</strong> 设 batch 里有 30 个请求在 decode，每一步 20 毫秒。这时来了一个带 4000 个 token 提示词的新请求。把它的 prefill 并进下一步：这一步要处理 30 + 4000 个位置，可能要 300 毫秒。那 30 个用户的这一个 token 就等了 300 毫秒，输出明显地卡了一下。请求来得越频繁、提示词越长，这种卡顿越多。</p><p>反过来，如果为了保护 decode 而让 prefill 一直等，新请求的首 token 延迟又会变得很长。</p><p><strong class="h">解法一：分块 prefill。</strong> Sarathi-Serve 的做法：不一次做完 4000 个位置，每一步只做其中一块（比如 512 个），和 decode 的请求一起执行。每一步的工作量有一个上限（一个“token 预算”），所以每一步的时间是可控的。那个新请求的 prefill 分散在七八步里完成，每一步里 decode 的请求只多等一点。</p><p>这在数学上是可行的，因为 prefill 的各个位置之间只有“后面的依赖前面的”这一种关系（1.4 的因果掩码）：先算前 512 个，把它们的 K、V 存进缓存，再算接下来的 512 个，结果和一次算完相同。</p><p>块的大小是一个旋钮：小了，对 decode 的干扰小，但 prefill 拖得久、总的开销也大一些；大了，正相反。</p><p><strong class="h">解法二：分离部署。</strong> DistServe 的做法：用两组 GPU，一组只做 prefill，另一组只做 decode。一个请求先在 prefill 的机器上处理完提示词，再把得到的 KV cache 传给 decode 的机器继续生成。</p><ul><li>两个阶段完全不干扰。</li><li>两组机器可以各自按自己的瓶颈来配置和调度：prefill 那边按算力优化、batch 小一些以保证首 token 延迟；decode 那边把 batch 开大以提高吞吐。</li><li>代价是要在机器之间传 KV cache（9.1 算过它的大小，可以有几百 MB 到几 GB），需要足够快的网络；以及两组机器的比例要和实际的负载匹配。</li></ul><p><strong class="h">这是 0.1 的老问题换了一个场景。</strong> 4.1 说同一个算子在训练和推理时“在等不同的东西”。这里更进一步：同一个请求的两个阶段在等不同的东西。<mark>把在等算力的和在等带宽的硬放在一起，谁都用不好</mark>。先分清它们在等什么，再决定怎么安排。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一条收银通道：前面的人每人只买一瓶水，几秒一个；突然来了一个推着满满一车货的人。后面买水的人全都被他卡住了。</p>
+<p class="i-impl">所以连续批处理不能“来者不拒”。两种主要的解法：把长的 prefill 切成小块，每一步只做一块；或者干脆用不同的 GPU 分别做 prefill 和 decode。</p>
+<div class="i-builds">承接 <a href="9-3.html#c-p9-3-continuous">连续批处理：请求随到随进，做完就走</a><a href="9-1.html#c-6-1-prefill-decode">prefill 受算力限制，decode 受带宽限制</a><a href="1-4.html#c-1-3-causal">因果掩码：训练时整段并行，生成时一词一词</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-scheduling">调度是在吞吐和延迟之间做取舍</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://www.usenix.org/system/files/osdi24-agrawal.pdf" target="_blank" rel="noopener">Sarathi-Serve 论文（OSDI 2024）：分块 prefill</a><a class="src" href="https://arxiv.org/abs/2401.09670" target="_blank" rel="noopener">DistServe 论文：prefill 与 decode 分离</a></div>
+</li>
+<li class="i-lead">前面两节其实都是调度问题的一部分。把它完整地摆出来。</li>
+<li class="icard" id="c-p9-3-scheduling"><h3><span class="i-num">4</span>调度是在吞吐和延迟之间做取舍</h3>
+<p class="i-essence">推理引擎每一步都要做几个决定：这一步放多少请求、新请求什么时候放进来、显存不够时先让谁等。把 batch 开大、让请求多等一会儿凑批，吞吐高但延迟差；反过来则延迟好、吞吐低。没有对所有场景都最优的策略，只有针对某个延迟目标的最优。</p>
+<div class="i-detail"><p><strong class="h">调度器手里的旋钮。</strong></p><ul><li>*最大并发数（batch 上限）。* 越大吞吐越高，每 token 延迟越差，KV cache 占用越多。</li><li>*新请求的准入。* 来了就放进去，还是等一等？放进去会不会让 batch 里的人卡顿（上一节）？</li><li>*每一步的 token 预算。* 这一步总共处理多少个位置，其中多少给 prefill。</li><li>*显存不够时。* KV cache 满了，是让新请求排队，还是暂停某个正在生成的请求、把它的缓存腾出来（之后重算或者从别处恢复）？</li><li>*先后顺序。* 先到先服务最简单。但一个要生成 5000 个 token 的请求排在前面，会让后面很多短请求久等。有的系统尝试预测输出长度，让短的先做。</li></ul><p><strong class="h">一条典型的曲线。</strong> 逐步提高请求到达的速率，画出延迟的变化：</p><ul><li>负载低时：延迟很低且平稳，GPU 没吃饱。</li><li>负载升高：吞吐随之上升，延迟缓慢变差。这一段是效率最高的工作区间。</li><li>接近容量：排队开始出现，首 token 延迟急剧上升。</li><li>超过容量：队列越积越长，延迟无限增长。</li></ul><p>“这套系统的容量”指的是延迟刚好还满足要求时的那个请求速率。不同的延迟要求，对应曲线上不同的点。</p><p><strong class="h">为什么要看尾部。</strong> 平均延迟好看，不代表用户体验好：少数请求遇到了卡顿或长时间排队，平均值反映不出来。0.2 讲过“平均值会骗人”。推理服务通常看第 90 或第 99 百分位的延迟：百分之九十九的请求不超过多少。上一节讲的 prefill 干扰，伤害的主要就是尾部。</p><p><strong class="h">压测要像真的。</strong> 用固定的 batch、固定长度的输入反复跑，测出来的是引擎的峰值能力，和线上的表现可能差很远。真实的负载是：请求随机到达、有时成群地来；提示词和输出的长度分布很宽；有的带很长的共享前缀（下一节）。</p><p><strong class="h">和第 8 部分的对照。</strong> <mark>两处都是调度，目标函数不同</mark>：</p><table><thead><tr><th></th><th>训练集群的调度（8.2）</th><th>推理引擎的调度</th></tr></thead><tbody><tr><td>调度的对象</td><td>作业（几小时到几周）</td><td>请求的每一步（几十毫秒）</td></tr><tr><td>目标</td><td>利用率、公平</td><td>延迟约束下的吞吐</td></tr><tr><td>成组的要求</td><td>一个作业的卡要同时就位</td><td>无，请求互相独立</td></tr><tr><td>抢占的代价</td><td>丢掉上次检查点之后的进度</td><td>丢掉或搬走 KV cache</td></tr></tbody></table><p>推理服务本身也运行在集群上：很多个引擎的副本，前面有一层把请求分发给它们，再根据负载增减副本的数量。那一层的问题（往哪个副本发、什么时候扩容）又是一层调度。</p></div>
+<p class="i-analogy"><b>打个比方</b>像电梯的调度：每来一个人就立刻运行，每个人等得最少，但电梯总是空跑；等人坐满再走，运力最高，但先进来的人要等很久。写字楼的早高峰和深夜，合适的策略完全不同。</p>
+<p class="i-impl">所以评价一个推理系统，要看它在给定的延迟要求下能撑住多高的请求速率，而不是它在某个固定 batch 下的峰值吞吐。压测时也要用接近真实的请求到达模式。</p>
+<div class="i-builds">承接 <a href="9-3.html#c-p9-3-interference">prefill 和 decode 混在一起，会互相拖累</a><a href="9-1.html#c-6-1-kv-memory">KV cache 是推理显存的大头</a><a href="0-2.html#c-p0-2-util">GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-less-work">少算一些：前缀缓存与投机解码</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://www.usenix.org/system/files/osdi24-agrawal.pdf" target="_blank" rel="noopener">Sarathi-Serve 论文：吞吐与延迟的取舍</a><a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM 论文：调度与抢占</a><a class="src" href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How to Scale Your Model：Inference</a></div>
+</li>
+<li class="i-lead">最后是两种思路不同的优化：不是把同样的工作安排得更好，而是让要做的工作变少。</li>
+<li class="icard" id="c-p9-3-less-work"><h3><span class="i-num">5</span>少算一些：前缀缓存与投机解码</h3>
+<p class="i-essence">两种不靠调度、而是直接减少计算量的办法。前缀缓存：很多请求以同样的内容开头（同一段系统提示、同一份文档），这一段的 KV cache 算一次就可以给所有请求共用，省掉重复的 prefill。投机解码：用一个小而快的模型先猜出后面几个 token，再让大模型一次性验证这几个，猜对的就直接采用，把几步串行的 decode 变成一步。</p>
+<div class="i-detail"><p><strong class="h">前缀缓存。</strong></p><p>*依据。* 1.4 的因果掩码保证了：一个位置的 K 和 V 只取决于它和它前面的内容。两个请求如果前 2000 个 token 完全相同，这 2000 个位置在每一层的 K、V 也完全相同。</p><p>*做法。* 把算过的前缀的 KV cache 留着，记下它对应的 token 序列。新请求到来时，找出它和已有缓存的最长公共前缀，这一段直接复用，只对后面不同的部分做 prefill。</p><p>*什么时候有效。* 常见的重复前缀：每个请求都带的系统提示词；多轮对话里之前的全部对话历史；很多个问题针对同一份长文档；带着同一组示例的批量任务。在这些场景里，prefill 的计算量可以省掉大半，首 token 延迟明显下降。</p><p>*代价。* 缓存占显存，要决定留哪些、淘汰哪些。9.1 讲的分页式管理让“多个请求共享同一段缓存”很自然：它们的页表指向同样的物理块。SGLang 用一棵前缀树来组织这些缓存。</p><p>这是 0.1 里“把算过的结果留在手边反复用”的又一个层次：KV cache 是一个请求内部的复用，前缀缓存是跨请求的复用。</p><p><strong class="h">投机解码。</strong></p><p>*依据。* decode 慢，是因为必须一个 token 一个 token 串行地来（1.4）。但大模型<strong>验证</strong>一串 token 是可以并行的：把这几个 token 一次性送进去，像 prefill 那样同时算出每个位置上“我自己会选什么”。4.1 讲过，单用户 decode 时算力是闲着的，瓶颈在读权重。一次读权重同时验证 5 个位置，几乎不比算 1 个位置多花时间。</p><p>*做法。*</p><ul><li>用一个小得多的“草稿”模型，快速地串行生成接下来的 k 个 token（比如 5 个）。</li><li>大模型一次前向，并行地算出这 k 个位置上自己的预测。</li><li>从头比较：草稿和大模型一致的前几个 token 全部采用；在第一个不一致的位置，用大模型的结果，后面的丢弃。</li><li>重复。</li></ul><p>只要设计得当，最后的输出和只用大模型时在分布上完全一样，它只是换了一种方式得到同样的结果。</p><p>*什么时候有效。* 草稿猜得准的时候：有很多“显而易见”的后续，比如代码里的固定写法、常见词组的后半截。如果平均每次能采用 3 个 token，大模型的前向次数就减少到原来的三分之一左右。草稿经常猜错时，大模型的前向一次也没少，还白白多跑了草稿模型。</p><p>*在高并发的服务里。* 它的好处会打折扣。投机解码利用的是“decode 时算力闲着”。而批处理（9.1）已经在用另一种方式利用这些闲着的算力了。batch 开得很大、接近算力受限时，再让每个请求多验证几个位置，就要和别的请求抢算力。所以它更适合并发不高、追求单个请求速度的场景。</p><p><strong class="h">共同点。</strong> <mark>两者都不改变模型，也不（在设计正确时）改变输出，只是利用了请求内容里的规律</mark>。它们和量化（9.2）、和调度（前面几节）互相独立，可以叠加。按 11.1 的原则，叠加之前先问每一种在对付什么：前缀缓存减少 prefill 的算力消耗，投机解码减少 decode 的串行步数，量化减少每一步要读的字节数。</p></div>
+<p class="i-analogy"><b>打个比方</b>前缀缓存像老师批改同一道题的一百份答卷：题目只需要读一遍。投机解码像一位资深编辑带着实习生：实习生先写出一段草稿，编辑扫一眼，对的地方直接通过，从第一个不对的地方开始自己改。</p>
+<p class="i-impl">所以这两种办法利用的都是工作负载里的“规律”：重复的前缀、容易猜的后续。负载里没有这些规律时，它们没有用，甚至有额外的开销。用之前要看自己的请求长什么样。</p>
+<div class="i-builds">承接 <a href="9-3.html#c-p9-3-scheduling">调度是在吞吐和延迟之间做取舍</a><a href="4-1.html#c-3-1-kv-cache">KV cache：算过的不再算</a><a href="4-1.html#c-3-1-decode-matvec">生成一个词时，矩阵乘法退化成了矩阵乘向量</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang 论文：用前缀树复用 KV cache</a><a class="src" href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noopener">投机解码的出处：Fast Inference from Transformers via Speculative Decoding</a><a class="src" href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How to Scale Your Model：Inference</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>推理服务要同时顾及<strong>吞吐</strong>和两种<strong>延迟</strong>。<strong>连续批处理</strong>让请求随到随进，把 GPU 一直填满。但 <strong>prefill</strong> 吃算力、<strong>decode</strong> 吃带宽，混在一起时长的 prefill 会让所有人的下一个 token 变慢；办法是把 prefill <strong>切块</strong>，或者把两个阶段<strong>分到不同的 GPU</strong> 上。<strong>前缀缓存</strong>和<strong>投机解码</strong>则直接减少了要做的计算。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>推理服务的三个主要性能指标是什么？为什么不能只优化吞吐？</li><li>连续批处理和传统的静态批处理有什么区别？它解决了生成任务的什么问题？</li><li>为什么 prefill 和 decode 放在同一个 batch 里会损害延迟？分块 prefill 和分离部署各是怎样解决的？</li><li>推理引擎的调度器每一步要做哪些决定？为什么说没有通用的最优策略？</li><li>前缀缓存和投机解码各自省掉了哪一部分计算？它们在什么条件下才有效？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>continuous batching</dt><dd>连续批处理</dd></div><div><dt>time to first token</dt><dd>首 token 延迟</dd></div><div><dt>time per output token</dt><dd>每 token 延迟</dd></div><div><dt>chunked prefill</dt><dd>分块 prefill</dd></div><div><dt>prefix caching</dt><dd>前缀缓存</dd></div><div><dt>speculative decoding</dt><dd>投机解码</dd></div><div><dt>goodput</dt><dd>满足延迟要求的有效吞吐</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="9-2.html"><small>上一单元</small>9.2 量化与低精度</a>
+<a class="next" href="10-1.html"><small>下一单元</small>10.1 强化学习是什么</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

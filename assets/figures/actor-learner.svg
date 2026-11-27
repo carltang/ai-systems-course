@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="采集与学习分开的架构">
+  <title>采集与学习分开的架构</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="300" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">采集（很多个进程，CPU）</text>
+  <text x="736" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">学习（少数几个进程，GPU）</text>
+  <rect x="24" y="52" width="230" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="139.0" y="70.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">actor 1</text>
+  <text x="139.0" y="91.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">环境 + 策略的本地副本</text>
+  <rect x="24" y="108" width="230" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="139.0" y="126.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">actor 2</text>
+  <text x="139.0" y="147.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">环境 + 策略的本地副本</text>
+  <rect x="24" y="164" width="230" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="139.0" y="182.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">actor 3</text>
+  <text x="139.0" y="203.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">环境 + 策略的本地副本</text>
+  <rect x="24" y="220" width="230" height="44" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="139.0" y="247.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">……</text>
+  <rect x="330" y="110" width="120" height="60" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="390.0" y="145.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">轨迹队列</text>
+  <rect x="530" y="96" width="206" height="88" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="633.0" y="136.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">learner</text>
+  <text x="633.0" y="157.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">组 batch、反向传播、更新策略</text>
+  <line x1="256" y1="74" x2="328" y2="132" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="256" y1="130" x2="328" y2="140" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="256" y1="186" x2="328" y2="148" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="452" y1="140" x2="528" y2="140" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="490.0" y="133.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">取数据</text>
+  <path d="M632 186 C 632 262, 420 276, 256 246" fill="none" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
+  <text x="470" y="284" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">定期把新的参数发回 actor</text>
+  <text x="290" y="60" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">轨迹</text>
+</svg>

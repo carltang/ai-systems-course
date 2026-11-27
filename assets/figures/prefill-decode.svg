@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="prefill 和 decode">
+  <title>prefill 和 decode</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">时间从左到右：一个请求的两段</text>
+  <rect x="24" y="56" width="250" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="149.0" y="82.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">prefill</text>
+  <text x="149.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">提示词的 N 个位置一次算完</text>
+  <rect x="286" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="308.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="336" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="358.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="386" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="408.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="436" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="458.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="486" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="508.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="536" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="558.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="586" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="608.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="636" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="658.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="686" y="56" width="44" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="708.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="24" y="130" width="250" height="6" rx="3" fill="#8aa2e6"/>
+  <rect x="286" y="130" width="444" height="6" rx="3" fill="#e0b860"/>
+  <text x="149" y="158" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">prefill：大矩阵乘大矩阵，受算力限制</text>
+  <text x="508" y="158" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">decode：一步一个新 token，矩阵乘向量，受显存带宽限制</text>
+  <text x="149" y="178" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">产出：第一个新 token，和整段的 KV cache</text>
+  <text x="508" y="178" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每一步都把权重和这个请求的缓存读一遍</text>
+  <text x="24" y="214" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">同一个模型、同一个请求，前后两段撞在硬件的两个不同上限上</text>
+</svg>

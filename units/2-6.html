@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2.6 混合精度与单卡训练加速 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="把单卡上其余的提速手段收齐：混合精度、融合优化器、专用库、模型简化。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="2-5.html" title="2.5 torch.compile 的三层栈" data-step="prev">‹ 2.5</a>
+<a href="3-1.html" title="3.1 GPU 环境与第一次性能分析" data-step="next">3.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 2 部分 · PyTorch 执行栈</span>2.6 混合精度与单卡训练加速</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>数据供上了，图也编译了，一张卡上的训练还能从哪里挤出速度？</div><div class="frame-c">承接 2.4–2.5：数据供上了，图也编译了，这一单元把单卡上其余的提速手段收齐。</div></div>
+<div class="story"><p>线索是：前面几个单元解决了数据和编译，这一单元把单卡上其余的提速手段收齐。先看混合精度在框架里是怎么实现的 → 用 16 位训练时怎样防止很小的梯度变成零 → 优化器这一步本身也可能慢，原因和 2.3 讲的一样 → 最后是一类不同的思路：让模型本身少算一些。这几项彼此独立，可以按 profiler 的提示各取所需。</p></div>
+<ol class="thread"><li><a href="#c-p2-6-autocast">autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</a></li><li><a href="#c-4-1-loss-scaling">fp16 要缩放损失，bf16 通常不用</a></li><li><a href="#c-4-1-foreach">优化器也会慢：几百个小 kernel，不如几个大 kernel</a></li><li><a href="#c-4-1-less-work">最快的计算，是不用做的计算</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p2-6-autocast"><h3><span class="i-num">1</span>autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</h3>
+<p class="i-essence">打开自动混合精度后，每次算子调用在到达后端之前先经过一站“autocast”。这一站查一张名单：矩阵乘法、卷积这类算子，把输入转成 16 位再算；求和、指数、损失函数这类对精度敏感的算子，把输入转回 32 位再算；其余的算子保持输入原来的类型。</p>
+<div class="i-detail"><p>1.5 讲过为什么要用低精度：矩阵乘法能用上 Tensor Core，显存的读写量减半。这里讲它在框架里是怎么实现的。</p><p><strong class="h">它是 dispatcher 上的一站。</strong> 2.3 讲过，一次算子调用按优先级经过若干“功能”。进入 <code>with torch.autocast(device_type="cuda", dtype=torch.bfloat16):</code> 之后，当前线程多打开了一个分发键。于是每次调用的路线变成：自动求导 → autocast → CUDA 后端。</p><p><strong class="h">这一站做什么。</strong> 它把算子分成三类：</p><ul><li>*转成 16 位的。* 矩阵乘法、线性层、卷积、注意力这些计算量大、对精度不太敏感的。<mark>autocast 把输入转换成 16 位，再往下分发</mark>。</li><li>*转成 32 位的。* 对数值范围或舍入误差敏感的：指数和对数、幂运算、大范围的求和、归一化里的某些步骤、各种损失函数。即使输入是 16 位的，也先转成 32 位再算。</li><li>*不管的。* 其余的算子，输入是什么类型就按什么类型算。如果几个输入的类型不一样，按最宽的那个来。</li></ul><p>完整的名单在官方文档的 Automatic Mixed Precision 一页里。</p><p><strong class="h">参数本身还是 32 位。</strong> autocast 不改变模型参数的类型。线性层的权重是 32 位存着的，每次前向时被转换成 16 位的一份临时副本参与计算。反向时梯度流回 32 位的权重，优化器在 32 位上更新。7.2 的“16 字节”里，2 字节的 16 位参数和 4 字节的 32 位主副本，说的就是这两份。</p><p><strong class="h">反向不需要包在 autocast 里。</strong> 前向时每个算子用什么精度，已经记在反向节点里了；反向时每个节点按前向对应算子的精度来算。所以只把前向和损失计算包起来，<code>loss.backward()</code> 放在外面。</p><p><strong class="h">bf16 和 fp16 的选择。</strong> 两者都是 16 位，分法不同（1.5）。bf16 的数值范围和 32 位一样大，不容易溢出，新一些的 GPU 都支持，是现在的首选；fp16 的范围小，需要下一节讲的损失缩放来防止梯度下溢。</p><p><strong class="h">排查数值问题。</strong> 打开混合精度后损失变成 NaN，先确认是不是它引起的（关掉再跑）。是的话，常见原因是某个自己写的运算在 16 位下溢出了，比如对一个很大的数做平方或指数。把那一小段单独放回 32 位：</p><pre>with torch.autocast(device_type="cuda", enabled=False):
+    y = risky_op(x.float())</pre></div>
+<p class="i-analogy"><b>打个比方</b>像工厂里的质检分流：大批量的常规件走快速通道（16 位），精密件走慢而稳的通道（32 位）。分流的规则是按零件种类事先定好的，工人不用逐件判断。</p>
+<p class="i-impl">所以用混合精度不需要改模型代码，只要把前向包在 autocast 里。但也因此，哪些运算实际跑在 16 位上是由这张名单决定的，自己写的特殊运算如果对精度敏感，要主动把它放回 32 位。</p>
+<div class="i-builds">承接 <a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a><a href="2-3.html#c-p2-3-dispatcher">dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</a><a href="2-1.html#c-p2-1-keys">说明里还有三个属性：设备、数据类型、布局，它们决定算子走哪条实现</a></div>
+<div class="i-builds">后面会用到 <a href="2-6.html#c-4-1-loss-scaling">fp16 要缩放损失，bf16 通常不用</a><a href="11-1.html#c-p11-1-case-single">案例一：单卡训练，GPU 利用率只有四成</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.pytorch.org/docs/stable/amp.html" target="_blank" rel="noopener">PyTorch 文档：Automatic Mixed Precision（算子名单）</a><span class="src">Accelerate 第 7 章 混合精度</span></div>
+</li>
+<li class="i-lead">用 16 位计算时，数值范围变小了。对其中一种 16 位格式，这会带来一个具体的问题。</li>
+<li class="icard" id="c-4-1-loss-scaling"><h3><span class="i-num">2</span>fp16 要缩放损失，bf16 通常不用</h3>
+<p class="i-essence">fp16 的指数位少，能表示的最小数有限，很多很小的梯度会直接变成 0（下溢）。损失缩放先把损失乘一个大数，让梯度落在 fp16 能表示的范围内，更新参数前再除回去。bf16 的数值范围和 fp32 一样，一般不需要这一步。</p>
+<div class="i-detail"><p><strong class="h">问题：梯度下溢。</strong> fp16 能表示的最小正数大约是 6×10⁻⁸ 的量级（再小就只能表示成 0）。训练中很多梯度比这还小，尤其是靠近输入的那些层。它们在 fp16 里直接变成 0，对应的参数就得不到更新。<mark>这种错误是静默的：不报错，只是训练效果变差</mark>。</p><p><strong class="h">办法：整体放大，算完再缩回来。</strong> 梯度是损失对各个量的导数。把损失乘以一个大数 S（比如 65536），由链式法则，反向过程中所有的梯度都被放大了 S 倍，原来会下溢的小梯度现在落在了 fp16 能表示的范围里。到了要更新参数的时候，再把梯度除以 S，恢复成原来的大小（这一步是在 32 位上做的，不会下溢）。</p><p><strong class="h">S 取多大。</strong> 太小不够用；太大会把本来就大的梯度放大到溢出，变成无穷大。PyTorch 的 <code>GradScaler</code> 是动态调整的：</p><ul><li>每一步检查梯度里有没有无穷大或 NaN。</li><li>有：说明 S 太大了。跳过这一步的参数更新，把 S 减半。</li><li>连续很多步都没有：把 S 稍微调大一点。</li></ul><p>所以用法是固定的三行：<code>scaler.scale(loss).backward()</code>、<code>scaler.step(optimizer)</code>、<code>scaler.update()</code>。</p><p><strong class="h">bf16 为什么不用。</strong> 1.5 讲过两种 16 位格式的区别：fp16 把更多的位给了小数部分，指数的范围小；bf16 的指数位数和 32 位浮点一样多，能表示的数值范围也就一样大，只是有效数字少一些。范围一样，就不存在“32 位里好好的梯度，到了 16 位下溢成 0”的问题。</p><p>所以在支持 bf16 的 GPU 上（A100 及之后的几代），直接用 bf16，不需要 <code>GradScaler</code>，代码更简单，也少一个出问题的地方。</p><p><strong class="h">排查。</strong> 用 fp16 训练时损失变成 NaN 或者长时间不下降：先看 scaler 的缩放系数（<code>scaler.get_scale()</code>）。它一直在减小，说明梯度反复溢出，模型里可能有数值不稳定的地方；它稳定在一个值，问题多半不在缩放上。</p></div>
+<p class="i-analogy"><b>打个比方</b>像用小量程的秤称很轻的东西：先放大一千倍再称，读数后再除回去。</p>
+<p class="i-impl">所以有 bf16 的显卡上优先用 bf16，省掉 GradScaler 的麻烦；用 fp16 训练时损失变成 NaN 或者不下降，先查缩放。</p>
+<div class="i-builds">承接 <a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a><a href="2-6.html#c-p2-6-autocast">autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Accelerate 第 7 章 梯度缩放</span><span class="src">Accelerate 数值格式对照表</span><a class="src" href="https://docs.pytorch.org/docs/stable/amp.html" target="_blank" rel="noopener">PyTorch 文档：Automatic Mixed Precision（GradScaler）</a></div>
+</li>
+<li class="i-lead">前向和反向都处理好了。一步训练里还有最后一段：优化器更新参数。它看起来微不足道，有时却占了不小的比例。</li>
+<li class="icard" id="c-4-1-foreach"><h3><span class="i-num">3</span>优化器也会慢：几百个小 kernel，不如几个大 kernel</h3>
+<p class="i-essence">朴素的优化器逐个参数张量更新，一个模型几百个张量，就是几百次小 kernel 启动，每个都只做一点点活。foreach 版本把同类张量批量处理，fused 版本把整个更新合成一个 kernel。</p>
+<div class="i-detail"><p><strong class="h">最直接的写法。</strong> 一个模型的参数是很多个张量：每一层的权重、偏置、归一化的系数。优化器对每个张量分别执行更新公式。Adam 的一次更新大约是十来个逐元素的算子（更新一阶矩、二阶矩、做偏差修正、算步长、改参数）。几百个参数张量，就是几千次算子调用。</p><p>每一次都要走 2.3 讲的那条路，付一次固定开销；而很多参数张量很小（偏置、归一化的系数只有几百上千个元素），GPU 上执行只要几微秒。<mark>这正是“开销受限”：时间花在发令上</mark>。</p><p><strong class="h">foreach：把同类的操作攒起来。</strong> PyTorch 提供了一组接受“张量列表”的算子。优化器不再对每个参数张量各调一次加法，而是把所有参数张量放进一个列表，调用一次“对列表里的每一对做加法”。这样 Python 和 dispatcher 的开销从“每个张量每个算子一次”降到“每个算子一次”。GPU 上仍然是很多个小 kernel，但发令快多了。</p><p><strong class="h">fused：整个更新只用一个 kernel。</strong> 更进一步，把 Adam 的十来步运算写进同一个 CUDA kernel：对每个元素，一口气读出参数、梯度、两份状态，算完全部步骤，写回去。这同时省了两样：发令的次数，以及中间结果的显存读写（十来个算子各读写一遍，变成总共读写一遍）。这就是 4.2 要讲的融合，只是这里是手写好的。</p><table><thead><tr><th>实现</th><th>算子调用次数</th><th>中间结果</th></tr></thead><tbody><tr><td>for-loop</td><td>参数张量数 × 每次更新的步数</td><td>每步落地</td></tr><tr><td>foreach</td><td>每次更新的步数</td><td>每步落地</td></tr><tr><td>fused</td><td>约等于 1</td><td>不落地</td></tr></tbody></table><p><strong class="h">怎么用。</strong> 较新的 PyTorch 在 GPU 上默认用 foreach。fused 要显式打开：<code>torch.optim.AdamW(params, lr=..., fused=True)</code>。Karpathy 在复现 GPT-2 的视频里就是这样做的（1.5）。</p><p><strong class="h">收益有多大。</strong> 取决于优化器这一步在总时间里占多少。参数张量多而小的模型（层数多、每层不大）收益明显；参数集中在少数几个大矩阵里的模型，优化器本来就不占多少时间。0.2 的打点计时能直接告诉你“优化器”这一段占几个百分点。</p><p>这是 0.1 里“成批处理，摊薄固定成本”在优化器上的样子。</p></div>
+<p class="i-analogy"><b>打个比方</b>像寄快递：一百个小包裹分一百次寄，不如装进一个大箱子寄一次。</p>
+<p class="i-impl">所以参数张量很多时，优化器这一步可能被启动开销主导；换成 foreach 或 fused 实现，几乎是零成本的提速。</p>
+<div class="i-builds">承接 <a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
+<div class="i-builds">后面会用到 <a href="4-2.html#c-p4-2-handwritten">编译器之外：你每天在用的手写融合 kernel</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.pytorch.org/docs/stable/optim.html" target="_blank" rel="noopener">PyTorch 文档：torch.optim（foreach 与 fused 实现）</a><span class="src">Accelerate 第 4 章 使用专用库</span></div>
+</li>
+<li class="i-lead">到这里为止，所有的办法都是“让同样的计算跑得更快”。最后一类思路不同：让要做的计算变少。</li>
+<li class="icard" id="c-4-1-less-work"><h3><span class="i-num">4</span>最快的计算，是不用做的计算</h3>
+<p class="i-essence">剪枝去掉不重要的权重，压缩让模型变小，蒸馏让小模型学大模型。但要注意：零散地把权重置零（非结构化稀疏）通常不会让 GPU 变快，只有按块、按通道去掉，或者硬件支持的稀疏格式，才真正减少计算。</p>
+<div class="i-detail"><p><strong class="h">几种“变小”的办法。</strong></p><ul><li>*剪枝*：把不重要的权重去掉（置为零）。</li><li>*蒸馏*：训练一个小模型去模仿大模型的输出。</li><li>*低秩分解*：把一个大矩阵近似成两个小矩阵的乘积。</li><li>*量化*：用更少的位数表示每个数（9.2 专门讲）。</li></ul><p><strong class="h">关键的判断：它减少的是参数个数，还是实际的计算和读写。</strong> 这两者不是一回事。</p><p>以剪枝为例。把一个权重矩阵里 90% 的元素零散地置为零（非结构化剪枝），参数的“有效个数”少了十倍。但矩阵还是那么大，存储没变；矩阵乘法的 kernel 仍然对每个元素做乘加，其中九成是在乘以零。GPU 上的时间一点没少。</p><p>要真的省，零得是“成片”的：</p><ul><li>*结构化剪枝*：整行、整列、整个注意力头、整层地去掉。去掉之后矩阵真的变小了，计算量和读写量随之下降。</li><li>*硬件支持的稀疏格式*：某些 GPU 的 Tensor Core 支持一种固定模式的稀疏（每 4 个元素里保留 2 个），配合专门的库能有实际的加速。</li></ul><p>零散的稀疏在 GPU 上为什么难利用？因为 GPU 靠的是规整：一组线程同时对一块连续的数据做同样的操作（第 3 部分）。稀疏矩阵要按索引跳着访问，访存无法合并，线程之间的工作量不均匀，除非稀疏到只剩百分之几，否则还不如直接算稠密的。</p><p><strong class="h">用第 0 部分的语言来检验任何一种“简化”。</strong> 问三件事：</p><ul><li>浮点运算的次数少了吗？（算力）</li><li>要从显存读写的字节数少了吗？（带宽）</li><li>kernel 的个数少了吗？（开销）</li></ul><p><mark>三样都没变，速度就不会变，不管参数个数少了多少</mark>。蒸馏出的小模型三样都少了，所以确实快；量化减少的主要是第二样（9.2）；低秩分解把一个大矩阵乘法换成两个小的，第一、二样少了，第三样多了一点。</p><p>这类方法通常用在推理部署，而不是训练加速：它们大多需要先有一个训练好的模型。放在这一单元，是为了把“提速”的手段列全，并且给出判断它们的标准。</p></div>
+<p class="i-analogy"><b>打个比方</b>像精简流程：删掉一个步骤才省时间，只把每个步骤里的几个字划掉，流程还是一样长。</p>
+<p class="i-impl">所以评估一种“简化模型”的方法，要看它在 GPU 上减少的是不是真实的计算和读写，而不只是参数个数。</p>
+<div class="i-builds">承接 <a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Accelerate 第 6 章 剪枝与压缩</span><span class="src">Accelerate 第 6 章 简化模型：剪枝与压缩</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">autocast</strong> 是算子调用路上的一站，按算子类型决定精度；参数仍以 32 位保存。fp16 要用<strong>损失缩放</strong>防止梯度下溢，bf16 通常不用。优化器逐个张量更新时被启动开销拖慢，<strong>foreach 和 fused</strong> 版本把它们合起来。<strong>简化模型</strong>只有在真正减少了计算和读写时才会变快。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>torch.autocast 是怎样做到不改模型代码就让一部分算子用 16 位计算的？哪些算子会被保留在 32 位？</li><li>为什么用 fp16 训练需要损失缩放，而 bf16 通常不需要？</li><li>优化器的 for-loop、foreach、fused 三种实现有什么区别？为什么后两种更快？</li><li>剪枝、蒸馏这类方法在什么条件下才能让模型在 GPU 上真的变快？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>data pipeline</dt><dd>数据管线</dd></div><div><dt>automatic mixed precision</dt><dd>自动混合精度</dd></div><div><dt>fused optimizer</dt><dd>融合优化器</dd></div><div><dt>loss scaling</dt><dd>损失缩放</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="2-5.html"><small>上一单元</small>2.5 torch.compile 的三层栈</a>
+<a class="next" href="3-1.html"><small>下一单元</small>3.1 GPU 环境与第一次性能分析</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

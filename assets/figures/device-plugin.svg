@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 226" width="760" height="226" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="设备插件做的三件事">
+  <title>设备插件做的三件事</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="226" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一个 GPU 节点上</text>
+  <rect x="24" y="62" width="170" height="70" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="109.0" y="93.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">设备插件</text>
+  <text x="109.0" y="114.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">管理 nvidia.com/gpu</text>
+  <rect x="296" y="62" width="170" height="70" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="381.0" y="102.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">kubelet</text>
+  <rect x="566" y="62" width="170" height="70" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="651.0" y="93.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">API 服务器</text>
+  <text x="651.0" y="114.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">节点的可分配资源</text>
+  <line x1="196" y1="80" x2="294" y2="80" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="245.0" y="73.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">注册、上报</text>
+  <line x1="294" y1="114" x2="196" y2="114" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="245.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">给它哪几张卡？</text>
+  <line x1="468" y1="97" x2="564" y2="97" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="516.0" y="90.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">报总数</text>
+  <text x="24" y="172" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">注册：我管的资源叫什么；上报：有哪些卡、是否健康；分配：选定具体的卡，返回容器需要的设置</text>
+  <text x="24" y="194" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">某张卡出故障被标为不健康，可分配的数量就少一张</text>
+  <text x="24" y="212" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">对调度器来说，GPU 只是一个整数</text>
+</svg>

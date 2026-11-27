@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 176" width="760" height="176" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="6N 的来历">
+  <title>6N 的来历</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="176" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">训练时每处理一个 token 的浮点运算次数（N 是参数个数）</text>
+  <rect x="24" y="54" width="230" height="58" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="139.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">前向  2N</text>
+  <text x="139.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每个权重一次乘、一次加</text>
+  <rect x="265" y="54" width="230" height="58" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="380.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">反向：对输入的梯度  2N</text>
+  <text x="380.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">要继续往前传</text>
+  <rect x="506" y="54" width="230" height="58" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="621.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">反向：对权重的梯度  2N</text>
+  <text x="621.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">用来更新参数</text>
+  <text x="24" y="150" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">合计约 6N。推理只有前向，约 2N。</text>
+</svg>

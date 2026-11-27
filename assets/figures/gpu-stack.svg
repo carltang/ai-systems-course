@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPU 节点上的一整套组件">
+  <title>GPU 节点上的一整套组件</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="300" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">让 GPU 在容器里能用，从下到上要有的东西（GPU Operator 负责把它们装齐）</text>
+  <rect x="24" y="50" width="170" height="34" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="109.0" y="72.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">监控导出器</text>
+  <text x="210" y="72" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">把利用率、显存、温度、Xid 错误导出成指标</text>
+  <rect x="24" y="92" width="170" height="34" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="109.0" y="114.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">特征发现</text>
+  <text x="210" y="114" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">探测型号、显存、驱动版本，给节点打标签</text>
+  <rect x="24" y="134" width="170" height="34" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="109.0" y="156.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">设备插件</text>
+  <text x="210" y="156" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">把 GPU 上报成可以申请的资源</text>
+  <rect x="24" y="176" width="170" height="34" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="109.0" y="198.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">容器工具包</text>
+  <text x="210" y="198" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">容器启动时，把设备文件和驱动的用户态库挂进去</text>
+  <rect x="24" y="218" width="170" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="109.0" y="240.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">驱动</text>
+  <text x="210" y="240" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">在节点的操作系统内核里，决定能支持的 CUDA 版本</text>
+  <text x="24" y="276" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">驱动在节点上，CUDA 的库在镜像里：两边的版本要配得上</text>
+</svg>

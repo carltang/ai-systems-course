@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4.3 Triton 入门 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="用 Triton 写出性能接近手写 CUDA 的 kernel，体会“按块编程”。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="4-2.html" title="4.2 算子融合" data-step="prev">‹ 4.2</a>
+<a href="4-4.html" title="4.4 Flash Attention" data-step="next">4.4 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 4 部分 · 算子与 kernel</span>4.3 Triton 入门</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>能不能不写线程级的 CUDA，也拿到接近手写的性能？</div><div class="frame-c">承接 4.1–4.2：同样的算子，换一种更高层的写法。</div></div>
+<div class="story"><p>线索是：手写 CUDA 要操心线程级的细节，Triton 把抽象提高了一层，让你按“块”来写 → 块的大小这类参数，交给它自动搜索 → 最后是一个实际的判断：什么时候用 Triton 就够了，什么时候还得回到 CUDA。2.5 讲过 torch.compile 生成的就是 Triton 代码，学完这一单元就能读懂那些代码。</p></div>
+<ol class="thread"><li><a href="#c-3-4-blocks">Triton 让你以“块”为单位思考</a></li><li><a href="#c-3-4-autotune">块多大最好？让它自己试</a></li><li><a href="#c-3-4-when-cuda">先用 Triton，证明不够再写 CUDA</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-3-4-blocks"><h3><span class="i-num">1</span>Triton 让你以“块”为单位思考</h3>
+<p class="i-essence">Triton 的一个程序实例处理一整块数据，用的是向量化的运算；块内怎么分给线程、怎么合并访存、要不要用共享内存、何时同步，都由编译器决定。</p>
+<div class="i-detail"><p><strong class="h">CUDA 的视角：一个线程。</strong> 3.2 讲过，写 CUDA kernel 时你站在一个线程的位置上：我是第几个线程，我负责哪个元素。要性能好，还得自己操心第 3 部分讲的那些事：让相邻线程的访存能合并、决定哪些数据放进共享内存、在合适的地方同步、处理边界上不满一块的情况。</p><p><strong class="h">Triton 的视角：一块数据。</strong> Triton 是嵌在 Python 里的一种写 kernel 的语言。它的一个程序实例负责一整块数据（比如一个 64×64 的小块），代码里操作的是“一块”，写法很像 NumPy：</p><pre>@triton.jit
+def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+    pid = tl.program_id(0)                     # 我是第几个程序实例
+    offs = pid * BLOCK + tl.arange(0, BLOCK)   # 我负责的这一块的下标
+    mask = offs &lt; n                            # 最后一块可能不满
+    x = tl.load(x_ptr + offs, mask=mask)       # 读一整块
+    y = tl.load(y_ptr + offs, mask=mask)
+    tl.store(out_ptr + offs, x + y, mask=mask) # 写一整块</pre><p>（这是官方入门教程里向量加法的结构，略去了细节。）</p><p>代码里没有出现“线程”。<code>x + y</code> 是对一整块做加法；这一块里的元素怎样分给各个线程、每个线程读哪几个，是编译器决定的。</p><p><strong class="h">编译器代劳了什么。</strong></p><ul><li>把块内的运算分配给一个 block 里的线程。</li><li>安排访存的方式，使它们能合并（3.4）。</li><li>需要时使用共享内存，插入必要的同步。</li><li>对矩阵乘法这样的运算，生成使用 Tensor Core 的指令。</li><li>用 <code>mask</code> 统一处理边界，不需要你写单独的分支。</li></ul><p><strong class="h">你仍然要决定的。</strong> 数据怎么切成块、块有多大、块与块之间的循环怎么写。也就是算法层面的结构。3.3 的分块矩阵乘法用 Triton 写，仍然是“外层循环遍历 K 方向的块，每次读入两小块、相乘、累加”，只是每一步操作的是块而不是单个元素。</p><p>所以 Triton 没有绕开第 3 部分的知识，而是把其中机械的那一半自动化了。<mark>你需要懂的是“为什么要分块、块放在哪一层存储”</mark>；不再需要亲手写“第几个线程读第几个地址”。</p><p><strong class="h">和 torch.compile 的关系。</strong> 2.5 讲过，Inductor 在 GPU 上生成的就是这样的 Triton 函数。用 <code>TORCH_LOGS=output_code</code> 打印出来的代码，结构和上面这个例子一样：算出这一块的下标，读入几个输入的同一块，做一串运算，写出去。</p></div>
+<p class="i-analogy"><b>打个比方</b>CUDA 像给每个士兵下命令；Triton 像给每个连队下命令，连队内部怎么分工由连长（编译器）安排。</p>
+<p class="i-impl">所以 Triton 代码比 CUDA 短得多，第 3 部分学过的合并访存、分块等优化大多自动完成；你要做的是想清楚数据怎么切块、块多大。</p>
+<div class="i-builds">承接 <a href="3-3.html#c-2-3-tiling">分块：一次搬一小块进共享内存，大家反复用</a><a href="3-4.html#c-2-4-coalescing">合并访存：一个 warp 的 32 次读，最好合成一次</a></div>
+<div class="i-builds">后面会用到 <a href="4-3.html#c-3-4-autotune">块多大最好？让它自己试</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">第 14 讲 notebook</span><a class="src" href="https://triton-lang.org/main/getting-started/tutorials/index.html" target="_blank" rel="noopener">Triton 官方教程</a><span class="src">PyTorch 2 论文 第 8 页 为什么选 Triton 作为生成目标</span></div>
+</li>
+<li class="i-lead">上面的例子里有一个参数 BLOCK。它取多大，对性能影响很大，却很难凭推理定下来。</li>
+<li class="icard" id="c-3-4-autotune"><h3><span class="i-num">2</span>块多大最好？让它自己试</h3>
+<p class="i-essence">最优的块大小、warp 数、流水线级数，取决于矩阵形状和具体的 GPU。Triton 的 autotune 会把几组候选配置都跑一遍，记住最快的那组。</p>
+<div class="i-detail"><p><strong class="h">参数有哪些。</strong> 一个 Triton kernel 通常有几个影响性能、不影响结果的参数：</p><ul><li>各个方向上的块大小（矩阵乘法有 M、N、K 三个方向）。</li><li>每个程序实例用几个 warp。</li><li>软件流水线的级数（提前几步预取数据，4.5 的双缓冲就是两级）。</li></ul><p><strong class="h">为什么难算。</strong> 块大小牵涉好几个互相矛盾的因素：</p><ul><li>块大：每次从显存读进来的数据被复用的次数多，算术强度高（3.3）。</li><li>块太大：共享内存和寄存器放不下；一个 SM 上能同时驻留的 block 变少，藏不住访存延迟（3.3 的占用率）。</li><li>最合适的折中点取决于具体的 GPU 型号（共享内存多大、有多少寄存器）、矩阵的形状、数据类型。</li></ul><p>这些因素之间的关系没有简单的公式。同一份代码，在 A100 和 H100 上、对 1024×1024 和 128×8192 的矩阵，最优配置可能都不同。</p><p><strong class="h">办法：都试一遍。</strong> 给 kernel 加一个装饰器，列出几组候选配置：</p><pre>@triton.autotune(
+    configs=[
+        triton.Config({"BLOCK_M": 128, "BLOCK_N": 64,  "BLOCK_K": 32}, num_warps=4, num_stages=3),
+        triton.Config({"BLOCK_M": 64,  "BLOCK_N": 64,  "BLOCK_K": 32}, num_warps=4, num_stages=4),
+        ...
+    ],
+    key=["M", "N", "K"],          # 这几个值变了，就重新搜索
+)</pre><p>第一次用某种形状调用这个 kernel 时，Triton 把每组配置都编译并运行一遍，记下最快的那组。之后同样形状的调用直接用它。</p><p><strong class="h">代价和注意事项。</strong></p><ul><li>第一次调用很慢（要编译和运行所有候选）。测性能时一定要跳过它。</li><li><code>key</code> 里的值每出现一种新的组合，都会重新搜索一次。形状变化多的场景，要么限制候选的数量，要么把形状归到几档。</li><li>它只在你给的候选里选。候选都不好，选出来的也不好。</li></ul><p>这是性能工程里很常见的一种态度：<mark>模型太复杂时，不去推导，直接测量</mark>。0.2 的“先量再改”在这里被自动化了。torch.compile 的 <code>max-autotune</code> 模式（2.5）用的是同一个思路。</p></div>
+<p class="i-analogy"><b>打个比方</b>像配眼镜：与其凭经验猜度数，不如几副镜片轮流试一下。</p>
+<p class="i-impl">所以同一份 kernel 能适应不同的形状和显卡；第一次运行慢一点，是它在搜索配置。</p>
+<div class="i-builds">承接 <a href="4-3.html#c-3-4-blocks">Triton 让你以“块”为单位思考</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html" target="_blank" rel="noopener">Triton 官方教程：矩阵乘法（autotune 的用法）</a></div>
+</li>
+<li class="i-lead">既然 Triton 省事，性能又好，是不是就不用学 CUDA 了？</li>
+<li class="icard" id="c-3-4-when-cuda"><h3><span class="i-num">3</span>先用 Triton，证明不够再写 CUDA</h3>
+<p class="i-essence">Triton 覆盖了大多数融合算子和不少矩阵乘法场景，性能常常接近手写 CUDA；但需要精细控制 warp 级操作、特殊数据布局或最新硬件特性时，仍然要回到 CUDA 或 CUTLASS。</p>
+<div class="i-detail"><p><strong class="h">Triton 擅长的。</strong></p><ul><li>融合的逐元素运算和归约（4.2）：这是它最主要的用途，也是 torch.compile 用它来做的事。</li><li>规整的、可以按块处理的稠密运算：矩阵乘法及其变体、注意力、归一化。</li><li>需要快速试验的新算子：代码短，改起来快，和 PyTorch 在同一个 Python 文件里。</li></ul><p>在这些场景里，Triton 写出来的 kernel 通常能达到手写 CUDA 的八九成甚至持平，代码量却只有几分之一。</p><p><strong class="h">它不擅长的。</strong></p><ul><li>需要精细控制每个 warp、每个线程行为的算法。3.5 讲的一些并行模式（比如需要线程之间按特定方式配合的扫描）用“块”的抽象很难表达。</li><li>不规整的数据：稀疏矩阵、图、长短不一的序列。</li><li>需要特殊的内存布局，或者要用上最新硬件的某个专有特性，而编译器还不支持。</li><li>追求最后百分之十几的性能：库的作者（cuBLAS、cuDNN）仍然用更底层的手段。</li></ul><p><strong class="h">一个实际的决策顺序</strong>（你的那份文档里把它列为要记住的顺序，这里补上理由）：</p><ul><li><strong>先用库。</strong> 矩阵乘法、卷积、标准的注意力，库里的实现几乎不可能被你超过。</li><li><strong>再用编译器。</strong> 自己拼的一串运算，先看 torch.compile 能不能融合好。零代码成本。</li><li><strong>然后才是 Triton。</strong> 编译器融合不了、或者融合得不好的模式，用 Triton 手写一个。</li><li><strong>最后是 CUDA。</strong> 只有当 profiler 证明这个 kernel 是瓶颈、Roofline 显示它离硬件上限还远、而 Triton 又表达不了你要的优化时。</li></ul><p><mark>每往下一级，开发和维护的成本都高一个量级，所以要有证据才往下走</mark>。</p><p><strong class="h">那为什么第 3 部分花那么多篇幅讲 CUDA。</strong> 因为你的目标是读懂和排查，而不只是写。Triton 生成的代码、库里的 kernel、profiler 报告的指标，说的都是 warp、共享内存、访存合并这套语言。不懂底下这一层，就看不懂上面这一层为什么快、为什么慢。</p></div>
+<p class="i-analogy"><b>打个比方</b>像装修：大部分活用成品家具就够了，只有特殊尺寸的角落才值得找木匠定做。</p>
+<p class="i-impl">所以先用 Triton 快速做出够快的版本；只有 profiler 证明它是瓶颈、而且离硬件极限还远时，才值得手写 CUDA。</p>
+<div class="i-builds">承接 <a href="3-1.html#c-2-1-measure">先测量，再优化：瓶颈常常不在你以为的地方</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>Triton 让你以<strong>块</strong>为单位写 kernel，块内的线程分配、访存合并、共享内存的使用由编译器负责。块大小等参数用 <strong>autotune</strong> 搜索。工程上<strong>先用 Triton</strong>，只有 profiler 证明不够、且离硬件上限还远时，才手写 CUDA。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>用 Triton 写 kernel 和用 CUDA 写有什么本质区别？哪些事情由 Triton 的编译器代劳了？</li><li>Triton 的 autotune 解决什么问题？为什么最优的块大小没法事先算出来？</li><li>什么情况下用 Triton 就够了？什么情况下仍然需要手写 CUDA？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>Triton</dt><dd>Triton 语言</dd></div><div><dt>autotuning</dt><dd>自动调优</dd></div><div><dt>block pointer</dt><dd>块指针</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="4-2.html"><small>上一单元</small>4.2 算子融合</a>
+<a class="next" href="4-4.html"><small>下一单元</small>4.4 Flash Attention</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

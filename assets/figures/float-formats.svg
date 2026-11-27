@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="fp32、fp16、bf16 的位数分配">
+  <title>fp32、fp16、bf16 的位数分配</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">三种浮点格式的位数分配（每小格 1 位）</text>
+  <text x="24" y="80" font-size="15" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">fp32</text>
+  <rect x="100.0" y="58" width="17.5" height="32" rx="5" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="119.5" y="58" width="154.0" height="32" rx="5" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="197.5" y="79" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">指数 8 位</text>
+  <rect x="275.5" y="58" width="446.5" height="32" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="499.75" y="79" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">有效数字 23 位</text>
+  <text x="24" y="136" font-size="15" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">fp16</text>
+  <rect x="100.0" y="114" width="17.5" height="32" rx="5" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="119.5" y="114" width="95.5" height="32" rx="5" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="168.25" y="135" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">指数 5 位</text>
+  <rect x="217.0" y="114" width="193.0" height="32" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="314.5" y="135" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">有效数字 10 位</text>
+  <text x="24" y="192" font-size="15" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">bf16</text>
+  <rect x="100.0" y="170" width="17.5" height="32" rx="5" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="119.5" y="170" width="154.0" height="32" rx="5" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="197.5" y="191" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">指数 8 位</text>
+  <rect x="275.5" y="170" width="134.5" height="32" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="343.75" y="191" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">有效数字 7 位</text>
+  <text x="24" y="236" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">bf16 保留了 fp32 的全部指数位，所以范围不变，只是每个数没那么精确；最左一格是符号位</text>
+</svg>

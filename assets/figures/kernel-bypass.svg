@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="内核网络栈和 RDMA 的路径对比">
+  <title>内核网络栈和 RDMA 的路径对比</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="300" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">走操作系统的网络栈</text>
+  <rect x="24.0" y="50" width="104" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="76.0" y="74.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">应用</text>
+  <text x="76.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">调用 send()</text>
+  <rect x="145.6" y="50" width="104" height="56" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="197.6" y="74.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">内核</text>
+  <text x="197.6" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">拷贝 + 协议处理</text>
+  <line x1="130.0" y1="78" x2="143.6" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="267.2" y="50" width="104" height="56" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="319.2" y="83.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡</text>
+  <line x1="251.6" y1="78" x2="265.2" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="388.79999999999995" y="50" width="104" height="56" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="440.79999999999995" y="74.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡</text>
+  <text x="440.79999999999995" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">中断</text>
+  <line x1="373.19999999999993" y1="78" x2="386.79999999999995" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="510.4" y="50" width="104" height="56" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="562.4" y="74.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">内核</text>
+  <text x="562.4" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">协议处理 + 拷贝</text>
+  <line x1="494.79999999999995" y1="78" x2="508.4" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="632.0" y="50" width="104" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="684.0" y="74.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">应用</text>
+  <text x="684.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">被唤醒</text>
+  <line x1="616.4" y1="78" x2="630.0" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="128" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每一道手续都占 CPU；链路越快，两端的手续占比越大</text>
+  <text x="24" y="186" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">RDMA：绕过内核</text>
+  <rect x="24" y="200" width="104" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="76.0" y="224.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">应用的内存</text>
+  <text x="76.0" y="245.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">先注册（锁页）</text>
+  <rect x="267.2" y="200" width="104" height="56" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="319.2" y="224.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡</text>
+  <text x="319.2" y="245.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">可靠传输在硬件里</text>
+  <rect x="388.79999999999995" y="200" width="104" height="56" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="440.79999999999995" y="233.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡</text>
+  <rect x="632.0" y="200" width="104" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="684.0" y="224.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">应用的内存</text>
+  <text x="684.0" y="245.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">直接写入</text>
+  <line x1="130" y1="228" x2="265.2" y2="228" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="373.19999999999993" y1="228" x2="386.79999999999995" y2="228" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="494.79999999999995" y1="228" x2="630.0" y2="228" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="282" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">没有系统调用、没有拷贝、没有中断：延迟从几十微秒降到几微秒</text>
+</svg>

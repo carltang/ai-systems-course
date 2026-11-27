@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 226" width="760" height="226" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="排查的循环">
+  <title>排查的循环</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="226" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每个案例走的都是同一个循环</text>
+  <rect x="24" y="56" width="160" height="60" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="104.0" y="82.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">先有预期</text>
+  <text x="104.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">算出理论上限</text>
+  <rect x="208" y="56" width="160" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="288.0" y="82.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">量</text>
+  <text x="288.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">吞吐、MFU、显存、效果</text>
+  <line x1="186" y1="86" x2="206" y2="86" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="392" y="56" width="160" height="60" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="472.0" y="82.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">判断它在等什么</text>
+  <text x="472.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">数据、发令、计算、别的卡</text>
+  <line x1="370" y1="86" x2="390" y2="86" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="576" y="56" width="160" height="60" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="656.0" y="82.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">只改一处</text>
+  <text x="656.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">用对应的手段</text>
+  <line x1="554" y1="86" x2="574" y2="86" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <path d="M656 118 C 656 176, 300 176, 288 120" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="472" y="190" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">再量：瓶颈解决一个，下一个就浮出来</text>
+  <text x="24" y="212" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">跳过中间两步、直接上手段，是最常见的弯路</text>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="环形 all-reduce 和每张卡的通信量">
+  <title>环形 all-reduce 和每张卡的通信量</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <line x1="134.8456710674493" y1="94.84567106744929" x2="165.1543289325507" y2="94.8456710674493" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="205.1543289325507" y1="120.8456710674493" x2="205.1543289325507" y2="179.1543289325507" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="165.1543289325507" y1="205.1543289325507" x2="134.8456710674493" y2="205.1543289325507" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="94.8456710674493" y1="179.1543289325507" x2="94.8456710674493" y2="120.84567106744929" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="58.8456710674493" y="74.84567106744929" width="72" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="94.8456710674493" y="99.84567106744929" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">卡 0</text>
+  <rect x="169.1543289325507" y="74.8456710674493" width="72" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="205.1543289325507" y="99.8456710674493" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">卡 1</text>
+  <rect x="169.1543289325507" y="185.1543289325507" width="72" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="205.1543289325507" y="210.1543289325507" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">卡 2</text>
+  <rect x="58.8456710674493" y="185.1543289325507" width="72" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="94.8456710674493" y="210.1543289325507" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">卡 3</text>
+  <text x="150" y="146" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每张卡只和</text>
+  <text x="150" y="164" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">下家说话</text>
+  <text x="150" y="262" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">前半程边传边加，后半程只传不加，各 N−1 步</text>
+  <text x="330" y="44" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每张卡一共发出多少份数据：2(N−1)/N</text>
+  <text x="330" y="84" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">2 张卡</text>
+  <rect x="404" y="64" width="130" height="30" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="544.0" y="84" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">1 份</text>
+  <text x="330" y="128" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">4 张卡</text>
+  <rect x="404" y="108" width="195" height="30" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="609.0" y="128" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">1.5 份</text>
+  <text x="330" y="172" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">8 张卡</text>
+  <rect x="404" y="152" width="228" height="30" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="641.5" y="172" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">1.75 份</text>
+  <text x="330" y="216" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">卡再多</text>
+  <rect x="404" y="196" width="260" height="30" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="674.0" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">趋近 2 份</text>
+  <text x="330" y="252" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">卡数从 2 到上千，每张卡的通信量最多只翻一倍</text>
+</svg>

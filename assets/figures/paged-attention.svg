@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="分页管理 KV cache">
+  <title>分页管理 KV cache</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每个请求以为自己的缓存是连续的</text>
+  <text x="736" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">显存里：固定大小的块，哪里有空放哪里</text>
+  <text x="24" y="82" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">请求 A</text>
+  <rect x="90" y="60" width="44" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="112.0" y="82.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">块 0</text>
+  <rect x="138" y="60" width="44" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="160.0" y="82.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">块 1</text>
+  <rect x="186" y="60" width="44" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="208.0" y="82.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">块 2</text>
+  <rect x="234" y="60" width="44" height="34" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="256.0" y="82.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…</text>
+  <text x="24" y="162" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">请求 B</text>
+  <rect x="90" y="140" width="44" height="34" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="112.0" y="162.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">块 0</text>
+  <rect x="138" y="140" width="44" height="34" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="160.0" y="162.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">块 1</text>
+  <rect x="186" y="140" width="44" height="34" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="208.0" y="162.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…</text>
+  <rect x="330" y="78" width="110" height="78" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="385.0" y="113.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">页表</text>
+  <text x="385.0" y="134.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">逻辑块 → 物理块</text>
+  <rect x="520" y="66" width="50" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="545.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="574" y="66" width="50" height="40" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="599.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="628" y="66" width="50" height="40" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="653.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="682" y="66" width="50" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="707.0" y="91.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="520" y="116" width="50" height="40" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="545.0" y="141.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="574" y="116" width="50" height="40" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="599.0" y="141.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="628" y="116" width="50" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="653.0" y="141.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <rect x="682" y="116" width="50" height="40" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="707.0" y="141.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
+  <line x1="284" y1="80" x2="328" y2="104" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="240" y1="160" x2="328" y2="130" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="442" y1="117" x2="516" y2="110" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="628" y="186" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">灰色：空闲的块</text>
+  <text x="24" y="232" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">用到多少分配多少：不必按最大长度预留，也不必为了变长而整块拷贝</text>
+  <text x="24" y="254" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">两个请求的前缀相同时，页表可以指向同一批块，这部分只存一份</text>
+</svg>

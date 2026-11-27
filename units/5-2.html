@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5.2 RDMA 与 InfiniBand · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清 RDMA 怎样绕过内核直接读写对方的内存，InfiniBand 和 RoCE 各是什么，一条链路出了问题看哪些计数器。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="5-1.html" title="5.1 机内互联：PCIe、NVLink 与 NVSwitch" data-step="prev">‹ 5.1</a>
+<a href="5-3.html" title="5.3 集群网络：拓扑、流量与拥塞" data-step="next">5.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 5 部分 · 高速互联</span>5.2 RDMA 与 InfiniBand</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>RDMA 是怎样做到绕过内核、零拷贝的？InfiniBand 和 RoCE 有什么不同？</div><div class="frame-c">承接 0.3 的“内核网络栈的开销”：那里说了为什么要绕过内核，这一单元讲怎么绕。</div></div>
+<div class="story"><p>线索是：RDMA 把“发数据”这件事拆成了四个对象 → 用这四个对象可以做两类操作，其中一类完全不需要对方的 CPU → 但这种做法要求网络几乎不丢包，InfiniBand 就是为此设计的 → 以太网本来会丢包，RoCE 要补上这一点 → 最后把内存换成显存，就是 GPUDirect RDMA。如果你的集群用的是 InfiniBand，第三条和后面的排查最贴近实际。</p></div>
+<ol class="thread"><li><a href="#c-p5-2-verbs">RDMA 的四样东西：注册内存、队列对、工作请求、完成队列</a></li><li><a href="#c-p5-2-one-sided">RDMA write：直接写进对方的内存，对方的 CPU 不需要知道</a></li><li><a href="#c-p5-2-lossless">RDMA 假设网络几乎不丢包；InfiniBand 用“信用”做到这一点</a></li><li><a href="#c-p5-2-roce">RoCE：把同一套传输搬到以太网上，再想办法让以太网不丢包</a></li><li><a href="#c-p5-2-gdr">GPUDirect RDMA：注册的不是主内存，而是显存</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p5-2-verbs"><h3><span class="i-num">1</span>RDMA 的四样东西：注册内存、队列对、工作请求、完成队列</h3>
+<p class="i-essence">用 RDMA 传数据，应用先把一块内存“注册”给网卡，得到两把钥匙；再和对方建立一个“队列对”（QP）；之后每次传输，就是往队列里放一张“工作请求”，说明要传哪块内存；网卡做完后，在“完成队列”里放一条回执。整个过程不进内核。</p>
+<div class="i-detail"><p>0.3 说过，传统的 socket 每次收发都要经过系统调用、拷贝、协议处理、中断四道手续。RDMA 的编程接口（叫 verbs）围绕四个对象，把这些手续全部移到了“事先”。</p><figure class="fig"><img src="../assets/figures/rdma-objects.svg" alt="四个对象和它们之间的关系" loading="lazy"><figcaption>四个对象和它们之间的关系</figcaption></figure><p><strong class="h">内存区域（MR）：先登记，后使用。</strong> 调用注册接口，告诉网卡“这块内存以后可能用来收发”。注册做两件事：把这块内存锁页（0.3 讲过为什么），并把它的地址映射写进网卡。注册完得到两把钥匙：</p><ul><li>本地钥匙（lkey）：自己发数据时用。</li><li>远程钥匙（rkey）：交给对方，对方凭它才能直接读写这块内存。</li></ul><p><strong class="h">队列对（QP）：一条连接的两端。</strong> 每个 QP 有一个发送队列和一个接收队列。训练里用的是“可靠连接”类型：一个 QP 只和对端的一个 QP 配对，网卡保证数据按序、不丢地送达。QP 建好后要经过几次状态切换才能用，这个握手过程比较慢。</p><p><strong class="h">工作请求（WR）：一张单子。</strong> 要发数据时，应用填一张单子（操作类型、内存地址、长度、钥匙），放进 QP 的发送队列。这一步只是往一块和网卡共享的内存里写几个字段，再“敲一下门铃”通知网卡，不进内核。</p><p><strong class="h">完成队列（CQ）：回执。</strong> 网卡执行完一张单子，就往 CQ 里放一条完成记录。应用自己去查（轮询）有没有新的记录，同样不进内核。</p><p>对照 0.3 的四项开销：系统调用没有了（写共享内存加门铃）；拷贝没有了（网卡直接从注册的内存取数据）；协议处理由网卡硬件完成；中断可以不用（应用轮询 CQ）。</p><p>代价也很清楚：注册内存和建立 QP 都是慢操作，而且注册的内存被锁住、不能再被系统调配。<mark>所以用 RDMA 的程序都会在启动时把缓冲区和连接准备好</mark>。</p></div>
+<details class="i-more"><summary>源码导读：一次 RDMA write 的代码骨架</summary><div class="i-detail"><p>下面是 verbs 接口的调用顺序。真实代码每一步都有不少参数，这里只留骨架，目的是读 NCCL 的 <code>net_ib.cc</code> 时能认出每一段在干什么。接口名都是 libibverbs 的标准名字，手册里有逐个的说明。</p><pre>// —— 一次性的准备 ——
+ctx = ibv_open_device(dev);          // 打开网卡
+pd  = ibv_alloc_pd(ctx);             // 保护域：把下面这些对象圈在一起
+mr  = ibv_reg_mr(pd, buf, len, 权限); // 注册内存，得到 mr-&gt;lkey 和 mr-&gt;rkey
+cq  = ibv_create_cq(ctx, ...);       // 完成队列
+qp  = ibv_create_qp(pd, ...);        // 队列对，类型选 RC（可靠连接）
+
+// 和对端交换 QP 编号、地址、rkey（通过一条普通的带外连接）
+// 然后把 QP 逐步切换到可用状态
+ibv_modify_qp(qp, ... INIT);
+ibv_modify_qp(qp, ... RTR);          // ready to receive
+ibv_modify_qp(qp, ... RTS);          // ready to send
+
+// —— 每次传输 ——
+wr.opcode = IBV_WR_RDMA_WRITE;       // 直接写进对方的内存
+wr.sg_list = { buf, len, mr-&gt;lkey }; // 我这边的数据在哪
+wr.wr.rdma.remote_addr = 对方的地址;
+wr.wr.rdma.rkey        = 对方给的钥匙;
+ibv_post_send(qp, &amp;wr, ...);         // 放进发送队列，不进内核
+
+ibv_poll_cq(cq, ...);                // 轮询完成队列，拿回执</pre><p>读的时候抓三件事：</p><ul><li><strong>哪些是一次性的。</strong> 从打开设备到 QP 进入 RTS 都只做一次。训练启动慢、启动时报错，问题多半在这一段。比如 <code>ibv_reg_mr</code> 或 <code>ibv_create_qp</code> 失败，NCCL 文档给出的常见原因是允许锁页的内存上限（memlock）太小。</li><li><strong>“带外连接”是什么。</strong> 两端要先用一条普通的 TCP 连接交换 QP 编号和钥匙，RDMA 连接才建得起来。NCCL 日志里的 OOB 指的就是这条连接；它选错了网络接口，初始化就会卡住。</li><li><strong>每次传输只有两个调用。</strong> <code>ibv_post_send</code> 和 <code>ibv_poll_cq</code>。NCCL 在主机上有一个专门的线程循环做这两件事（6.2）。</li></ul></div></details>
+<p class="i-analogy"><b>打个比方</b>像在仓库开了一个专用月台：先把一片货位登记给物流公司（注册内存），拿到货位编号；之后每次发货只要填一张单子放进收件箱（工作请求），物流公司自己来搬，搬完在回执箱里留个条（完成队列）。你不用每次都找前台办手续。</p>
+<p class="i-impl">所以 RDMA 的开销集中在“建立”阶段：注册内存、建连接都很慢，要提前做好并反复使用。NCCL 在初始化时把这些一次做完，训练过程中只剩下填单子。</p>
+<div class="i-builds">承接 <a href="0-3.html#c-p0-3-kernel-net">走操作系统的网络栈，每个包都要过很多道手续</a><a href="0-3.html#c-p0-3-pinned">内存里的数据会被操作系统挪动，交给设备之前要先“钉住”</a></div>
+<div class="i-builds">后面会用到 <a href="5-2.html#c-p5-2-one-sided">RDMA write：直接写进对方的内存，对方的 CPU 不需要知道</a><a href="5-2.html#c-p5-2-gdr">GPUDirect RDMA：注册的不是主内存，而是显存</a><a href="5-3.html#c-p5-3-ecmp">按哈希选路遇上少量大流：几条流会撞在同一条链路上</a><a href="6-2.html#c-p6-2-init">大部分工作在初始化时一次做完：探测拓扑、建环和树、连好每一对卡</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">RDMA 编程手册 §3.3 核心概念：完成队列与内存注册</span><span class="src">RDMA 编程手册 §3.4 典型应用的流程</span><a class="src" href="https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_infiniband_and_rdma_networks/understanding-infiniband-and-rdma_configuring-infiniband-and-rdma-networks" target="_blank" rel="noopener">Red Hat：Understanding InfiniBand and RDMA</a></div>
+</li>
+<li class="i-lead">有了这四个对象，能做的操作分两类。第二类是 RDMA 最有特点的地方。</li>
+<li class="icard" id="c-p5-2-one-sided"><h3><span class="i-num">2</span>RDMA write：直接写进对方的内存，对方的 CPU 不需要知道</h3>
+<p class="i-essence">RDMA 有两类操作。send/recv 是双方配合的：接收方要事先准备好接收缓冲区。RDMA write 和 read 是单方完成的：发起方拿着对方的地址和钥匙，让两边的网卡直接把数据写进（或读出）对方的内存，对方的应用和 CPU 完全不参与。</p>
+<div class="i-detail"><p><strong class="h">双方配合：send 和 recv。</strong> 接收方先往自己的接收队列里放一张单子，说“下一个到达的消息放在这块内存”；发送方再发。数据到达时，接收方的网卡取出一张接收单子，把数据写到它指定的位置，并在接收方的完成队列里放一条记录。如果数据到了而接收队列是空的，发送方会收到“对方没准备好”的错误并重试。</p><p><strong class="h">单方完成：RDMA write 和 read。</strong> 发起方在单子上直接写明对方的内存地址和远程钥匙。对方的网卡收到后核对钥匙，然后直接把数据写进那块内存（write），或者把那块内存的内容读出来发回去（read）。对方的应用没有填任何单子，完成队列里也不会出现记录。</p><p><mark>单方操作省掉了接收方的一切软件开销</mark>，但带来一个问题：接收方怎么知道数据到了？常见的做法是“带立即数的 RDMA write”：它和普通的 write 一样把数据写进对方内存，但额外带一个小整数，并且会在对方的完成队列里产生一条记录。</p><p><strong class="h">NCCL 怎么组合它们</strong>（依据 Demystifying NCCL 对源码的分析）：</p><ul><li>每一对要通信的 GPU 之间建两个可靠连接的 QP，一个方向一个。</li><li>接收方先通过反方向的 QP 发一条很小的“可以发了”（clear-to-send）消息，里面是接收缓冲区的地址和钥匙。这一步既是告知地址，也是流量控制：接收方没准备好，发送方就不会发。</li><li>发送方用一个或多个 RDMA write 把大块数据直接写进对方的缓冲区。</li><li>最后用一条带立即数的 write 通知对方“这一批写完了，一共多少”。</li></ul><p>5.3 会再回到“接收方先说可以发”这个设计：它恰好成了大规模集群里控制拥塞的手段。</p></div>
+<p class="i-analogy"><b>打个比方</b>像有了对方信箱的钥匙：send/recv 是敲门，等对方开门接过去；RDMA write 是你直接把东西放进他的信箱，他甚至不知道你来过。</p>
+<p class="i-impl">所以接收一侧几乎没有 CPU 开销，这是 RDMA 低延迟的关键。代价是对方不知道数据到了，需要另外通知。NCCL 的做法是数据用 RDMA write 送，最后补一条带“附言”的写操作当通知。</p>
+<div class="i-builds">承接 <a href="5-2.html#c-p5-2-verbs">RDMA 的四样东西：注册内存、队列对、工作请求、完成队列</a></div>
+<div class="i-builds">后面会用到 <a href="5-2.html#c-p5-2-lossless">RDMA 假设网络几乎不丢包；InfiniBand 用“信用”做到这一点</a><a href="5-3.html#c-p5-3-congestion">不丢包的代价：拥塞会沿着链路往回传，一处慢会拖慢一片</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">RDMA 编程手册 §3.1 可用的通信操作：Send、RDMA Read、RDMA Write</span><span class="src">Demystifying NCCL 第 5 页 IB 传输：QP 的布局与 CTS</span></div>
+</li>
+<li class="i-lead">这种“网卡直接读写内存”的做法，对网络本身提出了一个很高的要求。</li>
+<li class="icard" id="c-p5-2-lossless"><h3><span class="i-num">3</span>RDMA 假设网络几乎不丢包；InfiniBand 用“信用”做到这一点</h3>
+<p class="i-essence">RDMA 的可靠传输由网卡硬件实现，逻辑很简单：丢了一个包，就从那个包开始把后面的全部重发，代价很大。所以它需要一张几乎不因拥塞丢包的网。InfiniBand 就是这样设计的：每一段链路上，接收端告诉发送端“我还有多少空位”（信用），没有信用就不发。</p>
+<div class="i-detail"><p><strong class="h">为什么怕丢包。</strong> TCP 把可靠传输做在操作系统里，可以用复杂的算法：选择性重传、精细的拥塞窗口。RDMA 把可靠传输做进网卡硬件，逻辑必须简单。常见的做法是：接收方发现序号不连续，就要求发送方从缺的那个包开始全部重发。一条 400 Gb/s 的链路上，丢一个包意味着重发一大段数据，延迟一下子从微秒级跳到毫秒级。偶尔的物理错误可以这样处理，但如果网络一拥塞就丢包，性能会崩溃。</p><p><strong class="h">InfiniBand 怎么做。</strong> 它是一整套为此设计的网络，和以太网是两个体系：</p><ul><li><strong>基于信用的流控。</strong> 每一段链路（网卡到交换机、交换机到交换机）上，接收端持续告诉发送端自己的缓冲区还有多少空位。发送端手里有信用才发包，用完就停。于是缓冲区永远不会溢出，不会因为拥塞而丢包。</li><li><strong>子网管理器（SM）。</strong> 整个网络由一个集中的管理程序配置：它发现拓扑，给每个端口分配地址（LID），计算路由并下发到每台交换机。没有子网管理器在运行，端口就停在“已连线但未激活”的状态。</li><li><strong>速率。</strong> 常见的几代：EDR 是 100 Gb/s，HDR 是 200 Gb/s，NDR 是 400 Gb/s（都按 4 条通道合计）。</li></ul><p><strong class="h">这对排查意味着什么。</strong> 既然不丢包，拥塞时数据就在发送端等信用。所以：</p><ul><li>“等”有专门的计数器（发送等待，xmit wait）。它一直在涨，说明这个端口经常想发却发不出去，下游有拥塞或者有慢的接收者。</li><li>物理层的错误（信号质量差、线缆或光模块有问题）是另一类计数器：符号错误、链路恢复次数、链路断开次数。它们会真的造成重传和降速。</li></ul><p><mark>两类问题的处理方向完全不同</mark>：前者是流量和拓扑的问题（5.3），后者是硬件问题，换线缆、换模块。</p></div>
+<details class="i-more"><summary>排查：一条 InfiniBand 链路是否健康</summary><div class="i-detail"><p>按从简单到复杂的顺序。命令都来自标准的 InfiniBand 工具集，NCCL 的官方排查文档列的也是这几个。</p><p><strong class="h">第一步：端口起来了吗，速率对吗。</strong></p><pre>ibstat</pre><p>每个端口看三行：</p><ul><li><code>State: Active</code>：逻辑状态。停在 Initializing，通常是网络里没有子网管理器在运行（用 <code>sudo sminfo</code> 确认）。</li><li><code>Physical state: LinkUp</code>：物理状态。是 Polling 或 Disabled，说明线没插好或对端没起来。</li><li><code>Rate</code>：协商到的速率。NDR 的网卡显示 400、HDR 显示 200。比预期低，说明链路降速了（线缆、模块，或者只协商成了更少的通道）。</li></ul><p><strong class="h">第二步：错误计数器。</strong></p><pre>sudo perfquery -x          # 本机端口的扩展计数器
+sudo perfquery -x &lt;lid&gt; &lt;port&gt;   # 指定端口</pre><p>重点看三个，它们都应该接近 0，而且不增长：</p><ul><li><code>SymbolErrorCounter</code>：物理层的符号错误。</li><li><code>LinkErrorRecoveryCounter</code>：链路做错误恢复的次数。</li><li><code>LinkDownedCounter</code>：链路断开过几次。</li></ul><p>看绝对值意义不大（可能是很久以前累积的），要隔几分钟再读一次，看有没有在涨。</p><p><strong class="h">第三步：两台机器之间通不通、有多快。</strong></p><pre># 连通性：对端运行 sudo ibping -S，本机运行
+sudo ibping &lt;对端的 lid&gt;
+
+# 带宽：对端运行 ib_write_bw -d &lt;设备&gt; -a，本机运行
+ib_write_bw -d &lt;设备&gt; -a &lt;对端地址&gt;
+
+# 延迟
+ib_write_lat -d &lt;设备&gt; &lt;对端地址&gt;</pre><p><code>ib_write_bw</code> 量的是“裸”的 RDMA 带宽，不经过 NCCL 和框架。它达不到网卡的标称速率，问题就在网络这一层，不用往上查。它还可以加 <code>--use_cuda=&lt;gpu 编号&gt;</code> 直接用显存做缓冲区，顺便验证 GPUDirect RDMA 这条路。</p><p><strong class="h">第四步：RDMA 层的重传。</strong></p><pre>rdma statistic</pre><p>测试期间留意序号错误、超时这类计数器有没有增长，它们说明发生了重传。</p><p><strong class="h">整张网的体检</strong>用 <code>ibdiagnet</code>，它会遍历所有交换机和链路，报告错误率高的链路、降速的链路和路由问题。这通常由管理集群的人来跑。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像地铁站的限流：站台满了，闸机就不再放人进来。人会在闸机外排队，但不会有人被挤下站台。</p>
+<p class="i-impl">所以 InfiniBand 上拥塞的表现不是丢包，而是“等”。排查时看的不是丢包率，而是链路上的等待计数和物理层的错误计数。</p>
+<div class="i-builds">承接 <a href="5-2.html#c-p5-2-one-sided">RDMA write：直接写进对方的内存，对方的 CPU 不需要知道</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
+<div class="i-builds">后面会用到 <a href="5-2.html#c-p5-2-roce">RoCE：把同一套传输搬到以太网上，再想办法让以太网不丢包</a><a href="5-3.html#c-p5-3-congestion">不丢包的代价：拥塞会沿着链路往回传，一处慢会拖慢一片</a><a href="6-3.html#c-p6-3-layers">分层排除，自下而上：链路 → 裸 RDMA → NCCL → 框架</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">RDMA 编程手册 §2.5 子网管理器与交换机</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/networking_troubleshooting.html" target="_blank" rel="noopener">NCCL 用户指南：Networking Troubleshooting</a><span class="src">ibdiagnet 手册 误码率与链路健康检查</span><span class="src">ibdiagnet 手册 用 xmit_wait 评估拥塞</span></div>
+</li>
+<li class="i-lead">InfiniBand 是一套专用的网络。很多数据中心更愿意只维护以太网，于是有了另一条路。</li>
+<li class="icard" id="c-p5-2-roce"><h3><span class="i-num">4</span>RoCE：把同一套传输搬到以太网上，再想办法让以太网不丢包</h3>
+<p class="i-essence">RoCE 把 InfiniBand 的传输层原样装进普通的 UDP/IP 包里，跑在以太网上。上层的 verbs 接口完全一样。但以太网默认是“满了就丢”的，所以要额外配两样东西：PFC 让交换机在快满时叫上游暂停；ECN 让发送方在拥塞初期主动降速。</p>
+<div class="i-detail"><p><strong class="h">关系。</strong> 可以把网络分成上下两半看：</p><ul><li>上半（传输层和 verbs 接口）：<mark>RoCE 和 InfiniBand 是同一套</mark>。应用程序、NCCL、网卡里的可靠传输逻辑都不用改。</li><li>下半（链路和网络层）：InfiniBand 用自己的地址、路由和信用流控；RoCE 用以太网和 IP。现在说的 RoCE 一般指第二版：把 RDMA 的包封装在 UDP 里，可以跨路由器。</li></ul><p><strong class="h">补上“不丢包”。</strong> 以太网交换机的默认行为是队列满了就丢。RoCE 用两层机制防止这件事：</p><ul><li><strong>PFC（基于优先级的流量控制）</strong>：逐跳的硬刹车。交换机某个队列快满时，给上游发一个“暂停”帧，上游就停发这个优先级的流量。它和信用流控的目的相同，但更粗：是“快满了才喊停”，而不是“有空位才发”。</li><li><strong>ECN 加拥塞控制（常用的算法叫 DCQCN）</strong>：端到端的软刹车。交换机在队列开始变长时给经过的包打一个标记；接收方看到标记后通知发送方；发送方的网卡降低发送速率。目的是在触发 PFC 之前就把速度降下来。</li></ul><p><strong class="h">对比。</strong></p><table><thead><tr><th></th><th>InfiniBand</th><th>RoCE</th></tr></thead><tbody><tr><td>不丢包靠什么</td><td>信用流控，天生具备</td><td>PFC 加 ECN，要正确配置</td></tr><tr><td>网络怎么管</td><td>子网管理器集中配置</td><td>普通的 IP 路由</td></tr><tr><td>设备</td><td>专用交换机</td><td>通用以太网交换机</td></tr><tr><td>对上层</td><td>同一套 verbs</td><td>同一套 verbs</td></tr></tbody></table><p><strong class="h">排查上的区别。</strong> InfiniBand 用 <code>ibstat</code>、<code>perfquery</code> 这一套；RoCE 的端口是以太网口，用 <code>ethtool -S &lt;网卡名&gt;</code> 看计数器，重点是丢包、暂停帧和 PFC 相关的计数。RoCE 还多一类配置错误：网卡用哪个地址条目（GID）、流量打哪个优先级标记，配错了连接建不起来，或者流量没有进入不丢包的那个队列。</p><p>如果你的集群用的是 InfiniBand，这一节知道原理就够了；读 Meta 那篇论文（5.3）时会用到。</p></div>
+<p class="i-analogy"><b>打个比方</b>像把高铁列车开上普通铁路：车还是那辆车，但普通铁路没有高铁的信号系统，得加装一套设备，才能保证不追尾。</p>
+<p class="i-impl">所以 RoCE 的优势是能用通用的以太网设备和运维体系，代价是“不丢包”要靠配置来保证，配错了就会出现难查的性能问题。两者对 NCCL 和 PyTorch 是透明的。</p>
+<div class="i-builds">承接 <a href="5-2.html#c-p5-2-lossless">RDMA 假设网络几乎不丢包；InfiniBand 用“信用”做到这一点</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">RDMA 编程手册 §2 RoCE 与 InfiniBand 概览</span><span class="src">Meta RoCE 论文 第 8 页 PFC 与无损队列</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/networking_troubleshooting.html" target="_blank" rel="noopener">NCCL 用户指南：RoCE 的排查</a></div>
+</li>
+<li class="i-lead">最后一步：把这一切和 GPU 接起来。</li>
+<li class="icard" id="c-p5-2-gdr"><h3><span class="i-num">5</span>GPUDirect RDMA：注册的不是主内存，而是显存</h3>
+<p class="i-essence">普通的 RDMA 在主内存之间传数据。GPUDirect RDMA 让网卡把一块显存当作注册的内存区域：发送时网卡直接从显存取数据，接收时直接写进显存。数据从一台机器的显存到另一台机器的显存，中间不落到任何一边的主内存。</p>
+<div class="i-detail"><p><strong class="h">没有它的时候。</strong> 跨机发送一块梯度要走这样的路：</p><p>显存 →（PCIe）→ 主内存里注册过的缓冲区 →（PCIe）→ 网卡 → 网络 → 对端网卡 →（PCIe）→ 对端主内存 →（PCIe）→ 对端显存</p><p>两端各多一次拷贝，各多占一趟 PCIe 和一份主内存带宽，还需要主机上的线程来协调。</p><p><strong class="h">有了它。</strong> 路径变成：</p><p>显存 →（PCIe）→ 网卡 → 网络 → 对端网卡 →（PCIe）→ 对端显存</p><p>这其实就是 0.3 的 DMA 加上 5.2 的内存注册：只不过被注册、被网卡直接读写的那块“内存”在 GPU 上。</p><figure class="fig"><img src="../assets/figures/gdr-path.svg" alt="同一块梯度的两条路" loading="lazy"><figcaption>同一块梯度的两条路</figcaption></figure><p><strong class="h">条件。</strong></p><ul><li>软件上，要有一个把显存“介绍”给网卡驱动的内核模块。传统的做法是加载 <code>nvidia-peermem</code> 模块；较新的开源驱动可以走 Linux 的 DMA-BUF 机制，NCCL 会自动检测。</li><li>硬件上，网卡和 GPU 要足够近。按 Demystifying NCCL 对源码的分析，NCCL 只在网卡和 GPU 位于同一个 PCIe 交换芯片下时才启用它（可以用环境变量 <code>NCCL_NET_GDR_LEVEL</code> 放宽或收紧这个距离）。</li></ul><p><strong class="h">怎么确认。</strong></p><ul><li>模块在不在：<code>lsmod | grep nvidia_peermem</code>。</li><li>距离够不够近：5.1 里 <code>nvidia-smi topo -m</code> 的 GPU 和网卡那一格。</li><li>NCCL 实际用了没有：把 <code>NCCL_DEBUG</code> 设成 <code>INFO</code>，看建立连接的日志里，跨机的那些连接有没有标出 GDRDMA（6.3 会讲怎么读这份日志）。</li><li>不经过 NCCL 单独验证：<code>ib_write_bw</code> 加上 <code>--use_cuda</code>。</li></ul><p><mark>这是多机训练里最常见的一类“没报错但慢”的问题</mark>：模块没加载、容器里没把设备映射进来、或者网卡和 GPU 的配对不对，NCCL 都会照常工作，只是每一跳都多了两次拷贝。</p></div>
+<p class="i-analogy"><b>打个比方</b>像快递员直接进车间取货、直接送进对方车间：货物不用先搬到两边的门卫室再转一道手。</p>
+<p class="i-impl">所以它省掉了两端各一次“显存和主内存之间”的拷贝。但它有硬件位置的要求：网卡和 GPU 要离得够近。达不到要求时不会报错，只会悄悄退回“经主内存中转”的慢路径。</p>
+<div class="i-builds">承接 <a href="5-2.html#c-p5-2-verbs">RDMA 的四样东西：注册内存、队列对、工作请求、完成队列</a><a href="0-3.html#c-p0-3-dma">DMA：让设备自己搬数据，CPU 只负责发令</a><a href="5-1.html#c-p5-1-distance">两个设备的“距离”，决定数据走哪条路</a></div>
+<div class="i-builds">后面会用到 <a href="5-3.html#c-p5-3-two-nets">训练集群有两张网：前端管数据和管理，后端只跑 GPU 之间的 RDMA</a><a href="6-2.html#c-p6-2-transports">传输层：机内走 P2P 或共享内存，跨机走 IB verbs 或 socket</a><a href="6-3.html#c-p6-3-faults">几种典型故障，各有各的指纹</a><a href="8-2.html#c-p8-2-operator">GPU Operator：把让 GPU 在容器里能用的一整套组件装齐</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Demystifying NCCL 第 5 页 GPUDirect RDMA 优化</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/gpu_troubleshooting.html" target="_blank" rel="noopener">NCCL 用户指南：GPU Direct</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>RDMA 的核心是<strong>先把内存注册给网卡</strong>，之后网卡凭一把“钥匙”直接读写它；应用通过<strong>队列对</strong>下达请求，从<strong>完成队列</strong>得知结果，全程不进内核。<strong>RDMA write</strong> 连对方的 CPU 都不需要。这一切建立在<strong>网络不丢包</strong>之上：InfiniBand 靠信用流控天生做到，RoCE 靠 PFC 和 ECN 补上。把注册的对象换成显存，数据就能<strong>从显存直达显存</strong>。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>用 RDMA 传一次数据，要用到哪四个对象？各自起什么作用？</li><li>RDMA 的 send/recv 和 write/read 有什么本质区别？NCCL 是怎么用它们的？</li><li>为什么 RDMA 需要“不丢包”的网络？InfiniBand 是怎样避免拥塞丢包的？</li><li>RoCE 和 InfiniBand 是什么关系？RoCE 靠什么做到“不丢包”？</li><li>GPUDirect RDMA 省掉了哪些拷贝？它需要满足什么条件？怎样确认它在起作用？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>queue pair</dt><dd>队列对</dd></div><div><dt>memory registration</dt><dd>内存注册</dd></div><div><dt>completion queue</dt><dd>完成队列</dd></div><div><dt>verbs</dt><dd>RDMA 的编程接口</dd></div><div><dt>subnet manager</dt><dd>子网管理器</dd></div><div><dt>RoCE</dt><dd>以太网上的 RDMA</dd></div><div><dt>PFC</dt><dd>基于优先级的流量控制</dd></div><div><dt>ECN</dt><dd>显式拥塞通知</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="5-1.html"><small>上一单元</small>5.1 机内互联：PCIe、NVLink 与 NVSwitch</a>
+<a class="next" href="5-3.html"><small>下一单元</small>5.3 集群网络：拓扑、流量与拥塞</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

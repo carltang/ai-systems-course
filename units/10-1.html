@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10.1 强化学习是什么 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="从零建立强化学习的基本图景：它在解决什么问题，和监督学习有什么根本不同。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="9-3.html" title="9.3 推理引擎：批处理、显存与调度" data-step="prev">‹ 9.3</a>
+<a href="10-2.html" title="10.2 价值与策略：两条路线" data-step="next">10.2 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 10 部分 · 强化学习（选读）</span>10.1 强化学习是什么</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>强化学习和前面学的监督学习有什么根本不同？它在解决什么问题？</div><div class="frame-c">第 10 部分的起点，从零讲起。只需要第 1 部分的基础：模型、损失、梯度下降。</div></div>
+<div class="story"><p>线索是：先看强化学习的基本场景，一个智能体在环境里反复尝试 → 它和监督学习的三个关键区别 → 这些区别带来一个监督学习里没有的难题：探索还是利用 → 描述这类问题要用到三个核心概念 → 最后把它们放进一个统一的数学框架。这一单元不涉及任何具体的算法，目标是让你听到这些词时知道它们在说什么。</p></div>
+<ol class="thread"><li><a href="#c-p10-1-loop">一个在试错中学习的循环：智能体、环境、状态、动作、奖励</a></li><li><a href="#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a></li><li><a href="#c-p10-1-explore">探索与利用：试新的，还是用已知最好的</a></li><li><a href="#c-p10-1-concepts">回报、价值、策略：三个核心概念</a></li><li><a href="#c-p10-1-mdp">马尔可夫决策过程：把这个问题写成数学</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p10-1-loop"><h3><span class="i-num">1</span>一个在试错中学习的循环：智能体、环境、状态、动作、奖励</h3>
+<p class="i-essence">强化学习的基本场景是一个循环：智能体观察环境当前的状态，选择一个动作；环境因此发生变化，并给出一个数字作为奖励；智能体看到新的状态，再选下一个动作。它的目标是学会一种选动作的方式，让长期累积的奖励尽量多。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/rl-loop.svg" alt="智能体和环境之间的循环" loading="lazy"><figcaption>智能体和环境之间的循环</figcaption></figure><p>用一个具体的例子把这几个词对上：训练一个程序玩打砖块游戏。</p><ul><li><strong>智能体（agent）</strong>：我们要训练的程序。它的核心是一个神经网络。</li><li><strong>环境（environment）</strong>：游戏本身。智能体之外的一切。</li><li><strong>状态（state）</strong>：智能体在某一时刻看到的东西，这里是当前的游戏画面。</li><li><strong>动作（action）</strong>：智能体能做的选择：向左、向右、不动。</li><li><strong>奖励（reward）</strong>：环境在每一步给出的一个数。打掉一块砖得 1 分，其余时候是 0，漏球可以算 −1。</li></ul><p><strong class="h">一个回合的过程。</strong></p><ul><li>环境给出初始画面 s₀。</li><li>智能体看着 s₀，选一个动作 a₀（比如向左）。</li><li>环境执行这个动作，画面变成 s₁，并给出奖励 r₁。</li><li>智能体看着 s₁，选 a₁……</li><li>直到游戏结束。这一整串“状态、动作、奖励”叫一条轨迹，或者一个回合。</li></ul><p><strong class="h">目标。</strong> 不是让某一步的奖励最大，而是让整个回合累积的奖励最大。这个区别很重要：有时候当下看起来不划算的动作（先把球打到侧面的角落），能在后面带来大得多的收益（球钻到砖块上方连续得分）。</p><p><strong class="h">学的是什么。</strong> 一个“看到什么状态，就选什么动作”的规则，叫策略。训练开始时策略是随机的，智能体乱按一气；随着它不断地玩、不断地根据得到的奖励调整，策略逐渐变好。</p><p><strong class="h">这个框架非常宽。</strong> 换一组名词，它能描述很多看起来毫不相干的问题：</p><table><thead><tr><th>问题</th><th>状态</th><th>动作</th><th>奖励</th></tr></thead><tbody><tr><td>下围棋</td><td>棋盘</td><td>落子的位置</td><td>赢 +1，输 −1</td></tr><tr><td>机器人走路</td><td>各关节的角度和速度</td><td>各电机的力矩</td><td>向前走得越快越多，摔倒扣分</td></tr><tr><td>数据中心制冷</td><td>各处的温度、负载</td><td>调节阀门和风扇</td><td>耗电越少越多，超温扣分</td></tr><tr><td>让语言模型做数学题</td><td>题目和已经写出的内容</td><td>下一个 token</td><td>最后答案对了 +1</td></tr></tbody></table><p>最后一行是 10.4 的主题：<mark>把生成文本看成一连串的动作，强化学习就能用来训练语言模型</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像教一只小狗握手：你不能给它讲解动作要领。它随便做各种动作，碰巧抬起爪子时你给一块零食。次数多了，它就学会了“这种情况下抬爪子有好处”。</p>
+<p class="i-impl">所以强化学习适合“说不清该怎么做，但做完能判断好坏”的问题。它不需要有人事先标注正确的做法，只需要一个能给结果打分的规则。</p>
+<div class="i-builds">承接 <a href="1-1.html#c-1-1-chain-rule">反向传播 = 链式法则 + 记账</a></div>
+<div class="i-builds">后面会用到 <a href="10-1.html#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 1 章 引言：强化学习是什么</span><a class="src" href="https://spinningup.openai.com/" target="_blank" rel="noopener">OpenAI Spinning Up：Key Concepts in RL</a></div>
+</li>
+<li class="i-lead">这个循环看起来简单。把它和第 1 部分的监督学习放在一起比，才能看出它难在哪。</li>
+<li class="icard" id="c-p10-1-differences"><h3><span class="i-num">2</span>和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</h3>
+<p class="i-essence">监督学习里，每个输入都配着一个正确的输出，模型学的是模仿。强化学习里：没有人告诉智能体正确的动作是什么，它只知道做完之后得了多少分；这个分数常常很久之后才来，很难说清是哪一步的功劳；它看到什么数据，取决于它自己选了什么动作。</p>
+<div class="i-detail"><p><strong class="h">回顾监督学习</strong>（第 1 部分）。训练数据是一对对的（输入，正确答案）。模型给出预测，损失函数衡量预测和答案的差距，梯度告诉每个参数该怎么调。语言模型的预训练就是这样：输入是前文，答案是真实的下一个词。</p><p><strong class="h">区别一：只有评价，没有指导。</strong> 监督学习的反馈是“正确答案是 B”，它直接指明了方向。强化学习的反馈是“你选了 A，得了 3 分”。3 分是高是低？选 B 会不会更好？不知道，除非去试。</p><p>后果：不能直接对“奖励”求梯度来改进动作。奖励是环境给的，环境对智能体来说是个黑箱（游戏的规则、物理世界的规律都不是可导的函数）。10.2 会讲两条绕过这个障碍的路线。</p><p><strong class="h">区别二：奖励是延迟的。</strong> 下一盘围棋要走两百多步，只有终局时才知道输赢。赢了，是哪几步的功劳？输了，是哪一步的错？这叫<strong>功劳分配</strong>问题。</p><p>后果：需要一种办法，把最终的结果“分摊”回前面的每一个决策上。10.1 后面讲的“价值”就是为此而设的。</p><p><strong class="h">区别三：数据由智能体自己产生。</strong> 监督学习的数据集是事先准备好的、固定的。强化学习的数据是智能体和环境交互出来的轨迹：它选了什么动作，决定了它接下来会看到什么状态。</p><p>后果有三个：</p><ul><li>*探索的问题。* 智能体从来没试过的动作，它永远不知道好不好。下一节。</li><li>*数据的分布在变。* 策略变了，它遇到的状态就变了。一个刚学会走几步的机器人，根本见不到“快跑时怎样保持平衡”的数据。训练的目标在不断移动，这让训练不稳定。</li><li>*数据要现产。* 每改进一次策略，就要用新策略再去和环境交互，产生新数据。这是强化学习费时间的主要原因，也是 10.3 的系统设计围绕的核心。</li></ul><p><strong class="h">对照表。</strong></p><table><thead><tr><th></th><th>监督学习</th><th>强化学习</th></tr></thead><tbody><tr><td>反馈</td><td>正确答案</td><td>一个分数</td></tr><tr><td>反馈的时机</td><td>立刻</td><td>可能很久以后</td></tr><tr><td>数据从哪来</td><td>固定的数据集</td><td>自己和环境交互</td></tr><tr><td>数据的分布</td><td>不变</td><td>随策略变化</td></tr><tr><td>能达到的上限</td><td>数据里的水平</td><td>可以超过任何已有的示范</td></tr></tbody></table><p>最后一行是强化学习值得这些麻烦的原因。<mark>模仿只能学到示范者的水平；通过试错和奖励，智能体可以发现没有人示范过的、更好的做法</mark>。AlphaGo 下出人类棋手没下过的棋，靠的是这一点。</p></div>
+<p class="i-analogy"><b>打个比方</b>监督学习像对着标准答案订正作业。强化学习像学骑自行车：没有人能告诉你每一刻该用多大的力，你只知道刚才摔了；摔倒的原因可能是三秒钟之前的一个动作；而且你不上车去试，就什么也学不到。</p>
+<p class="i-impl">所以强化学习比监督学习难得多、也费数据得多。能用监督学习解决的问题，就不该用强化学习。它的价值在于监督学习够不着的地方：没有现成答案可模仿的任务。</p>
+<div class="i-builds">承接 <a href="10-1.html#c-p10-1-loop">一个在试错中学习的循环：智能体、环境、状态、动作、奖励</a><a href="1-2.html#c-1-2-likelihood">损失函数不是拍脑袋定的：它来自最大似然</a></div>
+<div class="i-builds">后面会用到 <a href="10-1.html#c-p10-1-explore">探索与利用：试新的，还是用已知最好的</a><a href="10-2.html#c-p10-2-policy">策略路线：直接调整策略，让得分高的动作更常出现</a><a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a><a href="10-4.html#c-p10-4-when">什么问题适合用强化学习</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 1 章 强化学习与监督学习、无监督学习的区别</span></div>
+</li>
+<li class="i-lead">第三个区别引出了一个监督学习里完全没有的问题。</li>
+<li class="icard" id="c-p10-1-explore"><h3><span class="i-num">3</span>探索与利用：试新的，还是用已知最好的</h3>
+<p class="i-essence">智能体每一步都面临一个选择：选目前已知收益最高的动作（利用），还是试一个了解不多的动作（探索）。只利用，可能永远发现不了更好的做法；只探索，又一直在浪费机会。好的学习过程要在两者之间平衡，通常是前期多探索，后期多利用。</p>
+<div class="i-detail"><p><strong class="h">最简单的例子：多臂老虎机。</strong> 面前有 10 台老虎机，每台的平均回报不同，但你不知道各是多少。你有 1000 次拉杆的机会，目标是总回报最多。</p><ul><li>你拉了几次之后，对每台机器有了一个粗略的估计。</li><li>接下来，是一直拉估计值最高的那台，还是再试试别的？</li></ul><p>估计值最高的那台，可能只是运气好碰上了几次高回报。真正最好的那台，可能因为头两次运气差，被你早早放弃了。只利用，你会被早期的偶然锁死。但把 1000 次机会平均分给 10 台，你又在那 9 台较差的机器上浪费了 900 次。</p><p>Sutton &amp; Barto 的第 2 章整章都在讲这个问题，因为它是强化学习区别于其他学习方式的最纯粹的体现。</p><p><strong class="h">最简单的办法：ε-贪心。</strong> 设一个小的概率 ε（比如 0.1）。每一步：以 1−ε 的概率选当前估计最好的动作；以 ε 的概率随机选一个。这样每个动作都有机会被反复尝试，估计值会越来越准；同时大部分时间在用当前最好的。通常让 ε 随着训练逐渐减小：前期多探索，后期多利用。</p><p><strong class="h">另一种常见的办法：让策略本身带随机性。</strong> 策略输出的不是一个确定的动作，而是每个动作的概率，然后按概率抽样。开始时各动作概率接近，探索充分；随着学习，好动作的概率越来越高，自然过渡到利用。10.2 的策略梯度方法就是这样。语言模型生成时按概率采样下一个 token，从这个角度看也是一种带随机性的策略。</p><p><strong class="h">在完整的强化学习里，探索更难。</strong> 老虎机只有一步。在多步的问题里，要发现一个好结果，可能需要连续做对几十个动作，随机乱试几乎碰不上。奖励稀少的任务（走完整个迷宫才有奖励）里，探索是最大的难点，有大量的研究专门对付它。</p><p><strong class="h">它对训练的影响。</strong></p><ul><li>结果的随机性大：同一个算法、同样的设置，换一个随机种子，结果可能差很多。<mark>评价一个强化学习的方法，通常要跑很多个种子</mark>。</li><li>训练曲线抖动：探索时做的动作常常不好，拉低了当时的表现。</li><li>训练时和使用时的行为不同：训练时要探索，实际使用时通常关掉探索，只用最好的动作。</li></ul></div>
+<p class="i-analogy"><b>打个比方</b>像在一个陌生的城市选餐馆：每次都去已知最好的那家，稳妥，但可能错过更好的；每次都换新的，可能发现惊喜，也会踩很多雷。住得越久、试过的越多，就越应该直接去最喜欢的那几家。</p>
+<p class="i-impl">所以强化学习的算法里总有一个控制“随机性”的机制。它不是噪声，而是学习所必需的。这也是强化学习的训练曲线比监督学习抖得多的原因之一。</p>
+<div class="i-builds">承接 <a href="10-1.html#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a></div>
+<div class="i-builds">后面会用到 <a href="10-1.html#c-p10-1-concepts">回报、价值、策略：三个核心概念</a><a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 1 章 探索与利用的权衡</span><span class="src">Sutton &amp; Barto 第 2 章 多臂老虎机</span></div>
+</li>
+<li class="i-lead">要把“长期累积的奖励尽量多”说精确，需要三个概念。后面所有的算法都是围绕它们展开的。</li>
+<li class="icard" id="c-p10-1-concepts"><h3><span class="i-num">4</span>回报、价值、策略：三个核心概念</h3>
+<p class="i-essence">回报是从某一刻开始、之后所有奖励的累加（越远的奖励打的折扣越多），它是智能体真正要最大化的东西。价值是“处在某个状态（或在某个状态做了某个动作）之后，预期能得到多少回报”，它是对未来的预测。策略是从状态到动作的规则，它是智能体的行为本身。</p>
+<div class="i-detail"><p><strong class="h">回报（return）。</strong> 从第 t 步开始，把之后得到的奖励加起来：</p><p>G = r₁ + γ·r₂ + γ²·r₃ + …</p><p>γ 是折扣因子，一个略小于 1 的数（比如 0.99）。越往后的奖励乘的折扣越多。为什么要打折：</p><ul><li>数学上，没有折扣的话，永不结束的任务里这个和可能是无穷大。</li><li>直观上，越远的未来越不确定，眼前的奖励更可靠。</li><li>γ 也控制了智能体的“眼光”：0.9 大致只看未来 10 步，0.99 看未来 100 步。</li></ul><p>智能体的目标，精确地说，是最大化回报的期望值。</p><p><strong class="h">策略（policy）。</strong> 一个函数：输入状态，输出动作（或者每个动作的概率）。记作 π。在深度强化学习里，它是一个神经网络：输入是状态（画面、传感器读数、一段文本），输出是动作的概率分布。</p><p><strong class="h">价值函数（value function）。</strong> 有两种常用的形式：</p><ul><li>*状态价值 V(s)*：从状态 s 出发，之后一直按策略 π 行动，预期的回报是多少。它回答“这个局面有多好”。</li><li>*动作价值 Q(s, a)*：在状态 s 先做动作 a，之后按策略 π 行动，预期的回报是多少。它回答“在这个局面走这一步有多好”。</li></ul><p>注意价值是相对于某个策略而言的：同一个局面，高手接着下和新手接着下，预期的结果不同。</p><p><strong class="h">价值解决了 10.1 第二节的“延迟”问题。</strong> 奖励只告诉你眼前的得失，而且常常是 0。价值把未来所有的奖励都折算到了现在。有了准确的价值函数，就不必等到终局才知道一步棋的好坏：看走完之后的局面的价值就行。它把一个长期的问题变成了每一步都能判断的问题。</p><p><strong class="h">三者的关系。</strong></p><ul><li>有了策略，可以（通过大量试玩）估计出它的价值函数：这叫策略评估。</li><li>有了动作价值 Q，可以得到一个更好的策略：在每个状态选 Q 最大的那个动作。这叫策略改进。</li><li>两者交替进行：评估当前的策略，据此改进它，再评估新的策略……策略和价值函数互相推动着变好。几乎所有的强化学习算法都是这个循环的某种形式。</li></ul><p><strong class="h">一个重要的递推关系。</strong> 一个状态的价值 = 这一步的奖励 + γ × 下一个状态的价值（取期望）。这叫贝尔曼方程。它说的是：<mark>长期的价值可以拆成“眼前的一步”加上“之后的价值”</mark>。10.2 的时序差分学习，就是把这个等式当成了学习的目标。</p></div>
+<p class="i-analogy"><b>打个比方</b>下棋的人看的不是“这一步能吃掉对方几个子”（即时的奖励），而是“走完这一步之后的局面好不好”（价值）。局面好不好，又取决于之后双方会怎么走（策略）。高手和新手的区别，就在于对局面的判断。</p>
+<p class="i-impl">所以强化学习的各种算法，学的无非是这两样里的一样或两样：学一个价值函数来判断好坏，或者学一个策略来直接行动。10.2 的两条路线由此而来。</p>
+<div class="i-builds">承接 <a href="10-1.html#c-p10-1-explore">探索与利用：试新的，还是用已知最好的</a></div>
+<div class="i-builds">后面会用到 <a href="10-1.html#c-p10-1-mdp">马尔可夫决策过程：把这个问题写成数学</a><a href="10-2.html#c-p10-2-td">时序差分：不必等到结局，用下一步的估计来修正这一步的估计</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 3 章 回报与回合</span><span class="src">Sutton &amp; Barto 第 3 章 策略与价值函数</span><a class="src" href="https://spinningup.openai.com/" target="_blank" rel="noopener">OpenAI Spinning Up：Key Concepts in RL</a></div>
+</li>
+<li class="i-lead">最后给这些概念一个统一的框架。它也是你读强化学习的论文和文档时会反复遇到的术语。</li>
+<li class="icard" id="c-p10-1-mdp"><h3><span class="i-num">5</span>马尔可夫决策过程：把这个问题写成数学</h3>
+<p class="i-essence">前面这些概念合在一起，有一个标准的数学名字：马尔可夫决策过程（MDP）。它由状态的集合、动作的集合、“在某个状态做某个动作后，会以多大的概率转到哪个状态、得到多少奖励”的规则，以及折扣因子组成。“马尔可夫”指的是一个假设：下一步会发生什么，只取决于当前的状态和动作，与更早的历史无关。</p>
+<div class="i-detail"><p><strong class="h">四个组成部分。</strong></p><ul><li>状态的集合 S：环境可能处于的所有情况。</li><li>动作的集合 A：智能体可以做的所有选择。</li><li>环境的动态：在状态 s 做了动作 a 之后，转到状态 s′ 并得到奖励 r 的概率。它描述了环境“怎么运转”。智能体通常不知道它，只能通过交互来体会。</li><li>折扣因子 γ。</li></ul><p>智能体要找的是一个策略，使回报的期望最大。</p><p><strong class="h">马尔可夫性。</strong> 环境下一步的反应只取决于当前的状态和动作。换句话说，“状态”必须包含决策所需的全部信息。</p><p>现实中这常常不完全成立：</p><ul><li>打砖块的单帧画面看不出球往哪个方向飞。解决办法是把最近几帧叠在一起当作状态。</li><li>机器人只能看到传感器的读数，看不到整个世界的真实状态。</li><li>对话里，当前这一句的含义依赖前面的全部对话。所以语言模型的“状态”是到目前为止的整段文本。</li></ul><p>智能体看到的东西不足以确定环境的状态时，叫“部分可观测”。实践中的办法是让状态包含一段历史，或者用带记忆的网络。Transformer 在这里很自然：它的输入本来就是整段历史。</p><p><strong class="h">定义问题时的两个关键选择。</strong></p><p>*状态里放什么。* 太少，信息不够，学不出好策略；太多，包含大量无关的东西，学得慢。</p><p>*奖励怎么设计。* 这是最容易出问题的地方。智能体会不折不扣地最大化你给的奖励，而不是你心里想要的结果。两者有偏差时，它会找到你意想不到的“捷径”：</p><ul><li>奖励“向前移动的速度”的机器人，可能学会一种怪异但很快的翻滚方式，而不是走路。</li><li>奖励“得分”的赛船游戏智能体，发现原地转圈反复吃同一个加分道具比完成比赛得分更高。</li><li>奖励“用户点了赞”的对话模型，可能学会一味地讨好用户。</li></ul><p>这叫钻奖励的空子。<mark>它不是算法出了故障，恰恰是算法太有效了</mark>。10.4 讲业界的应用时会看到，奖励从哪来、可不可靠，是每个应用首先要解决的问题。</p><p><strong class="h">这一单元到这里。</strong> 你现在有了描述强化学习问题的全部词汇：智能体、环境、状态、动作、奖励、回报、策略、价值、探索、MDP。下一单元讲怎样真正把策略学出来。</p></div>
+<p class="i-analogy"><b>打个比方</b>像下棋：要决定下一步怎么走，只需要看当前的棋盘，不需要知道这个局面是怎么一步步走出来的。棋盘上已经包含了做决定所需的全部信息。</p>
+<p class="i-impl">所以把一个实际问题交给强化学习，第一件事是定义这四样东西，其中最关键的是状态和奖励。状态里缺了必要的信息，或者奖励没有准确地表达你想要的结果，后面的算法再好也没用。</p>
+<div class="i-builds">承接 <a href="10-1.html#c-p10-1-concepts">回报、价值、策略：三个核心概念</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-rlhf">大模型的对齐：用人的偏好当奖励（RLHF）</a><a href="10-4.html#c-p10-4-when">什么问题适合用强化学习</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 3 章 有限马尔可夫决策过程</span><span class="src">Sutton &amp; Barto 第 3 章 最优策略与最优价值函数</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>强化学习研究的是一个<strong>智能体</strong>怎样通过和<strong>环境</strong>的反复交互，学会选择能带来最多<strong>奖励</strong>的动作。它<strong>没有标准答案</strong>，只有事后的打分；打分常常<strong>延迟</strong>；训练数据由智能体<strong>自己的行为</strong>产生。所以它必须在<strong>探索</strong>和<strong>利用</strong>之间权衡。<strong>回报</strong>是累积的奖励，<strong>价值</strong>是对未来回报的预期，<strong>策略</strong>是从状态到动作的规则。这一切用<strong>马尔可夫决策过程</strong>来描述。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>强化学习的基本循环由哪几个要素组成？智能体的目标是什么？</li><li>强化学习和监督学习有哪三个根本区别？各自带来了什么困难？</li><li>什么是探索与利用的两难？最简单的平衡办法是什么？</li><li>回报、价值函数和策略各是什么？它们之间是什么关系？</li><li>马尔可夫决策过程由哪几部分组成？“马尔可夫性”是什么意思？定义一个强化学习问题时最容易出错的是哪两样？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>agent</dt><dd>智能体</dd></div><div><dt>environment</dt><dd>环境</dd></div><div><dt>reward</dt><dd>奖励</dd></div><div><dt>return</dt><dd>回报（累积的奖励）</dd></div><div><dt>policy</dt><dd>策略</dd></div><div><dt>value function</dt><dd>价值函数</dd></div><div><dt>exploration</dt><dd>探索</dd></div><div><dt>MDP</dt><dd>马尔可夫决策过程</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="9-3.html"><small>上一单元</small>9.3 推理引擎：批处理、显存与调度</a>
+<a class="next" href="10-2.html"><small>下一单元</small>10.2 价值与策略：两条路线</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

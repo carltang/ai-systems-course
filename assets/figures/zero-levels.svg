@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="16 字节和 ZeRO 的三级">
+  <title>16 字节和 ZeRO 的三级</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="300" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">混合精度加 Adam：每个参数 16 字节</text>
+  <rect x="24" y="50" width="85.0" height="52" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="66.5" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">参数</text>
+  <text x="66.5" y="93.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">16 位，2</text>
+  <rect x="113.0" y="50" width="85.0" height="52" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="155.5" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">梯度</text>
+  <text x="155.5" y="93.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">16 位，2</text>
+  <rect x="202.0" y="50" width="174.0" height="52" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="289.0" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">参数主副本</text>
+  <text x="289.0" y="93.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">32 位，4</text>
+  <rect x="380.0" y="50" width="174.0" height="52" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="467.0" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一阶矩</text>
+  <text x="467.0" y="93.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">32 位，4</text>
+  <rect x="558.0" y="50" width="174.0" height="52" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="645.0" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">二阶矩</text>
+  <text x="645.0" y="93.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">32 位，4</text>
+  <text x="24" y="126" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">蓝色是计算用的，紫色是优化器这一侧的（12 字节，占四分之三）</text>
+  <text x="24" y="164" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">ZeRO 各级之后，每张卡为每个参数存多少（卡多时）</text>
+  <text x="24" y="193" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">不切（数据并行）</text>
+  <rect x="190" y="178" width="352" height="20" rx="5" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="552" y="193" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">16 字节</text>
+  <text x="736" y="193" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信 1 倍</text>
+  <text x="24" y="221" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">第一级：切优化器状态</text>
+  <rect x="190" y="206" width="88" height="20" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="288" y="221" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">约 4 字节</text>
+  <text x="736" y="221" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信 1 倍</text>
+  <text x="24" y="249" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">第二级：再切梯度</text>
+  <rect x="190" y="234" width="44" height="20" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="244" y="249" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">约 2 字节</text>
+  <text x="736" y="249" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信 1 倍</text>
+  <text x="24" y="277" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">第三级：再切参数</text>
+  <rect x="190" y="262" width="11" height="20" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="211.0" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">16/N 字节</text>
+  <text x="736" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信约 1.5 倍</text>
+</svg>

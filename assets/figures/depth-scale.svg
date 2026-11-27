@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 214" width="760" height="214" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="每层的倍数经过 50 层之后">
+  <title>每层的倍数经过 50 层之后</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="214" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">信号每过一层被乘上一个倍数，过 50 层之后</text>
+  <text x="24" y="78" font-size="14" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">每层 × 1.5</text>
+  <rect x="120" y="56" width="612" height="32" rx="7" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="132" y="77" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">放大约 6 亿倍：数值溢出</text>
+  <text x="24" y="128" font-size="14" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">每层 × 1</text>
+  <rect x="120" y="106" width="300" height="32" rx="7" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="132" y="127" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">大小不变：能稳定穿过</text>
+  <text x="24" y="178" font-size="14" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">每层 × 0.7</text>
+  <rect x="120" y="156" width="26" height="32" rx="7" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="158" y="177" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">缩小到一亿分之二：信号成了零</text>
+</svg>

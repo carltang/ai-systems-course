@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3.2 第一个 CUDA kernel · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="理解线程、线程块、网格，能独立写出并正确启动简单的 CUDA kernel。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="3-1.html" title="3.1 GPU 环境与第一次性能分析" data-step="prev">‹ 3.1</a>
+<a href="3-3.html" title="3.3 计算与内存架构" data-step="next">3.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 3 部分 · GPU 与 CUDA 执行模型</span>3.2 第一个 CUDA kernel</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>怎样让成千上万个线程各自找到自己的那份工作？</div><div class="frame-c">承接 3.1：GPU 的长处是同时做大量相同的活，这一单元学怎么把活分给线程。</div></div>
+<div class="story"><p>上一单元说 GPU 擅长“同时做大量相同的活”。这一单元回答：这些活具体怎么分下去？线索是：只写一个线程的代码 → 每个线程靠编号找到自己的数据 → 数据先得从 CPU 搬到 GPU → 线程按 block 分组，组与组之间互不依赖。</p></div>
+<ol class="thread"><li><a href="#c-2-2-spmd">只写一个线程的代码，让它跑一百万份</a></li><li><a href="#c-2-2-index">线程的门牌号：blockIdx × blockDim + threadIdx</a></li><li><a href="#c-2-2-two-memories">CPU 和 GPU 各有一块内存，中间是一条窄路</a></li><li><a href="#c-2-2-independent-blocks">块与块互不等待，所以同一个程序能在大卡小卡上都跑</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-2-2-spmd"><h3><span class="i-num">1</span>只写一个线程的代码，让它跑一百万份</h3>
+<p class="i-essence">CUDA kernel 描述的是“一个线程做什么”。启动 kernel 时指定开多少线程，所有线程执行同一份代码，只是各自处理不同的数据，这叫 SPMD（single program, multiple data）。并行不是写出来的，是“开”出来的。</p>
+<div class="i-detail"><p>在 CPU 上给数组每个元素加 1，你会写一个循环：</p><pre>for (int i = 0; i &lt; n; i++) c[i] = a[i] + b[i];</pre><p>在 CUDA 里，循环消失了。你只写循环体，也就是“第 i 个元素怎么算”：</p><pre>__global__ void add(float* a, float* b, float* c, int n) {
+    int i = /* 我是第几号线程 */;
+    if (i &lt; n) c[i] = a[i] + b[i];
+}</pre><p>然后在启动时说“开 n 个线程来执行它”。n 个线程同时运行这同一段代码，各自的 <code>i</code> 不同。</p><p>这就是 SPMD（single program, multiple data）：程序只有一份，数据有很多份。它和上一单元的结论直接对应：GPU 擅长大量相同的工作，kernel 就是对“相同的工作”的描述。</p><p>因此把 CPU 代码搬到 GPU 上，第一步总是找出那个“每次迭代互不依赖”的循环：<mark>循环变量变成线程编号，循环体变成 kernel</mark>。如果各次迭代互相依赖（比如第 i 步要用第 i−1 步的结果），就不能直接这样做，那是 3.5 的话题。</p></div>
+<p class="i-analogy"><b>打个比方</b>像发给一百万个工人同一张工作说明：每个人照着同一张说明干活，只是凭自己的工号去领不同的料。</p>
+<p class="i-impl">所以写 kernel 的思路是：先想清楚“一个元素怎么算”，再想“第几号线程负责哪个元素”。CPU 代码里的循环，往往变成了线程。</p>
+<div class="i-builds">后面会用到 <a href="3-2.html#c-2-2-index">线程的门牌号：blockIdx × blockDim + threadIdx</a><a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §2.5</span></div>
+</li>
+<li class="i-lead">每个线程执行同一段代码，那它怎么知道自己该处理哪个元素？靠的是它的编号。</li>
+<li class="icard" id="c-2-2-index"><h3><span class="i-num">2</span>线程的门牌号：blockIdx × blockDim + threadIdx</h3>
+<p class="i-essence">线程分两层组织：网格（grid）由线程块（block）组成，块里是线程。一个线程的全局编号 = 块号 × 每块线程数 + 块内编号，用它找到自己负责的数据。为了凑整，开出的线程通常比数据多，多出来的必须用 if (i &lt; n) 挡住。</p>
+<div class="i-detail"><p>线程不是一个平铺的大列表，而是分两层：若干线程组成一个 block，若干 block 组成 grid。每个线程能读到三个内置变量：<code>blockIdx</code>（我在第几个 block）、<code>blockDim</code>（每个 block 有多少线程）、<code>threadIdx</code>（我在 block 里排第几）。</p><p>全局编号就是：<code>i = blockIdx.x * blockDim.x + threadIdx.x</code>。比如每个 block 256 个线程，第 3 个 block 里的第 10 号线程，全局编号是 3 × 256 + 10 = 778，它就负责 <code>c[778]</code>。</p><p>为什么要越界检查？因为<mark>线程只能按整个 block 来开</mark>。有 1000 个元素、每个 block 256 个线程时，要开 ⌈1000/256⌉ = 4 个 block，一共 1024 个线程。编号 1000 到 1023 的这 24 个线程没有对应的数据，如果不拦住，它们会去读写数组后面不属于你的内存。</p><p>二维的情况（图片、矩阵）完全一样，只是 x、y 两个方向各算一次：列号用 x 方向的三个变量，行号用 y 方向的三个变量。</p></div>
+<details class="i-more"><summary>例子：处理一张 1920×1080 的图片，grid 要开多大？</summary><div class="i-detail"><p>假设每个 block 取 16×16 = 256 个线程，一个线程处理一个像素。</p><ul><li>x 方向（宽 1920）：1920 ÷ 16 = 120，正好 120 个 block。</li><li>y 方向（高 1080）：1080 ÷ 16 = 67.5，要向上取整，68 个 block。</li></ul><p>所以 grid 是 120×68，一共 8160 个 block、约 209 万个线程。线程覆盖的范围是 1920×1088，比图片多出 8 行（15360 个线程），这些线程必须被越界检查拦住。</p><p>kernel 里每个线程这样找到自己的像素：</p><pre>int col = blockIdx.x * blockDim.x + threadIdx.x;
+int row = blockIdx.y * blockDim.y + threadIdx.y;
+if (col &lt; width &amp;&amp; row &lt; height) {
+    int i = row * width + col;       // 图片按行存：第 row 行第 col 列
+    out[i] = /* 用 in[i] 算出结果 */;
+}</pre><p>向上取整有一个常用写法：<code>(n + blockSize - 1) / blockSize</code>，用整数除法就能得到 ⌈n / blockSize⌉。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像用“楼号 × 每栋户数 + 房号”算出全小区的门牌号；最后一栋没住满，空房间不能去敲门。</p>
+<p class="i-impl">所以每个 kernel 的第一行几乎都是算下标，第二行是越界检查；图片、矩阵这样的二维数据，就用 x、y 两个方向分别算出列和行。</p>
+<div class="i-builds">承接 <a href="3-2.html#c-2-2-spmd">只写一个线程的代码，让它跑一百万份</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-channels">通道：把一次操作切成几路并行，每一路占用 GPU 的一个计算单元</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §2.5</span><span class="src">PMPP 第 3 章</span></div>
+</li>
+<li class="i-lead">线程找到了自己的位置，但它要处理的数据在哪里？一开始它在 CPU 这边的内存里，而 GPU 访问不到那里。</li>
+<li class="icard" id="c-2-2-two-memories"><h3><span class="i-num">3</span>CPU 和 GPU 各有一块内存，中间是一条窄路</h3>
+<p class="i-essence">主机内存和显存是分开的，数据要通过 PCIe 拷过去。显存带宽在每秒上千 GB 的量级，PCIe 只有每秒几十 GB，差了几十倍。</p>
+<div class="i-detail"><p>CPU 用的内存（主机内存）和 GPU 用的内存（显存）是两块独立的存储，中间靠 PCIe 总线连接。GPU 上的 kernel 只能读写显存，所以数据必须先拷过去，结果需要时再拷回来。</p><p>问题在于这条通道很窄。GPU 读写自己的显存，速度在每秒几百到上千 GB；而 PCIe 的传输速度大约是每秒十几到几十 GB。拷贝 1 GB 的数据要几十毫秒，而 GPU 对 1 GB 数据做一次逐元素运算只要几毫秒。也就是说，搬一次数据的时间够算十次。</p><p>由此得到一条实用的规则：<mark>数据进了 GPU 就别轻易出来</mark>。把一长串运算都在 GPU 上连着做完，最后只把需要的结果拷回去。</p><p>训练循环里最常见的坑是每一步都调用 <code>loss.item()</code> 或 <code>.cpu()</code>。它们不仅触发一次拷贝，还会让 CPU 停下来等 GPU 做完前面所有任务（因为 GPU 是异步的，见 3.1）。偶尔打印一次没问题，每一步都调用就会明显变慢。</p></div>
+<p class="i-analogy"><b>打个比方</b>工厂（GPU）里面搬运很快，但原料仓库（CPU 内存）在城外，中间只有一条小路。</p>
+<p class="i-impl">所以数据要尽量一直留在 GPU 上，在上面连续做完多步计算；频繁在 CPU 和 GPU 之间来回拷贝，往往比计算本身还慢。PyTorch 里的 .cpu()、.item() 都会触发拷贝和同步。</p>
+<div class="i-builds">承接 <a href="3-1.html#c-2-1-async">Python 只是在点单：GPU 是异步执行的</a><a href="0-3.html#c-p0-3-pinned">内存里的数据会被操作系统挪动，交给设备之前要先“钉住”</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP 第 2 章</span><span class="src">Best Practices §9.1 主机与设备间的数据传输</span></div>
+</li>
+<li class="i-lead">回到线程的两层结构：为什么要分成 block，而不是一个大平面？因为 block 是一条分界线，线内可以协作，线外互不相干。</li>
+<li class="icard" id="c-2-2-independent-blocks"><h3><span class="i-num">4</span>块与块互不等待，所以同一个程序能在大卡小卡上都跑</h3>
+<p class="i-essence">同一个 block 里的线程可以用 __syncthreads() 同步、共用共享内存；不同 block 之间没有执行顺序的保证，彼此独立。硬件可以按任意顺序、以任意并行度调度它们。</p>
+<div class="i-detail"><p>同一个 block 里的线程有两个特权：它们共用一小块很快的存储（共享内存），并且可以用 <code>__syncthreads()</code> 互相等待，意思是“所有人都做到这一步了，再一起往下走”。这让它们能合作完成一件事，比如一起把一块数据搬进共享内存再各自使用（3.3 的分块）。</p><p>不同 block 之间则什么保证都没有：谁先执行、谁后执行、是不是同时执行，都由硬件决定，程序里不能假设。</p><p>这条限制换来的好处是可扩展性。因为 block 互不依赖，硬件可以自由安排：小显卡上同时跑 8 个 block，其余排队；大显卡上同时跑 100 个。<mark>程序一个字都不用改，性能自动随硬件增长</mark>。这叫 transparent scalability。</p><p>反过来，它也限定了你设计算法的方式：需要线程之间紧密配合的工作，要安排在同一个 block 里；跨 block 的配合，只能通过“先启动一个 kernel 算完，再启动下一个”来实现。</p></div>
+<p class="i-analogy"><b>打个比方</b>像考试分考场：考场里有监考统一口令，考场之间互不相干；考场多就同时开考，考场少就分批考。</p>
+<p class="i-impl">所以同一个 kernel 在 SM 更多的大卡上自动更快（transparent scalability）；也意味着不能写依赖“别的 block 先算完”的逻辑。</p>
+<div class="i-builds">后面会用到 <a href="3-3.html#c-2-3-warp">warp：32 个线程听同一个口令</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §4.3</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">因为</strong> kernel 只描述一个线程的工作，<strong>所以</strong>关键是线程编号到数据位置的换算；<strong>因为</strong>数据在两块内存之间搬运很贵，<strong>所以</strong>要让数据留在 GPU 上；<strong>因为</strong> block 之间互相独立，<strong>所以</strong>同一份程序能在任何大小的 GPU 上运行。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>CUDA kernel 描述的是什么？并行是从哪里来的？</li><li>线程怎么算出自己负责的数据位置？为什么需要 if (i &lt; n)？</li><li>为什么要尽量让数据留在 GPU 上？.item() 为什么会拖慢训练？</li><li>同一个 block 内的线程和不同 block 的线程，各自能做什么、不能做什么？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>thread block</dt><dd>线程块</dd></div><div><dt>grid</dt><dd>网格</dd></div><div><dt>host</dt><dd>主机端（CPU）</dd></div><div><dt>device</dt><dd>设备端（GPU）</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="3-1.html"><small>上一单元</small>3.1 GPU 环境与第一次性能分析</a>
+<a class="next" href="3-3.html"><small>下一单元</small>3.3 计算与内存架构</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

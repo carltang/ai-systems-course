@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="NUMA：进程和设备不在同一侧">
+  <title>NUMA：进程和设备不在同一侧</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <rect x="24" y="46" width="336" height="150" rx="12" fill="none" stroke="#d9d4c8" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="36" y="38" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">NUMA 节点 0</text>
+  <rect x="40" y="62" width="140" height="44" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="110.0" y="89.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">CPU 插槽 0</text>
+  <rect x="204" y="62" width="140" height="44" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="274.0" y="89.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">内存</text>
+  <rect x="400" y="46" width="336" height="150" rx="12" fill="none" stroke="#d9d4c8" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="412" y="38" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">NUMA 节点 1</text>
+  <rect x="416" y="62" width="140" height="44" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="486.0" y="89.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">CPU 插槽 1</text>
+  <rect x="580" y="62" width="140" height="44" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="650.0" y="89.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">内存</text>
+  <rect x="40" y="136" width="180" height="44" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="130.0" y="154.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">DataLoader 进程</text>
+  <text x="130.0" y="175.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">被调度到了这一侧</text>
+  <rect x="580" y="136" width="140" height="44" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="650.0" y="154.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">GPU 3</text>
+  <text x="650.0" y="175.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">挂在这一侧</text>
+  <path d="M222 158 C 330 158, 330 120, 380 120 S 470 158, 578 158" fill="none" stroke="#dc97a3" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="214" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每个 batch 都要穿过插槽之间的互联</text>
+  <text x="24" y="244" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">放对的原则：一个进程用哪张卡，就让它的 CPU 核和内存都在那张卡所在的一侧</text>
+  <text x="24" y="264" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">多张卡同时放错时，插槽之间的互联会成为瓶颈</text>
+</svg>

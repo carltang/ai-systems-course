@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4.5 矩阵乘法的极限与 Tensor Core · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="把 4.1 的 kernel 一步步优化，学会用 Tensor Core 做矩阵乘法。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="4-4.html" title="4.4 Flash Attention" data-step="prev">‹ 4.4</a>
+<a href="5-1.html" title="5.1 机内互联：PCIe、NVLink 与 NVSwitch" data-step="next">5.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 4 部分 · 算子与 kernel</span>4.5 矩阵乘法的极限与 Tensor Core</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>怎样把矩阵乘法从“能跑”优化到接近硬件极限？</div><div class="frame-c">承接 3.3 的分块和 3.4 的清单：这一次的目标是追上 cuBLAS。</div></div>
+<div class="story"><p>线索是：矩阵乘法是算力受限的，先看硬件给它准备的专用单元 Tensor Core → 算力上去之后，瓶颈又回到“数据喂得够不够快”，于是要在每一层存储上都分块 → 再用软件流水线把等数据的时间藏起来 → 最后看这样一路优化下来，离 cuBLAS 还差多少、差在哪。这一单元是选读：实际工作中矩阵乘法直接用库，学它是为了看懂性能从哪里来。</p></div>
+<ol class="thread"><li><a href="#c-3-2-tensor-core">Tensor Core 一条指令算完一个小矩阵乘</a></li><li><a href="#c-3-2-levels">分块要分好几层：block、warp、线程各管一块</a></li><li><a href="#c-3-2-pipeline">边算这一块，边搬下一块</a></li><li><a href="#c-3-2-cublas">追 cuBLAS：知道差在哪，比追平更重要</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-3-2-tensor-core"><h3><span class="i-num">1</span>Tensor Core 一条指令算完一个小矩阵乘</h3>
+<p class="i-essence">普通 CUDA core 一次做一个乘加；Tensor Core 由一个 warp 协同，一次完成一个小矩阵块（例如 16×8×16）的乘加，输入是 fp16、bf16、tf32、fp8 这类低精度格式，累加用 fp32。吞吐比普通核心高一个数量级。</p>
+<div class="i-detail"><p><strong class="h">普通的运算单元。</strong> 3.3 讲过 GPU 的计算由一组组线程（warp，32 个线程）执行。普通情况下，每个线程每条指令做一次标量运算：一次乘法，或者一次乘加。矩阵乘法 C = A × B 的每个输出元素是一行和一列的点积，要做很多次乘加，由线程们一次一次地做。</p><p><strong class="h">Tensor Core。</strong> 它是 SM 里专门为矩阵乘法设计的硬件单元。一条指令，由一整个 warp 协同，完成“一个小矩阵乘以另一个小矩阵，再加到第三个小矩阵上”。常见的一种形状是 16×16 的 A 小块、16×8 的 B 小块，结果累加到 16×8 的 C 小块上。这一条指令里包含的乘加次数，普通单元要做上千次。于是同样的时间里能完成的运算量高出一个量级。显卡规格里“Tensor Core 的半精度峰值”和“普通单精度峰值”那两个 TFLOPS 数字的差距，就来自这里。</p><p><strong class="h">使用条件。</strong></p><ul><li>*低精度。* 输入是 16 位（fp16、bf16）或更低（8 位整数、fp8）；32 位输入可以走一种内部降精度的模式（TF32）。结果通常用 32 位累加，以免误差累积。这就是 1.5 里“换成 bf16 或 TF32 才能用上 Tensor Core”的硬件原因。</li><li>*数据要按小块排好。* 指令的输入是“一个 warp 的各个线程手里合起来的一小块矩阵”。每个线程的寄存器里要放这一小块的哪几个元素，有固定的规定。所以在调用它之前，数据必须已经从显存经共享内存搬进了寄存器，并且位置摆对。</li><li>*尺寸要凑整。* 矩阵的维度最好是小块尺寸的整数倍，否则边角要单独处理。1.5 里“把维度凑成 64、128 的倍数”说的就是这件事。</li></ul><p><strong class="h">瓶颈随之转移。</strong> 没有 Tensor Core 时，矩阵乘法是算力受限的：运算单元忙不过来。有了它，运算快了一个量级，“把数据从显存搬到寄存器”的速度就跟不上了。同一个 kernel 从算力受限变成了带宽受限。这是 0.1 的第一个思想的典型表现：<mark>消除了一个瓶颈，下一个瓶颈就浮出来</mark>。后面两节讲的分块和流水线，都是为了把数据喂得够快。</p><p><strong class="h">你需要自己用它吗。</strong> 几乎不需要。cuBLAS、cuDNN 和 Triton 的编译器都会在条件满足时自动使用。你要做的是让条件满足：打开混合精度（2.6），维度凑整。想确认用上了没有，可以用 profiler 看矩阵乘法 kernel 的名字，或者直接比较开关混合精度前后的吞吐。</p></div>
+<p class="i-analogy"><b>打个比方</b>普通核心像一次只能拧一颗螺丝的工人，Tensor Core 像一次压出一整块零件的冲床。</p>
+<p class="i-impl">所以要用上 Tensor Core，数据必须是低精度格式、按小块排好；算力上限一下子高了很多，瓶颈又回到了“能不能把数据喂得够快”。</p>
+<div class="i-builds">承接 <a href="3-3.html#c-2-3-intensity">算术强度：每搬 1 字节，能做几次运算</a><a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">CUDA for LLMs 第 7 章 Tensor Core</span><span class="src">CUDA for LLMs 第 6 章 低精度与吞吐</span><a class="src" href="https://docs.nvidia.com/cuda/cuda-programming-guide/" target="_blank" rel="noopener">CUDA Programming Guide</a></div>
+</li>
+<li class="i-lead">算力够了，接下来的问题是把数据足够快地送到 Tensor Core 面前。3.3 讲过一层分块，这里要做好几层。</li>
+<li class="icard" id="c-3-2-levels"><h3><span class="i-num">2</span>分块要分好几层：block、warp、线程各管一块</h3>
+<p class="i-essence">高性能矩阵乘法在每一层存储上都做一次分块：block 把一大块搬进共享内存，warp 和线程再把小块搬进寄存器，每个线程用寄存器里的数据算出一小片输出（例如 8×8）。每多一层分块，算术强度就再提高一截。</p>
+<div class="i-detail"><p><strong class="h">回顾 3.3 的一层分块。</strong> 朴素的矩阵乘法里，每个线程为了算一个输出元素，要从显存读一整行和一整列，每个读进来的数只用一次。分块的做法是：一个 block 的线程一起把 A 的一小块和 B 的一小块搬进共享内存，然后大家反复使用它们。每个从显存读进来的数被用了“块的边长”那么多次，算术强度相应提高。</p><p><strong class="h">为什么一层不够。</strong> 共享内存虽然比显存快，访问它仍然有代价；而 Tensor Core 要的数据必须在寄存器里。如果每做一次小矩阵乘都从共享内存现取，共享内存的访问又成了瓶颈。于是在共享内存和运算单元之间，再加一层。</p><figure class="fig"><img src="../assets/figures/tiling-levels.svg" alt="从显存到 Tensor Core，一层一层往近处搬" loading="lazy"><figcaption>从显存到 Tensor Core，一层一层往近处搬</figcaption></figure><p><strong class="h">三层存储，三层分块</strong>（从远到近）：</p><table><thead><tr><th>层</th><th>存储</th><th>谁负责</th><th>一块多大（举例）</th></tr></thead><tbody><tr><td>第一层</td><td>共享内存</td><td>一个 block</td><td>128×128 的输出对应的 A、B 片段</td></tr><tr><td>第二层</td><td>寄存器</td><td>一个 warp</td><td>64×32 左右</td></tr><tr><td>第三层</td><td>Tensor Core 的一条指令</td><td>一个 warp 的一次调用</td><td>16×8</td></tr></tbody></table><p>数据的流动是：显存 → 共享内存（一个 block 一起搬一大块）→ 寄存器（每个 warp 取自己那一片）→ Tensor Core（逐个小块相乘、累加在寄存器里）。全部算完后，累加的结果从寄存器直接写回显存。</p><p>每一层都遵循同一个原则：从较远的存储搬一次，在较近的存储里用多次。层数越多，每个从显存读出来的字节被利用得越充分。</p><p><strong class="h">块的大小由什么定。</strong> 每一层都受那一级存储容量的限制：共享内存每个 SM 只有一两百 KB，寄存器每个线程只有几十到两百多个。块太大放不下，或者挤占了别的 block 的资源（3.3 讲的占用率）。这些互相牵制的因素没有解析解，所以 4.3 讲的 autotune 才有用武之地。</p><p><strong class="h">读这类代码的办法。</strong> 高性能的矩阵乘法代码看起来很吓人：几层循环，大量的下标计算。但它的骨架只有一句话：<mark>对每一级存储，重复“搬一块进来、在里面多用几次”。</mark>认出每一层循环对应的是哪一级存储，代码就读通了。CUTLASS（NVIDIA 开源的矩阵乘法模板库）的结构就是按 block、warp、指令这三层组织的。</p></div>
+<p class="i-analogy"><b>打个比方</b>像物流：干线卡车把货运到城市仓库，小货车再送到街区，最后快递员送上门；每一段都尽量满载。</p>
+<p class="i-impl">所以 GEMM 代码看起来复杂，本质只是把 3.3 的分块思想在共享内存和寄存器两层上各做一遍，再加上向量化读写。</p>
+<div class="i-builds">承接 <a href="3-3.html#c-2-3-tiling">分块：一次搬一小块进共享内存，大家反复用</a></div>
+<div class="i-builds">后面会用到 <a href="4-5.html#c-3-2-pipeline">边算这一块，边搬下一块</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">CUDA for LLMs 第 6 章 优化路线</span><span class="src">CUDA for LLMs 第 6 章 寄存器分块</span><a class="src" href="https://siboehm.com/articles/22/CUDA-MMM" target="_blank" rel="noopener">siboehm：CUDA 矩阵乘法逐步优化</a></div>
+</li>
+<li class="i-lead">分块解决了“每个字节用得够不够多”。还有一个问题：搬下一块数据的时候，运算单元在干什么？</li>
+<li class="icard" id="c-3-2-pipeline"><h3><span class="i-num">3</span>边算这一块，边搬下一块</h3>
+<p class="i-essence">计算变快以后，等数据的时间就显得更突出。双缓冲（double buffering）准备两块共享内存：一块正在被计算时，另一块已经在异步加载下一批数据，两者重叠进行。</p>
+<div class="i-detail"><p><strong class="h">问题。</strong> 按上一节的做法，一个 block 的工作是一个循环：搬一块 A、B 进共享内存 → 用它们计算 → 搬下一块 → 计算……“搬”的时候，数据在从显存过来的路上，运算单元只能等；“算”的时候，访存的通道又闲着。两者交替，谁也没有满负荷。有了 Tensor Core 之后计算非常快，“等数据”在一个循环里占的比例就更突出了。</p><p><strong class="h">办法。</strong> 准备两块共享内存缓冲区（所以叫双缓冲）：</p><ul><li>第 k 轮：对缓冲区 1 里的数据做计算；<strong>同时</strong>，发起“把第 k+1 块数据搬进缓冲区 2”的操作。这个搬运是异步的，发出之后不等它完成。</li><li>第 k+1 轮：缓冲区 2 的数据已经到了，对它做计算；同时把第 k+2 块搬进缓冲区 1。</li></ul><p><mark>两块缓冲区轮流扮演“正在算”和“正在装”的角色</mark>。计算和搬运在时间上叠在了一起，一轮的时间从“搬 + 算”变成了两者里较长的那个。</p><figure class="fig"><img src="../assets/figures/double-buffer.svg" alt="两块缓冲区交替“算”和“装”" loading="lazy"><figcaption>两块缓冲区交替“算”和“装”</figcaption></figure><p>较新的 GPU 提供了专门的异步拷贝指令：发起一次“从显存到共享内存”的拷贝后立刻返回，之后在需要数据的地方等待它完成。这让上面的写法更直接。流水线也可以不止两级：提前两三块发起搬运，容忍更长的访存延迟。4.3 里 Triton 的 <code>num_stages</code> 参数设的就是这个级数。</p><p><strong class="h">这是同一个思想的又一次出现。</strong> 把它和课程里其他地方对一下，结构完全相同：</p><table><thead><tr><th>在哪</th><th>谁在算</th><th>同时谁在搬</th></tr></thead><tbody><tr><td>这里（一个 block 内）</td><td>Tensor Core 算当前块</td><td>下一块从显存进共享内存</td></tr><tr><td>2.4（数据加载）</td><td>GPU 算当前 batch</td><td>CPU 准备下一个 batch，并异步拷上 GPU</td></tr><tr><td>6.2（NCCL 的通道）</td><td>kernel 处理缓冲区的一格</td><td>网卡发送另一格</td></tr><tr><td>7.1（DDP）</td><td>反向计算前面的层</td><td>后面层的梯度在做 all-reduce</td></tr><tr><td>7.2（FSDP）</td><td>计算当前层</td><td>预取下一层的参数</td></tr></tbody></table><p>都是 0.1 里的“用别的活把等待填满”。区别只在尺度：从纳秒级的一次访存，到毫秒级的一次梯度同步。共同的代价也一样：要多一份缓冲空间（这里是第二块共享内存，那边是预取的 batch 或多拼出来的一层参数）。</p></div>
+<p class="i-analogy"><b>打个比方</b>像流水线：工人装配手上这一件时，下一件的零件已经在传送带上送过来了。</p>
+<p class="i-impl">所以访存延迟被藏在了计算后面；cuBLAS、CUTLASS 里都能看到这种软件流水线。</p>
+<div class="i-builds">承接 <a href="3-3.html#c-2-3-latency-hiding">GPU 不躲开等待，而是用别的活把等待填满</a><a href="4-5.html#c-3-2-levels">分块要分好几层：block、warp、线程各管一块</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">CUDA for LLMs 第 6 章 双缓冲</span></div>
+</li>
+<li class="i-lead">把这些技巧都用上之后，离专业的库还有多远？</li>
+<li class="icard" id="c-3-2-cublas"><h3><span class="i-num">4</span>追 cuBLAS：知道差在哪，比追平更重要</h3>
+<p class="i-essence">一步步优化矩阵乘法（合并访存 → 共享内存分块 → 寄存器分块 → 向量化 → Tensor Core），每一步都能用 3.4 的清单解释为什么变快。最后能到 cuBLAS 的八九成，已经很接近硬件极限。</p>
+<div class="i-detail"><p><strong class="h">一条典型的优化路线。</strong> 以一个固定大小的矩阵乘法为例，每一步解决的问题和对应的章节：</p><ul><li>*朴素版本*：一个线程算一个输出元素，从显存读一行一列。慢在访存：每个数只用一次，而且对其中一个矩阵是跳着读的。</li><li>*合并访存*（3.4）：调整线程和数据的对应关系，让相邻线程读相邻的地址。</li><li>*共享内存分块*（3.3）：一块数据搬进来用很多次。这一步通常提升最大。</li><li>*寄存器分块*（上上节）：每个线程算一小片输出，而不是一个元素。</li><li>*向量化读写*：一次读写 4 个数，而不是 1 个，减少访存指令的条数。</li><li>*双缓冲*（上一节）：搬和算重叠。</li><li>*Tensor Core*：换成专用硬件，同时换成低精度。</li></ul><p>siboehm 那篇广受好评的博客就是按这样的顺序，从朴素版本一步步优化到接近 cuBLAS，每一步都给出了测量结果。《CUDA for LLMs》第 6、7 章走的是相同的路线，最后达到 cuBLAS 的八成多。</p><p><strong class="h">每一步都能用 3.4 的清单解释。</strong> 这是走这条路线的真正价值：不是得到一个矩阵乘法，而是亲眼看到“算力受限、带宽受限、藏住延迟”这些概念各自值多少倍的性能。</p><p><strong class="h">剩下的差距在哪。</strong> 库的作者还做了更多：</p><ul><li>针对每一代 GPU、每一种矩阵形状和数据类型分别调优，运行时按实际情况选择不同的实现。</li><li>处理各种不规整的情况：不是块大小整数倍的尺寸、很扁或很窄的矩阵、不连续的内存布局。</li><li>用上最新硬件的专有特性，往往在公开文档之前。</li></ul><p>追平最后那一两成，需要的工作量比前面八成加起来还多，而且换一代硬件又要重来。</p><p><strong class="h">所以实际工程里的分工是：</strong></p><ul><li>标准的矩阵乘法、卷积：直接用 cuBLAS、cuDNN。PyTorch 的 <code>matmul</code>、<code>nn.Linear</code> 底下就是它们。</li><li>需要把矩阵乘法和别的运算融合在一起、库里没有现成的（Flash Attention 是最好的例子）：用 Triton 写，或者基于 CUTLASS 这样的模板库写。这时上面这些技巧才派上用场。</li></ul><p>0.2 讲过“<mark>离上限只差一两成时，就该换一个瓶颈去攻</mark>”。矩阵乘法是这句话最典型的应用场景。</p></div>
+<p class="i-analogy"><b>打个比方</b>像学做菜对照名厨的版本：做不到一模一样没关系，关键是尝得出差在火候还是调料。</p>
+<p class="i-impl">所以实际工程里矩阵乘法直接用 cuBLAS 或 CUTLASS；自己写的意义在于看懂性能从哪里来，以及在库覆盖不到的融合算子里用上这些技巧。</p>
+<div class="i-builds">承接 <a href="3-4.html#c-2-4-checklist">优化清单的本质：让计算单元一直有活干</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">CUDA for LLMs 第 7 章 达到 cuBLAS 的 87%</span><a class="src" href="https://siboehm.com/articles/22/CUDA-MMM" target="_blank" rel="noopener">siboehm：CUDA 矩阵乘法逐步优化</a><a class="src" href="https://www.aleksagordic.com/blog/matmul" target="_blank" rel="noopener">Aleksa Gordić：matmul 解析</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">Tensor Core</strong> 让一个 warp 一条指令完成一小块矩阵乘，算力高一个量级，但要求低精度、按块排好的数据。要喂饱它，就得在共享内存和寄存器上<strong>逐层分块</strong>，再用<strong>双缓冲</strong>让搬数据和计算重叠。这样能到 cuBLAS 的八九成；实际工程直接用 <strong>cuBLAS</strong>，这些技巧用在库覆盖不到的融合算子里。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>Tensor Core 和普通的 CUDA core 有什么不同？使用它需要满足什么条件？</li><li>高性能矩阵乘法为什么要做多层分块？每一层分别利用了哪一级存储？</li><li>双缓冲（软件流水线）解决什么问题？它是怎样让搬数据和计算重叠的？</li><li>手写的矩阵乘法一步步优化，大致经过哪些阶段？为什么实际工程里仍然直接用 cuBLAS？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>tensor core</dt><dd>张量核心</dd></div><div><dt>WMMA</dt><dd>warp 级矩阵乘加接口</dd></div><div><dt>double buffering</dt><dd>双缓冲</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="4-4.html"><small>上一单元</small>4.4 Flash Attention</a>
+<a class="next" href="5-1.html"><small>下一单元</small>5.1 机内互联：PCIe、NVLink 与 NVSwitch</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

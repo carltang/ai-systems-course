@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10.2 价值与策略：两条路线 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清强化学习的两大类方法各自的思路，以及 PPO 为什么成了最常用的算法。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="10-1.html" title="10.1 强化学习是什么" data-step="prev">‹ 10.1</a>
+<a href="10-3.html" title="10.3 强化学习的系统形态" data-step="next">10.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 10 部分 · 强化学习（选读）</span>10.2 价值与策略：两条路线</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>怎样从“试错得到的奖励”里学出一个好策略？</div><div class="frame-c">承接 10.1 的价值和策略两个概念：分别从它们出发，就是两条路线。</div></div>
+<div class="story"><p>线索是：先看一个贯穿两条路线的基本技巧，用“下一步的估计”来修正“这一步的估计” → 第一条路线学价值：学会给每个动作打分，照着分数行动 → 第二条路线学策略：直接调整策略本身 → 两者各有弱点，合起来用效果最好 → 最后看今天最常用的算法 PPO 在此基础上加了什么。</p></div>
+<ol class="thread"><li><a href="#c-p10-2-td">时序差分：不必等到结局，用下一步的估计来修正这一步的估计</a></li><li><a href="#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a></li><li><a href="#c-p10-2-policy">策略路线：直接调整策略，让得分高的动作更常出现</a></li><li><a href="#c-p10-2-actor-critic">两者结合：一个出主意，一个打分</a></li><li><a href="#c-p10-2-ppo">PPO：每次只把策略改一小步</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p10-2-td"><h3><span class="i-num">1</span>时序差分：不必等到结局，用下一步的估计来修正这一步的估计</h3>
+<p class="i-essence">要学一个状态的价值，最直接的办法是从它出发玩到底，看实际得到多少回报，重复很多次取平均。时序差分（TD）学习不等到底：只走一步，用“这一步的奖励 + 下一个状态的估计价值”作为目标，把当前状态的估计值朝它挪一点。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/rl-two-routes.svg" alt="这一单元的路线图：两条路线都用到时序差分，最后汇合成 actor-critic 和 PPO" loading="lazy"><figcaption>这一单元的路线图：两条路线都用到时序差分，最后汇合成 actor-critic 和 PPO</figcaption></figure><p><strong class="h">两种估计价值的办法。</strong></p><p>*玩到底（蒙特卡洛）。* 从状态 s 出发按策略一直玩到回合结束，把实际得到的回报记下来。重复多次，取平均，作为 V(s) 的估计。</p><ul><li>优点：用的是真实的结果，没有偏差。</li><li>缺点：必须等回合结束才能学；一局里随机的因素很多，单次的回报波动很大，要很多局才能平均出准确的值。</li></ul><p>*时序差分（TD）。* 10.1 最后提到的贝尔曼方程说：V(s) 应该等于“这一步的奖励 + γ × 下一个状态的价值”。把它当作学习的目标：</p><ul><li>在状态 s 做一个动作，得到奖励 r，到达状态 s′。</li><li>目标值 = r + γ·V(s′)，其中 V(s′) 用的是当前的估计。</li><li>把 V(s) 朝目标值挪一小步：V(s) ← V(s) + α × (目标值 − V(s))。</li></ul><p>括号里的差叫 TD 误差：“走了这一步之后，发现情况比我原来估计的好了多少（或差了多少）”。它是强化学习里最核心的一个信号。</p><p><strong class="h">为什么这样做是对的。</strong> 目标值里的 V(s′) 只是个估计，但它比 V(s) “多知道一步”：它包含了一步真实的奖励 r。每次更新，都有一点真实的信息被注入进来。在回合的终点，价值是确定的（就是最后的奖励）；这个确定的信息通过一次次更新，从终点一步步向前传到所有的状态。</p><p><strong class="h">比较。</strong></p><table><thead><tr><th></th><th>玩到底</th><th>时序差分</th></tr></thead><tbody><tr><td>什么时候能学</td><td>回合结束后</td><td>每一步之后</td></tr><tr><td>目标值</td><td>真实的回报</td><td>一步奖励 + 估计</td></tr><tr><td>波动</td><td>大</td><td>小</td></tr><tr><td>偏差</td><td>无</td><td>有（估计不准时）</td></tr></tbody></table><p>实践中常取中间：走 n 步真实的奖励，再接上估计。n 是一个旋钮，在波动和偏差之间调节。</p><p><strong class="h">隐患。</strong> “用估计来更新估计”叫自举。价值函数用神经网络来表示时，更新一个状态的值会连带改变相邻状态的值，包括目标里用到的那个 V(s′)。目标在跟着被学的东西一起动，有可能互相追逐、越追越偏，最后发散。Sutton &amp; Barto 指出，三个因素同时出现时最危险：用函数近似（神经网络）、自举、用别的策略产生的数据来学。书里把它叫“致命三角”。下一节的 DQN 的几个关键技巧，都是为了稳住它。</p><p><strong class="h">和第 1 部分的联系。</strong> 这个更新式的形状你见过：参数 ← 参数 + 步长 × 误差。它就是梯度下降，损失函数是“当前估计和目标值之差的平方”。<mark>区别在于监督学习的目标是数据里固定的答案，这里的目标是模型自己算出来的、会变的</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像估计开车回家要多久：不必等到家了才更新估计。出门时估计要 30 分钟；开了 5 分钟到了高架入口，发现堵车，这时估计从这里到家还要 40 分钟。那么“出门时的估计”就该修正为 45 分钟。到没到家，都可以立刻修正。</p>
+<p class="i-impl">所以智能体每走一步都能学到东西，不用等一局结束。代价是它在用一个估计去修正另一个估计，早期两者都不准。几乎所有现代的强化学习算法里都有 TD 的成分。</p>
+<div class="i-builds">承接 <a href="10-1.html#c-p10-1-concepts">回报、价值、策略：三个核心概念</a><a href="1-2.html#c-1-2-adam">Adam = 动量 + 每个参数各自的步长</a></div>
+<div class="i-builds">后面会用到 <a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a><a href="10-2.html#c-p10-2-actor-critic">两者结合：一个出主意，一个打分</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto 第 6 章 时序差分学习</span><span class="src">Sutton &amp; Barto §11.3 致命三角</span></div>
+</li>
+<li class="i-lead">有了 TD 这个工具，第一条路线是把它用在动作价值上。</li>
+<li class="icard" id="c-p10-2-value"><h3><span class="i-num">2</span>价值路线：学会给每个动作打分，再挑分数最高的</h3>
+<p class="i-essence">Q-learning 学的是动作价值 Q(s, a)：在状态 s 做动作 a，之后一直做到最好，预期能得多少回报。学会了它，策略就是现成的：每个状态选 Q 最大的动作。DQN 用一个神经网络来表示 Q，输入画面，输出每个动作的分数，第一次让同一个算法从像素学会了几十种游戏。</p>
+<div class="i-detail"><p><strong class="h">Q-learning 的更新。</strong> 和上一节的 TD 更新几乎一样，只是对象换成了 Q，并且目标里取“下一个状态里最好的动作”：</p><ul><li>在状态 s 做动作 a，得到奖励 r，到达 s′。</li><li>目标值 = r + γ × max Q(s′, a′)，max 是对 s′ 里所有可能的动作取的。</li><li>Q(s, a) 朝目标值挪一步。</li></ul><p>目标里的 max 意味着：不管实际上下一步做了什么，都按“下一步做到最好”来估计。所以它学的是最优策略的 Q，而不是当前行为策略的 Q。</p><p><strong class="h">这带来一个重要的性质：异策略（off-policy）。</strong> 学习用的数据（s, a, r, s′）可以来自任何地方：一个在随机探索的策略、一个很早以前的旧策略、甚至人类的操作记录。只要是环境里真实发生过的一步转移，就可以拿来更新 Q。</p><p>这意味着数据可以存起来反复用。10.1 讲过强化学习最大的成本是产生数据，所以这一点很有价值。</p><p><strong class="h">DQN：用神经网络表示 Q。</strong> 状态很多时（游戏画面有天文数字种可能），不可能给每个状态单独记一个值。DQN 用一个卷积网络：输入最近几帧画面，输出每个动作的 Q 值。训练的损失是“网络的输出”和“TD 目标值”之差的平方。</p><p>直接这样做是不稳定的（上一节的致命三角）。DQN 加了两个技巧：</p><ul><li>*经验回放。* 把每一步的转移存进一个很大的缓冲区。训练时从中随机抽一批。好处有两个：打破了相邻样本之间的强相关（连续的几帧几乎一样，直接拿来训练相当于反复学同一个样本）；每条数据能被用很多次。</li><li>*目标网络。* 计算目标值时，用的是 Q 网络的一个旧副本，每隔一段时间才从当前的网络同步一次。这样目标在一段时间内是固定的，不会和正在更新的网络互相追逐。</li></ul><p>DQN 在 2015 年用同一套网络结构和超参数，从屏幕像素学会了几十种雅达利游戏，其中不少超过了人类玩家。这是深度强化学习的起点。</p><p><strong class="h">这条路线的局限。</strong></p><ul><li>*要对动作取 max。* 动作只有几个或几十个时，网络一次输出全部动作的 Q，取最大值就行。动作是连续的（机器人每个关节的力矩是实数）或者数量巨大（语言模型的整段输出）时，这个 max 本身就是个难题。</li><li>*策略是确定的。* “选 Q 最大的”没有随机性，探索要另外加（ε-贪心）。</li><li>*Q 值容易被高估。* max 会系统性地挑中那些“被估高了”的动作，误差越滚越大。有一系列改进专门修正它。</li></ul><p><mark>所以在连续控制和语言模型上，主流是下一节的另一条路线</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一位美食评论家给每家餐馆的每道菜打分。分数打准了，点菜就不用想：翻开点评，选分数最高的那道。</p>
+<p class="i-impl">所以价值路线的策略是“隐含”在 Q 里的。它有一个重要的优点：可以用任何来源的数据来学，包括很久以前的经验。但它要求能对所有动作求最大值，动作很多或连续时就不好用了。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-td">时序差分：不必等到结局，用下一步的估计来修正这一步的估计</a><a href="10-1.html#c-p10-1-explore">探索与利用：试新的，还是用已知最好的</a></div>
+<div class="i-builds">后面会用到 <a href="10-2.html#c-p10-2-policy">策略路线：直接调整策略，让得分高的动作更常出现</a><a href="10-3.html#c-p10-3-replay">经验回放：把数据存起来，反复用</a><a href="10-4.html#c-p10-4-classic">游戏、推荐、调度：几个经典的应用领域</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto §6.5 Q-learning</span><a class="src" href="https://www.nature.com/articles/nature14236" target="_blank" rel="noopener">DQN 论文（Nature 2015）：Human-level control through deep reinforcement learning</a></div>
+</li>
+<li class="i-lead">价值路线绕了一个弯：先学打分，再从分数得到行为。能不能直接学行为？</li>
+<li class="icard" id="c-p10-2-policy"><h3><span class="i-num">3</span>策略路线：直接调整策略，让得分高的动作更常出现</h3>
+<p class="i-essence">策略梯度方法不学“每个动作值多少”，而是直接把策略表示成一个网络，输出每个动作的概率。训练的办法很朴素：按当前的策略玩几局；哪些动作之后得到的回报高，就提高它们被选中的概率；回报低的，就降低。重复这个过程。</p>
+<div class="i-detail"><p><strong class="h">要解决的障碍。</strong> 10.1 讲过，奖励是环境给的，环境是黑箱，没法对“奖励关于动作”求导。那怎么知道参数该往哪调？</p><p><strong class="h">关键的转换。</strong> 我们不对奖励求导，而是对“动作的概率”求导。策略网络输出的是每个动作的概率，这个概率关于网络参数是可导的。于是有一个可以实际计算的梯度：</p><p>对于实际做过的每一个动作：梯度 = 这个动作之后得到的回报 × “让这个动作的概率变大”的方向</p><p>把一批轨迹里所有动作的这一项加起来取平均，就是对“期望回报关于参数的梯度”的一个估计。这就是策略梯度定理的内容。它不需要知道环境的任何内部规则，只需要：做了什么动作，之后得了多少回报。</p><p><strong class="h">和监督学习的对比很有启发。</strong> 第 1 部分的交叉熵损失，梯度的方向是“让正确答案的概率变大”。策略梯度的形式一模一样，只是：</p><ul><li>没有“正确答案”，取而代之的是“自己实际采样到的动作”；</li><li>每一项前面多了一个权重：这个动作之后的回报。</li></ul><p>所以可以这样理解它：<strong>把自己做过的动作当成标签来做监督学习，但按结果的好坏加权。</strong> 结果好的动作，被强化得多；结果差的，被强化得少，甚至（回报为负时）被抑制。</p><p>这也说明了为什么语言模型很容易接上强化学习：语言模型本来就是输出下一个 token 的概率，训练它用的本来就是交叉熵。换成策略梯度，代码上只是给每个样本的损失乘一个权重（10.4）。</p><p><strong class="h">最基本的算法（REINFORCE）。</strong> 重复：用当前策略玩 N 局；对每一步算出它之后的回报；按上面的公式算梯度；更新策略。</p><p><strong class="h">缺点一：信号的噪声很大（方差大）。</strong> 一局游戏的回报受很多随机因素影响：环境的随机性、后面几百步里自己的随机选择。同一个动作，这一局后面碰巧顺利，回报很高；下一局碰巧不顺，回报很低。用这么抖的数字当权重，梯度的方向每次都差很多，要平均很多局才能看出真正的趋势。</p><p>一个立刻见效的改进：不用回报的绝对值，而用“回报减去一个基准”。比如所有局的平均回报是 100，那么得了 110 的动作权重是 +10，得了 90 的是 −10。这不改变梯度的期望方向，但数值小得多、有正有负，抖动大为减少。这个基准选什么最好，引出了下一节。</p><p><strong class="h">缺点二：数据只能用一次（同策略）。</strong> 这个梯度的估计只对“产生这批数据的那个策略”有效。策略一更新，旧数据就不再适用，要用新策略重新去玩。相比能反复使用旧数据的价值路线，它对样本的需求大得多。</p><p>所以策略路线的特点是：<mark>适用面广、概念直接，但费样本、不够稳</mark>。后面两节分别对付“不够稳”的两个来源。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一位厨师改进自己的菜谱：不去给每种做法精确打分，而是每次凭感觉做出略有不同的版本，客人反应好的做法以后就多用一点，反应差的就少用一点。</p>
+<p class="i-impl">所以它对动作的形式没有任何限制：连续的、数量巨大的都可以，只要能从策略里采样。代价是它只能用当前策略刚产生的数据，而且学习的信号噪声很大，需要大量的样本。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a><a href="1-2.html#c-1-2-likelihood">损失函数不是拍脑袋定的：它来自最大似然</a><a href="10-1.html#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a></div>
+<div class="i-builds">后面会用到 <a href="10-2.html#c-p10-2-actor-critic">两者结合：一个出主意，一个打分</a><a href="10-4.html#c-p10-4-verifiable">训练推理能力：用可以验证的结果当奖励</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto §13.2 策略梯度定理</span><span class="src">Sutton &amp; Barto §13.3 REINFORCE</span><a class="src" href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html" target="_blank" rel="noopener">Spinning Up：Intro to Policy Optimization</a></div>
+</li>
+<li class="i-lead">上一节末尾说，用“回报减去一个基准”可以大大减少噪声。最好的基准是什么？这个问题把两条路线接到了一起。</li>
+<li class="icard" id="c-p10-2-actor-critic"><h3><span class="i-num">4</span>两者结合：一个出主意，一个打分</h3>
+<p class="i-essence">actor-critic 方法同时训练两个网络。演员（actor）是策略，负责选动作。评论家（critic）是价值函数，负责判断“这个状态平均而言值多少”。更新演员时，不再用整局的回报当权重，而是用“这个动作的实际结果比评论家预期的好多少”，这个量叫优势。</p>
+<div class="i-detail"><p><strong class="h">基准应该是什么。</strong> 我们想知道的是：在状态 s 选了动作 a，是比“在 s 的平均表现”好，还是差。“在 s 的平均表现”正是 10.1 定义的状态价值 V(s)。</p><p><strong class="h">优势（advantage）。</strong> A(s, a) = 做了 a 之后的回报 − V(s)。</p><ul><li>大于零：这个动作比平均水平好，应该提高它的概率。</li><li>小于零：比平均水平差，应该降低。</li></ul><p>用优势代替回报作为策略梯度里的权重，信号干净得多。原因是它去掉了和这个动作无关的部分：如果这个状态本身就很好（不管做什么都能得高分），高回报并不说明这个动作好。减去 V(s) 之后，剩下的才是这个动作自己的贡献。这正是 10.1 讲的功劳分配问题的一个解法。</p><p><strong class="h">评论家从哪来。</strong> V(s) 是未知的，要学。于是有了第二个网络，用 10.2 第一节的 TD 方法来训练：输入状态，输出对回报的预测，朝着“一步奖励 + 下一个状态的预测”更新。</p><p><strong class="h">评论家还能进一步降低噪声。</strong> “做了 a 之后的回报”本身也可以不用整局的真实回报，而是用 TD 的方式估计：r + γ·V(s′)。这样优势就是上一步的 TD 误差：</p><p>A ≈ r + γ·V(s′) − V(s)</p><p>只涉及一步的随机性，噪声很小；但依赖评论家的估计，评论家不准时有偏差。实用的算法在“用几步真实奖励、从哪一步开始接评论家的估计”上取一个折中，常用的一种叫广义优势估计（GAE），用一个参数在两头之间调节。这和第一节里“走 n 步再接估计”是同一个旋钮。</p><p><strong class="h">训练的循环。</strong></p><ul><li>用演员（当前策略）和环境交互一段，收集数据。</li><li>用评论家算出每一步的优势。</li><li>更新演员：按优势加权的策略梯度。</li><li>更新评论家：让它对回报的预测更准。</li><li>重复。</li></ul><p>两个网络常常共用前面的大部分层（都要先“看懂”状态），只在最后分成两个输出。</p><p><strong class="h">对照 10.1 的大循环。</strong> 10.1 说几乎所有算法都是“评估策略、改进策略”的交替。这里看得很清楚：<mark>评论家在做评估，演员在做改进，两者同时、渐进地进行</mark>。</p><p><strong class="h">两条路线的总结。</strong></p><table><thead><tr><th></th><th>价值路线（DQN 类）</th><th>策略路线（策略梯度类）</th><th>actor-critic</th></tr></thead><tbody><tr><td>学什么</td><td>Q 函数</td><td>策略</td><td>策略 + 价值</td></tr><tr><td>动作</td><td>少量离散的</td><td>任意</td><td>任意</td></tr><tr><td>旧数据</td><td>可以反复用</td><td>不能</td><td>一般不能（有变体可以）</td></tr><tr><td>稳定性</td><td>需要技巧</td><td>噪声大</td><td>较好</td></tr></tbody></table></div>
+<p class="i-analogy"><b>打个比方</b>像一位演员和一位懂行的导演：演员每演一段，导演不是等电影上映看票房（整局的回报），而是当场告诉他“这一段比你平时的水平高了一点”还是“低了一点”。反馈又快又准。</p>
+<p class="i-impl">所以评论家的作用是给演员一个更干净的学习信号。几乎所有实用的策略梯度算法都是这种结构，包括下一节的 PPO，以及用强化学习微调语言模型时的做法。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-policy">策略路线：直接调整策略，让得分高的动作更常出现</a><a href="10-2.html#c-p10-2-td">时序差分：不必等到结局，用下一步的估计来修正这一步的估计</a></div>
+<div class="i-builds">后面会用到 <a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Sutton &amp; Barto §13.5 Actor–Critic 方法</span><a class="src" href="https://arxiv.org/abs/1506.02438" target="_blank" rel="noopener">广义优势估计（GAE）论文</a></div>
+</li>
+<li class="i-lead">actor-critic 减少了噪声。策略梯度还有第二个不稳定的来源，PPO 针对的是它。</li>
+<li class="icard" id="c-p10-2-ppo"><h3><span class="i-num">5</span>PPO：每次只把策略改一小步</h3>
+<p class="i-essence">策略梯度有一个危险：一次更新把策略改得太多，新策略的表现可能突然崩溃，而它产生的数据又很差，之后很难恢复。PPO 的办法是限制每次更新的幅度：新策略选某个动作的概率，相对于旧策略不能变化太多。超出范围的部分不再给奖励。有了这个限制，同一批数据可以放心地多用几遍。</p>
+<div class="i-detail"><p><strong class="h">问题：步子太大的后果比监督学习严重得多。</strong> 监督学习里一步走错了，损失升高，下一步用同样的数据再走回来就是了。强化学习里：</p><ul><li>策略梯度的估计只在当前策略附近可靠（10.2 第三节）。走远了，这个方向就不再代表“变好”。</li><li>策略变坏之后，它去采集的数据也是坏的：一个摔倒在地的机器人，采到的全是“在地上挣扎”的数据，里面没有任何关于怎样走路的信息。</li><li>于是坏策略产生坏数据，坏数据又训不出好策略。训练曲线会突然断崖式下跌，再也上不来。</li></ul><p>10.1 讲的“数据由自己产生”在这里露出了最危险的一面。</p><p><strong class="h">一个矛盾。</strong> 步子小一点可以避免崩溃，但样本很贵（每批数据只能用来走一小步，然后就得扔掉重新采集）。能不能同一批数据多更新几次？直接这样做，等于走了一大步，又回到了崩溃的风险。</p><p><strong class="h">PPO 的办法。</strong> 更新时盯着一个量：对数据里的每一个动作，新策略选它的概率 ÷ 旧策略选它的概率。这个比值是 1，说明策略在这一点上没变；离 1 越远，变得越多。</p><p>PPO 的目标函数是“比值 × 优势”，但把比值<strong>截断</strong>在一个小范围内，比如 0.8 到 1.2：</p><ul><li>一个优势为正的动作，提高它的概率会让目标变大。但比值超过 1.2 之后，再提高也不再有额外的收益。于是优化器没有动力把它推得更远。</li><li>优势为负的动作同理，概率降到 0.8 倍之后就不再继续压。</li></ul><p>效果是：无论在这批数据上优化多少轮，新策略都被“拴”在旧策略附近。于是可以放心地对同一批数据做好几轮更新，把每一批昂贵的数据用得更充分。</p><p><strong class="h">完整的一轮。</strong></p><ul><li>用当前策略采集一批数据（很多条并行的轨迹）。</li><li>用评论家算出优势（上一节）。</li><li>把这批数据当成一个小数据集，像监督学习那样分成小 batch、训练几轮，目标是截断后的那个函数，同时训练评论家。</li><li>扔掉数据，回到第一步。</li></ul><p><strong class="h">为什么它成了默认选择。</strong></p><ul><li>它之前有一个理论上更严格的方法（TRPO），同样是限制更新幅度，但要解一个带约束的优化问题，实现复杂。PPO 用一个简单的截断达到了差不多的效果，用普通的梯度下降和 Adam 就能训练。</li><li>对超参数不敏感。</li><li>天然适合并行：第一步的采集可以分给很多个环境同时做（10.3）。</li></ul><p><strong class="h">它的弱点</strong>仍然是同策略方法的通病：<mark>每批数据用几轮就得扔，费样本</mark>。在仿真很便宜的场景（游戏、物理仿真）这不是问题；在每条数据都很贵的场景（真实的机器人、需要人打分），就要想别的办法。</p><p><strong class="h">到这里，算法的主线讲完了。</strong> 从 TD，到价值路线，到策略路线，到两者结合，再到加上稳定性的约束。下一单元换一个角度：这些算法跑起来的时候，系统长什么样。</p></div>
+<p class="i-analogy"><b>打个比方</b>像学开车时调整习惯：每次只改一点点，确认没问题再继续。一下子把所有习惯都改掉，很可能下一脚就冲出路面，而且因为之后的每一段路都开得很糟，根本学不到有用的东西。</p>
+<p class="i-impl">所以 PPO 用“稳”换来了“好用”：实现简单，对超参数不敏感，各种任务上都能跑出不错的结果。它是今天默认的强化学习算法，机器人训练和语言模型的 RLHF 大多用它或它的近亲。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-actor-critic">两者结合：一个出主意，一个打分</a><a href="1-3.html#c-p1-3-lr">学习率是最重要的一个旋钮：先预热，再衰减</a><a href="10-1.html#c-p10-1-differences">和监督学习的三个不同：没有标准答案、奖励有延迟、数据是自己产生的</a></div>
+<div class="i-builds">后面会用到 <a href="10-3.html#c-p10-3-generate">数据不是读出来的，是和环境交互“跑”出来的</a><a href="10-3.html#c-p10-3-actor-learner">采集和学习分开：很多个 actor，少数几个 learner</a><a href="10-4.html#c-p10-4-rlhf">大模型的对齐：用人的偏好当奖励（RLHF）</a><a href="10-4.html#c-p10-4-robots">机器人与控制：在仿真里训练，迁移到真机</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noopener">PPO 论文：Proximal Policy Optimization Algorithms</a><a class="src" href="https://spinningup.openai.com/en/latest/algorithms/ppo.html" target="_blank" rel="noopener">Spinning Up：PPO</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">时序差分</strong>让智能体不必等到结局，每走一步就能学习。<strong>价值路线</strong>（Q-learning、DQN）学“在这个状态做这个动作值多少”，再选分数最高的；数据可以反复用，但只适合动作不多的问题。<strong>策略路线</strong>直接提高好动作的概率，适用面广，但需要大量新数据、波动大。<strong>actor-critic</strong> 用一个价值函数给策略的更新提供更稳的信号。<strong>PPO</strong> 再限制每次更新的幅度，换来稳定。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>时序差分学习是怎样更新价值估计的？它相对于“玩到底再统计”有什么优点和隐患？</li><li>Q-learning 学的是什么？它是怎样得到策略的？DQN 为了让神经网络稳定地学 Q，用了哪两个关键技巧？</li><li>策略梯度是怎样在不知道环境规则的情况下，算出“该往哪个方向调整策略”的？它的主要缺点是什么？</li><li>actor-critic 里的演员和评论家各学什么？“优势”是什么，为什么用它当权重比用回报更好？</li><li>为什么策略更新的步子太大会导致训练崩溃？PPO 是怎样限制更新幅度的？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>temporal difference</dt><dd>时序差分</dd></div><div><dt>Q-learning</dt><dd>Q 学习</dd></div><div><dt>policy gradient</dt><dd>策略梯度</dd></div><div><dt>actor-critic</dt><dd>演员-评论家</dd></div><div><dt>advantage</dt><dd>优势</dd></div><div><dt>on-policy / off-policy</dt><dd>同策略 / 异策略</dd></div><div><dt>PPO</dt><dd>近端策略优化</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="10-1.html"><small>上一单元</small>10.1 强化学习是什么</a>
+<a class="next" href="10-3.html"><small>下一单元</small>10.3 强化学习的系统形态</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

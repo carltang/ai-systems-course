@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="通信问题的分层排查">
+  <title>通信问题的分层排查</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">自下而上，一层正常了再看上一层</text>
+  <rect x="24" y="50" width="190" height="40" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="119.0" y="75.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第四层：框架</text>
+  <text x="230" y="68" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">训练里的通信是不是在等别的东西</text>
+  <text x="230" y="85" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">某个进程慢了，所有进程都在同步点等它</text>
+  <rect x="24" y="100" width="190" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="119.0" y="125.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第三层：NCCL</text>
+  <text x="230" y="118" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">NCCL 用上这条路了吗</text>
+  <text x="230" y="135" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">nccl-tests 的 busbw，初始化日志</text>
+  <rect x="24" y="150" width="190" height="40" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="119.0" y="175.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第二层：裸传输</text>
+  <text x="230" y="168" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">不经过 NCCL，这条路能跑多快</text>
+  <text x="230" y="185" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">nvbandwidth，ib_write_bw</text>
+  <rect x="24" y="200" width="190" height="40" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="119.0" y="225.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第一层：链路和设备</text>
+  <text x="230" y="218" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">硬件本身是好的吗</text>
+  <text x="230" y="235" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">nvidia-smi topo，ibstat，perfquery，dmesg</text>
+  <line x1="744" y1="236" x2="744" y2="56" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="24" y="268" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每一层都按“单机 → 两台 → 全量”放大；每次只改一个条件</text>
+</svg>

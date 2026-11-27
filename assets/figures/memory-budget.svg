@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 214" width="760" height="214" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="训练显存的五笔账">
+  <title>训练显存的五笔账</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="214" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">训练显存的五笔账（fp32、Adam 时前三项合计是参数的 4 倍）</text>
+  <rect x="24" y="56" width="92" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="70.0" y="82.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">参数</text>
+  <text x="70.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">1 份</text>
+  <rect x="120" y="56" width="92" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="166.0" y="82.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">梯度</text>
+  <text x="166.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">1 份</text>
+  <rect x="216" y="56" width="188" height="60" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="310.0" y="82.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">优化器状态</text>
+  <text x="310.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">Adam 是 2 份</text>
+  <rect x="408" y="56" width="222" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="519.0" y="82.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">激活值</text>
+  <text x="519.0" y="103.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">和 batch 成正比</text>
+  <rect x="634" y="56" width="82" height="60" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="675.0" y="91.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">缓存与碎片</text>
+  <rect x="24" y="134" width="380" height="6" rx="3" fill="#8aa2e6"/>
+  <text x="214" y="160" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">和 batch 大小无关</text>
+  <rect x="408" y="134" width="222" height="6" rx="3" fill="#e0b860"/>
+  <text x="519" y="160" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">大 batch、长序列时远超前三项</text>
+  <text x="24" y="194" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">推理只剩参数和当前一层的激活值，所以省得多</text>
+</svg>

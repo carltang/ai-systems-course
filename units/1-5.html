@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>1.5 复现 GPT-2：从模型到高效训练 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="把小 GPT 变成一次真正的训练任务，第一次接触混合精度、FlashAttention、torch.compile 和多卡训练。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="1-4.html" title="1.4 Transformer" data-step="prev">‹ 1.4</a>
+<a href="2-1.html" title="2.1 张量与内存" data-step="next">2.1 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 1 部分 · 深度学习原理</span>1.5 复现 GPT-2：从模型到高效训练</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>一次真实的训练，时间都花在哪？每种提速手段省下的是什么？</div><div class="frame-c">承接 1.4：同一个模型，现在关心它在 GPU 上跑得多快。这是后面所有系统单元的地图。</div></div>
+<div class="story"><p>线索是：先建立一把尺子，估算训练到底需要多少运算 → 第一种提速手段是用更少的位数表示数字 → 第二种几乎是免费的：把尺寸凑整 → 最后把视频里用到的所有手段摆在一起，看每一种对付的是哪类瓶颈。这一单元是后面所有系统单元的地图，配合第 0 部分一起读最好。</p></div>
+<ol class="thread"><li><a href="#c-1-4-6n">训练每个 token，大约要 6N 次浮点运算</a></li><li><a href="#c-1-4-precision">少用几位数字，就少搬一半数据</a></li><li><a href="#c-1-4-nice-numbers">把维度凑成 64、128 的倍数，几乎免费的提速</a></li><li><a href="#c-1-4-map">每种提速手段，对付的是不同的瓶颈</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-1-4-6n"><h3><span class="i-num">1</span>训练每个 token，大约要 6N 次浮点运算</h3>
+<p class="i-essence">N 是参数个数。前向时每个参数参与一次乘加，约 2N 次运算；反向要算对输入和对权重的两份梯度，约 4N 次。用它乘以训练的 token 数，再除以 GPU 的算力，就得到训练时间的理论下限。</p>
+<div class="i-detail"><p><strong class="h">数矩阵乘法。</strong> 4.1 会详细讲：Transformer 的运算量几乎全在矩阵乘法里。一个线性层把输入乘以权重矩阵，对一个位置的输入来说，每个权重参与一次乘法和一次加法，共 2 次浮点运算。模型的参数绝大部分是这些权重矩阵里的元素。所以处理一个 token（一个位置）：</p><ul><li><strong>前向</strong>：每个参数 2 次运算，约 2N。</li></ul><p><strong class="h">反向。</strong> 1.1 讲过，反向经过每一层时要算两样东西：</p><ul><li>损失对这一层<strong>输入</strong>的梯度（要继续往前传）：一次和前向同样规模的矩阵乘法，约 2N。</li><li>损失对这一层<strong>权重</strong>的梯度（用来更新参数）：又一次同样规模的矩阵乘法，约 2N。</li></ul><p>反向合计约 4N。<mark>前向加反向，每个 token 约 6N 次浮点运算</mark>。</p><figure class="fig"><img src="../assets/figures/flops-6n.svg" alt="三次同样规模的矩阵乘法" loading="lazy"><figcaption>三次同样规模的矩阵乘法</figcaption></figure><p><strong class="h">它忽略了什么。</strong> 注意力里“Q 乘 Kᵀ”和“乘以 V”这两步不涉及参数，运算量和序列长度有关，没有算进来；归一化、激活函数的运算量很小，也没算。词嵌入表的参数只是被查表，不做乘法，却被算进了 N。所以它是一个量级上的估计，对常见的配置误差在一两成以内。</p><p><strong class="h">用处一：估算训练要多久。</strong> 总运算量 = 6N × 训练的 token 总数。除以硬件的实际运算速度，就是时间。124M 参数的 GPT-2 训练 100 亿个 token：6 × 1.24×10⁸ × 10¹⁰ ≈ 7.4×10¹⁸ 次。一张峰值 312 TFLOPS 的 A100 即使百分之百用上，也要 6.6 小时；按 40% 的利用率，是 16 小时左右。动手之前先算这一笔，能知道一个计划是否现实。</p><p><strong class="h">用处二：算 MFU。</strong> 0.2 讲过：MFU = 实际完成的运算速度 ÷ 硬件峰值。分子就是 6N × 实测的每秒 token 数。它告诉你离硬件的上限还有多远。</p><p><strong class="h">用处三：比较不同的模型和硬件。</strong> 模型大 10 倍，每个 token 的成本就大 10 倍。换一种 GPU，看它的峰值算力就能大致知道吞吐会怎么变（前提是别的瓶颈没有先出现）。</p><p>推理也有对应的估算：只有前向，每个 token 约 2N。但 4.1 讲过，逐词生成时瓶颈不在运算量而在显存带宽，那时要换一把尺子。</p></div>
+<p class="i-analogy"><b>打个比方</b>像估算搬家时间：知道一共多少箱、每小时最多搬多少箱，就能算出至少要几小时。</p>
+<p class="i-impl">所以拿到训练任务先估算：124M 的 GPT-2 训练 100 亿个 token，大约需要 7.4×10¹⁸ 次运算。实际吞吐和这个理论值的比值（MFU）告诉你还有多少优化空间。</p>
+<div class="i-builds">承接 <a href="0-2.html#c-p0-2-mfu">MFU：实际用上了硬件峰值算力的百分之几</a><a href="1-1.html#c-1-1-chain-rule">反向传播 = 链式法则 + 记账</a></div>
+<div class="i-builds">后面会用到 <a href="11-1.html#c-6-2-ceiling">先算出理论上限，才知道还差多远</a></div>
+</li>
+<li class="i-lead">有了尺子，来看视频里依次使用的几种提速手段。第一种改动最小，效果最明显。</li>
+<li class="icard" id="c-1-4-precision"><h3><span class="i-num">2</span>少用几位数字，就少搬一半数据</h3>
+<p class="i-essence">fp32 每个数 4 字节，bf16 只要 2 字节。矩阵乘法换成 TF32 或 bf16 后能跑在 Tensor Core 上，显存读写量也减半。bf16 和 fp32 的指数位一样多，数值范围相同，只是精度低一些。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/float-formats.svg" alt="位数怎么分，决定了范围和精度" loading="lazy"><figcaption>位数怎么分，决定了范围和精度</figcaption></figure><p><strong class="h">浮点数的三个部分。</strong> 一个浮点数由符号、指数、有效数字（尾数）组成。指数决定能表示多大和多小的数（范围），有效数字决定能精确到几位（精度）。</p><table><thead><tr><th>格式</th><th>总位数</th><th>指数</th><th>有效数字</th><th>范围</th><th>精度</th></tr></thead><tbody><tr><td>fp32</td><td>32</td><td>8 位</td><td>23 位</td><td>很大</td><td>约 7 位十进制</td></tr><tr><td>fp16</td><td>16</td><td>5 位</td><td>10 位</td><td>小得多</td><td>约 3 位十进制</td></tr><tr><td>bf16</td><td>16</td><td>8 位</td><td>7 位</td><td>和 fp32 相同</td><td>约 2–3 位十进制</td></tr></tbody></table><p>bf16 可以看成“把 fp32 的有效数字砍掉 16 位”：指数部分原样保留，所以能表示的范围和 fp32 一样，只是每个数没那么精确。fp16 则是两头都缩了。</p><p><strong class="h">为什么会变快。两个独立的原因。</strong></p><ul><li>*能用上 Tensor Core。* GPU 上有专门做矩阵乘法的硬件单元，它要求低精度的输入，算力比普通单元高一个量级（4.5）。这对付的是算力受限的矩阵乘法。</li><li>*要搬的数据减半。* 每个数从 4 字节变成 2 字节。同样的显存带宽，每秒能读写的元素个数翻倍。这对付的是带宽受限的那些算子（归一化、激活函数等）。显存占用也减半，可以放更大的 batch。</li></ul><p><strong class="h">TF32：不改数据类型的折中。</strong> 数据仍然是 fp32，但做矩阵乘法时，Tensor Core 内部只用其中一部分有效数字来算。只拿到了上面第一个好处，没有第二个；好处是不用改任何代码，只要打开一个开关。Karpathy 的视频里先开的就是它，然后才换成 bf16。</p><p><strong class="h">精度降低为什么可以接受。</strong> 训练本来就充满噪声：每个 batch 的梯度都是带偏差的估计。有效数字少几位带来的误差，比这个噪声小得多。但有几个地方不能省：</p><ul><li>参数的更新：每一步的更新量相对参数很小，在 16 位下会被舍入掉。所以参数的主副本和优化器状态仍然用 32 位（7.2 的 16 字节）。</li><li>大范围的累加、指数和对数：误差会累积或溢出。</li></ul><p>这就是“混合”精度的含义：<mark>计算量大的部分用 16 位，敏感的部分保留 32 位</mark>。哪些算子用哪种精度，由 2.6 讲的 autocast 自动安排。</p><p><strong class="h">bf16 还是 fp16。</strong> 范围小的 fp16 会让很小的梯度变成零，需要额外的损失缩放来补救（2.6）。bf16 没有这个问题，是现在的首选。</p></div>
+<p class="i-analogy"><b>打个比方</b>像记账只保留三位有效数字：绝大多数计算不受影响，却写得更快、更省纸。</p>
+<p class="i-impl">所以混合精度往往是最省事的提速：矩阵乘法用低精度，对数值敏感的地方（累加、损失、优化器状态）保留 fp32。</p>
+<div class="i-builds">后面会用到 <a href="1-5.html#c-1-4-nice-numbers">把维度凑成 64、128 的倍数，几乎免费的提速</a><a href="1-5.html#c-1-4-map">每种提速手段，对付的是不同的瓶颈</a><a href="2-6.html#c-p2-6-autocast">autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</a><a href="2-6.html#c-4-1-loss-scaling">fp16 要缩放损失，bf16 通常不用</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Accelerate bfloat16</span><span class="src">Accelerate 数值格式对照表</span></div>
+</li>
+<li class="i-lead">第二种手段看起来像玄学，其实有很具体的硬件原因。</li>
+<li class="icard" id="c-1-4-nice-numbers"><h3><span class="i-num">3</span>把维度凑成 64、128 的倍数，几乎免费的提速</h3>
+<p class="i-essence">GPU kernel 按固定大小的块处理数据。维度不是块大小的整数倍时，边角那一块要额外处理，常常走慢路径。复现 GPT-2 时把词表从 50257 补到 50304（128 的倍数），多算了一点无用的行，整体却更快了。</p>
+<div class="i-detail"><p><strong class="h">视频里的例子。</strong> GPT-2 的词表大小是 50257，一个很“难看”的数。把它补到 50304（等于 128 × 393），多出来的 47 个词永远不会被用到，模型白白多了一些参数和计算。结果训练反而快了几个百分点。</p><p><strong class="h">原因在 kernel 的写法。</strong> 第 3、4 部分会反复看到：GPU 上的 kernel 是按“块”处理数据的。</p><ul><li>线程以 32 个为一组（warp）执行。</li><li>矩阵乘法的 kernel 把矩阵切成固定大小的小块，比如 16×16、64×64、128×128，一块一块地处理（3.3、4.5）。</li><li>Tensor Core 的一条指令处理一个固定形状的小矩阵。</li></ul><p>维度正好是块大小的整数倍时，所有的块都是满的，kernel 走的是最优化的那条路径。</p><p>不是整数倍时，最后会剩下一条不满的“边”。对这条边，kernel 有几种处理办法，都有代价：</p><ul><li>另外用一段通用但较慢的代码来处理边角。</li><li>把边角补成满块来算，再把多余的结果丢掉（要额外的拷贝或掩码）。</li><li>整个运算换用一个对任意尺寸都适用、但没那么快的实现。</li></ul><p>具体走哪条取决于库的实现，从外面看不到，只是慢了一些。</p><p><strong class="h">为什么是 2 的幂。</strong> 上面这些块的大小几乎都是 2 的幂（16、32、64、128）。一个数是 128 的倍数，它同时也是 64、32、16 的倍数，无论 kernel 内部用哪种块大小都能整除。所以“取 2 的幂或者 64、128 的倍数”是一个不需要知道内部细节的安全选择。</p><p><strong class="h">哪些维度值得凑。</strong> 隐藏维度、每个头的维度（1.4 说过通常是 64）、MLP 的中间维度、词表大小、batch 大小、序列长度。这也是为什么常见的模型配置里全是 768、1024、4096 这样的数。</p><p><strong class="h">更一般的道理。</strong> 这是 0.1 里“成批处理”的一个侧面：硬件和库都是为规整的、成块的数据优化的。<mark>让数据的形状迎合硬件的块，比让硬件去适应不规整的数据便宜得多</mark>。2.5 里固定形状以避免重新编译、2.1 里固定张量大小以减少显存碎片，是同一个道理在不同层上的表现。</p></div>
+<p class="i-analogy"><b>打个比方</b>像装箱：货物尺寸正好是箱子的整数倍时，每个箱子都装满；差一点的话，就得为零头单独找箱子。</p>
+<p class="i-impl">所以设计模型时，隐藏维度、头维度、词表大小都尽量取 2 的幂或 64、128 的倍数。</p>
+<div class="i-builds">承接 <a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a></div>
+</li>
+<li class="i-lead">视频里一共用了五六种手段，把训练速度提高了一个量级。把它们放在一起看，会发现它们并不重复。</li>
+<li class="icard" id="c-1-4-map"><h3><span class="i-num">4</span>每种提速手段，对付的是不同的瓶颈</h3>
+<p class="i-essence">TF32/bf16 加快矩阵乘法（算力）；torch.compile 把多个逐元素算子合成一个 kernel（显存带宽和启动开销）；FlashAttention 不写出 N×N 的注意力矩阵（显存带宽）；梯度累积和多卡训练则是在显存和规模上做文章。</p>
+<div class="i-detail"><p>把视频里的手段按它们对付的瓶颈重新排列。瓶颈的分类用的是第 0 部分的语言。</p><table><thead><tr><th>手段</th><th>对付的瓶颈</th><th>原理</th><th>细讲的单元</th></tr></thead><tbody><tr><td>TF32、bf16</td><td>算力；带宽</td><td>Tensor Core；数据减半</td><td>2.6、4.5</td></tr><tr><td>torch.compile</td><td>发令的开销；带宽</td><td>去掉逐算子的开销；融合</td><td>2.5、4.2</td></tr><tr><td>Flash Attention</td><td>带宽；显存</td><td>不让 N×N 的矩阵落地</td><td>4.4</td></tr><tr><td>维度凑整</td><td>算力</td><td>走 kernel 的快速路径</td><td>上一节</td></tr><tr><td>fused AdamW</td><td>发令的开销；带宽</td><td>优化器的十来步合成一个 kernel</td><td>2.6</td></tr><tr><td>梯度累积</td><td>显存</td><td>用几个小 batch 凑一个大 batch</td><td>1.3</td></tr><tr><td>多卡 DDP</td><td>规模</td><td>把数据分给多张卡</td><td>7.1</td></tr></tbody></table><p><strong class="h">几个观察。</strong></p><ul><li>*没有哪一种是万能的。* 每种只对它针对的那类瓶颈有效。模型的时间如果全在矩阵乘法上，torch.compile 帮助有限；如果全在发令上，换 bf16 也没用。</li><li>*它们可以叠加，但不是简单相乘。* <mark>消除了一个瓶颈，另一个就成了新的瓶颈</mark>。视频里每加一样手段，收益的大小都取决于当时“轮到谁是瓶颈”。这是 0.1 的第一个思想。</li><li>*顺序有讲究。* 先做便宜的、收益大的（精度、编译），再做需要改代码的。</li></ul><p><strong class="h">怎么知道自己的瓶颈是哪一类。</strong> 不能靠猜，要量（0.2）：</p><ul><li>加倍 batch，看时间是否跟着加倍（2.3）：判断是不是开销受限。</li><li>反复喂同一个 batch（2.4）：判断是不是数据受限。</li><li>看 profiler 里矩阵乘法占 GPU 时间的比例（4.1）：判断算力受限的部分有多大。</li><li>算 MFU（0.2）：知道总体上离上限多远。</li></ul><p><strong class="h">这张表就是后面课程的目录。</strong> 第 2 部分讲框架这一层的手段，第 3、4 部分讲 kernel 这一层为什么这些手段有效，第 5–7 部分讲规模上去之后的通信。读后面的任何一个单元时，都可以回到这张表，问一句：它在对付哪一类瓶颈。11.1 会用几个完整的案例把这张表再走一遍。</p></div>
+<p class="i-analogy"><b>打个比方</b>像给一家餐厅提速：换更快的灶（算力），把备菜动线理顺（带宽），减少来回跑腿（开销），再多开几家分店（多卡）。</p>
+<p class="i-impl">所以每用一种手段之前，先问它省的是哪一样，再用 profiler 验证。后面的每个部分，都在深入其中一项。</p>
+<div class="i-builds">承接 <a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Accelerate 第 1 章 拆解训练过程</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>训练每个 token 约需 <strong>6N</strong> 次浮点运算，由此可以估出理论上限和 MFU。<strong>低精度</strong>让矩阵乘法用上 Tensor Core，也让读写量减半。<strong>把维度凑整</strong>避免了 kernel 的慢路径。每种提速手段<strong>对付的瓶颈不同</strong>：算力、带宽、开销、显存，用之前先问它省的是哪一样。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>“训练每个 token 约需 6N 次浮点运算”是怎么估出来的？它有什么用？</li><li>fp32、fp16、bf16 有什么区别？为什么降低精度能让训练变快？</li><li>为什么把张量的维度取成 64、128 的倍数会更快？</li><li>复现 GPT-2 时用到的几种提速手段，各自对付的是哪一类瓶颈？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>mixed precision</dt><dd>混合精度</dd></div><div><dt>throughput</dt><dd>吞吐量</dd></div><div><dt>kernel fusion</dt><dd>算子融合</dd></div><div><dt>gradient accumulation</dt><dd>梯度累积</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="1-4.html"><small>上一单元</small>1.4 Transformer</a>
+<a class="next" href="2-1.html"><small>下一单元</small>2.1 张量与内存</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

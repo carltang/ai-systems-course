@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>10.3 强化学习的系统形态 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清强化学习的训练系统长什么样，它的瓶颈和大模型训练有什么不同。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="10-2.html" title="10.2 价值与策略：两条路线" data-step="prev">‹ 10.2</a>
+<a href="10-4.html" title="10.4 业界怎么用强化学习" data-step="next">10.4 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 10 部分 · 强化学习（选读）</span>10.3 强化学习的系统形态</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>强化学习的训练系统，和前面讲的大模型训练有什么不一样？</div><div class="frame-c">承接 10.2，并回到 0.1 的管道图：强化学习的“数据供给”不是读硬盘，而是和环境交互出来的。</div></div>
+<div class="story"><p>线索是：强化学习的训练数据要靠运行环境来产生，这改变了管道的形状 → 经典的应对是把采集和学习分给不同的进程 → 更彻底的办法是把环境本身搬到 GPU 上 → 另一个方向是把产生的数据存起来多用几次 → 最后用第 0 部分的语言把它和大模型训练对照一遍。你会发现需要的知识前面都学过，只是瓶颈换了位置。</p></div>
+<ol class="thread"><li><a href="#c-p10-3-generate">数据不是读出来的，是和环境交互“跑”出来的</a></li><li><a href="#c-p10-3-actor-learner">采集和学习分开：很多个 actor，少数几个 learner</a></li><li><a href="#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a></li><li><a href="#c-p10-3-replay">经验回放：把数据存起来，反复用</a></li><li><a href="#c-p10-3-compare">对照第 0 部分：同一条管道，不同的瓶颈</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p10-3-generate"><h3><span class="i-num">1</span>数据不是读出来的，是和环境交互“跑”出来的</h3>
+<p class="i-essence">大模型训练的数据躺在硬盘上，管道的第一步是“读”。强化学习的数据要靠运行来产生：每一步都要让策略网络做一次推理选出动作，再让环境的仿真程序向前推进一步。训练的大部分时间常常花在这上面，而不是花在反向传播上。</p>
+<div class="i-detail"><p><strong class="h">回顾 0.1 的管道。</strong> 大模型训练的一步：读数据 → 预处理 → 拷上 GPU → 前向反向 → 同步梯度 → 更新参数。数据是现成的，第一步只是 IO。</p><p><strong class="h">强化学习的一步。</strong> 以 PPO 为例（10.2）：</p><ul><li><strong>采集。</strong> 重复几百到几千次：策略网络看当前的状态，推理出动作；环境执行动作，算出下一个状态和奖励。把这些记下来。</li><li><strong>学习。</strong> 用刚采集的数据算优势，做几轮前向反向，更新策略和评论家。</li><li>扔掉数据，用新策略重新采集。</li></ul><p>采集阶段替代了“读数据”，而它本身包含大量的计算。</p><p><strong class="h">采集阶段有两种计算，性格完全不同。</strong></p><ul><li>*环境的仿真。* 物理引擎计算碰撞和受力、游戏模拟器执行一帧、或者（在语言模型的场景）运行一段代码来检查答案。传统上这些是 CPU 上的程序，逻辑复杂、分支多，每个环境实例是串行的。</li><li>*策略的推理。* 一次神经网络的前向。强化学习里的网络通常很小（几层的 MLP 或小的卷积网络），单次推理的计算量很小。</li></ul><p>两者是交替进行的：推理一次，仿真一步，再推理一次。它们之间有严格的先后依赖，和 1.4 讲的自回归生成一样，无法把一条轨迹内部并行化。</p><p><strong class="h">时间花在哪。</strong> 很多强化学习的任务里，仿真占了大头。网络小，反向传播很快；而要学会一个任务可能需要几亿甚至几十亿步的交互。于是典型的画面是：几十上百个 CPU 核满负荷地跑仿真，GPU 的利用率只有百分之十几。按 0.2 的说法，这不代表系统有毛病，而是瓶颈根本不在 GPU 上。</p><p><strong class="h">并行的方向。</strong> 一条轨迹内部不能并行，但可以同时跑很多条：开 N 个环境的副本，每一步让策略网络对 N 个状态做一次批量的推理，得到 N 个动作，再让 N 个环境各走一步。这叫向量化环境。它把策略推理变成了有 batch 的运算（9.1 讲的批处理的好处在这里同样成立），仿真则分给多个 CPU 核。后面三节都是这个思路的不同实现。</p><p><strong class="h">衡量的指标。</strong> 强化学习系统的吞吐通常用“每秒环境步数”来衡量。<mark>一个好的实现和一个朴素的实现，可以差出几个数量级</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>大模型训练像一家有现成原料仓库的工厂，只管加工。强化学习像一家自己有农场的餐厅：先得种菜，而且种什么菜、怎么种，取决于厨师最近的手艺。厨房再快，菜没长出来也只能等。</p>
+<p class="i-impl">所以强化学习系统设计的核心问题是“怎样更快地产生数据”。评价它的吞吐，看的是每秒产生多少步环境交互，而不只是每秒训练多少个样本。</p>
+<div class="i-builds">承接 <a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a><a href="0-1.html#c-p0-1-pipeline">训练的一步是一条串联的管道，最慢的一段决定速度</a><a href="1-4.html#c-1-3-causal">因果掩码：训练时整段并行，生成时一词一词</a></div>
+<div class="i-builds">后面会用到 <a href="10-3.html#c-p10-3-actor-learner">采集和学习分开：很多个 actor，少数几个 learner</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/1802.01561" target="_blank" rel="noopener">IMPALA 论文</a><a class="src" href="https://huggingface.co/learn/deep-rl-course/unit0/introduction" target="_blank" rel="noopener">Hugging Face Deep RL Course</a></div>
+</li>
+<li class="i-lead">采集是瓶颈，而且天然可以并行。最直接的做法是把它分出去。</li>
+<li class="icard" id="c-p10-3-actor-learner"><h3><span class="i-num">2</span>采集和学习分开：很多个 actor，少数几个 learner</h3>
+<p class="i-essence">经典的分布式强化学习架构把系统分成两种角色。actor 进程运行环境和策略，只负责产生数据；它们数量很多，跑在 CPU 上。learner 进程从 actor 那里接收数据，在 GPU 上做反向传播更新模型，再把新的参数发回给 actor。两边各按各的节奏运行，互不等待。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/actor-learner.svg" alt="actor 只管产生数据，learner 只管学习，两边互不等待" loading="lazy"><figcaption>actor 只管产生数据，learner 只管学习，两边互不等待</figcaption></figure><p><strong class="h">为什么要分开。</strong> 采集要的是大量的 CPU 核，学习要的是 GPU。把它们绑在一个同步的循环里（上一节的“采集一批，学习一轮”），GPU 在采集时闲着，CPU 在学习时闲着。分开之后各自满负荷运行。</p><p><strong class="h">同步的版本先看一眼。</strong> 一个 learner，N 个环境。每一步：N 个环境各给出一个状态 → 策略网络批量推理 → N 个环境各走一步。问题是每一步都要等最慢的那个环境。环境的每一步耗时常常很不均匀（游戏里某些画面计算量大，物理仿真里碰撞多的时刻更慢），所有人都被最慢的拖住。7.1 讲的慢节点问题，在这里每一步都在发生。</p><p><strong class="h">异步的版本：IMPALA。</strong></p><ul><li>每个 actor 有一份策略参数的本地副本，独立地和自己的环境交互，攒够一段轨迹就发给 learner，然后不等任何人，继续采集。</li><li>learner 持续地从队列里取出收到的轨迹，组成 batch，做反向传播。</li><li>actor 定期从 learner 拉取最新的参数。</li></ul><p>没有任何一方在等另一方。actor 可以有几百上千个，分布在很多台机器上。</p><p><strong class="h">新问题：策略滞后。</strong> actor 采集一段轨迹期间，learner 已经更新了好几次。等这段轨迹到达 learner 时，产生它的策略已经是“旧版本”了。10.2 讲过，策略梯度要求数据来自当前的策略。用旧策略的数据直接算，会有偏差。</p><p>IMPALA 的贡献之一是一种修正方法（叫 V-trace）：根据“新策略选这个动作的概率 ÷ 旧策略选它的概率”，给数据重新加权，把旧数据“折算”成对新策略有效的信号。这个比值你在 PPO 里见过，两处的想法是相通的。</p><p><strong class="h">另一种分法：Ape-X。</strong> 面向价值路线（DQN 类）。很多 actor 把经验写进一个共享的回放缓冲区，learner 从缓冲区里抽样学习。因为 Q-learning 本来就是异策略的，旧数据可以直接用，不需要修正。</p><p><strong class="h">推理放在哪。</strong> actor 要做策略推理。两种安排：</p><ul><li>每个 actor 在自己的 CPU 上推理：简单，但网络稍大就慢。</li><li>集中推理：actor 只跑环境，把状态发给一个在 GPU 上的推理服务，由它把来自很多 actor 的请求批在一起推理，再把动作发回去。这其实就是 9.3 讲的推理服务：请求陆续到达，要在批大小和延迟之间权衡。<mark>强化学习的训练系统里嵌着一个小型的推理服务系统</mark>。</li></ul><p><strong class="h">用第 0 部分的眼光看。</strong> 这套架构是“用别的活把等待填满”：采集和学习重叠进行。代价和别处一样：数据在途中，会“变旧”。7.1 的 DDP 让通信和计算重叠时没有这个问题，因为梯度不会过时；这里的数据会过时，所以多了一步修正。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一家报社：很多记者在外面跑新闻（actor），把稿子陆续发回来；编辑部（learner）不停地处理收到的稿件，并时不时把最新的采编要求通知给记者。记者不用等编辑，编辑也不用等某一位记者。</p>
+<p class="i-impl">所以这套架构能把采集的规模扩到几千个 CPU 核。它带来一个新问题：actor 手里的策略总是比 learner 的旧一点，用旧策略产生的数据去更新新策略，需要做修正。</p>
+<div class="i-builds">承接 <a href="10-3.html#c-p10-3-generate">数据不是读出来的，是和环境交互“跑”出来的</a><a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a><a href="7-1.html#c-5-2-efficiency">扩展效率：多卡吞吐 ÷（单卡吞吐 × 卡数）</a></div>
+<div class="i-builds">后面会用到 <a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a><a href="10-4.html#c-p10-4-classic">游戏、推荐、调度：几个经典的应用领域</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/1802.01561" target="_blank" rel="noopener">IMPALA 论文：Scalable Distributed Deep-RL with Importance Weighted Actor-Learner Architectures</a><a class="src" href="https://arxiv.org/abs/1803.00933" target="_blank" rel="noopener">Ape-X 论文：Distributed Prioritized Experience Replay</a></div>
+</li>
+<li class="i-lead">上一节是把采集分给很多 CPU。还有一个更彻底的方向：让采集根本不需要 CPU。</li>
+<li class="icard" id="c-p10-3-gpu-sim"><h3><span class="i-num">3</span>把环境搬上 GPU：成千上万个仿真同时跑</h3>
+<p class="i-essence">仿真在 CPU、网络在 GPU 时，每一步都要在两者之间来回传数据。更彻底的办法是把仿真本身也写成 GPU 上的张量运算：几千上万个环境的状态存在一个大张量里，一次运算让所有环境同时前进一步。整个采集和学习的循环都在 GPU 上，数据不离开显存。</p>
+<div class="i-detail"><p><strong class="h">传统做法的三处开销。</strong></p><ul><li>仿真在 CPU 上，每个环境实例占一个核的一部分。要几千个环境，就要几百个核。</li><li>每一步，状态要从主内存拷到显存（给网络推理），动作再从显存拷回主内存（给仿真）。数据量不大，但每一步都要过一次 PCIe，并且是同步的。3.6 讲过，这样的同步点会打断 GPU 的任务队列。</li><li>策略网络很小，每次推理只有几个很小的 kernel。GPU 大部分时间在等 CPU 把下一步的状态算出来。2.3 的“等发令”在这里非常典型。</li></ul><p><strong class="h">GPU 上的仿真。</strong> 以物理仿真为例。每个环境的状态是一组数（各个物体的位置、速度、关节角度）。把 N 个环境的状态叠成一个张量，第一维是环境的编号。物理引擎的一步（算受力、检测碰撞、积分得到新的位置和速度）写成对这个张量的批量运算。对 GPU 来说，这和神经网络的一次前向没有本质区别。</p><p>NVIDIA 的 Isaac Gym 是这个方向有代表性的工作：物理仿真、观测的计算、奖励的计算、策略的推理和训练，全部在同一张 GPU 上，中间的数据一直是显存里的张量。论文报告在一张卡上同时运行几千到上万个机器人环境，一些原来需要一个 CPU 集群跑几天的任务，缩短到了几十分钟到几小时。</p><p><strong class="h">为什么这么有效，用前面的话来说。</strong></p><ul><li>第 3 部分：GPU 擅长的是对大量数据做同样的运算。一万个环境执行同一套物理规则，正是这种情形。</li><li>0.1：没有了 CPU 和 GPU 之间的往返，“等数据”和“等发令”同时消失。</li><li>9.1：策略推理的 batch 从几十变成了一万，小网络也能把 GPU 用起来。</li></ul><p><strong class="h">适用的前提。</strong></p><ul><li>仿真的逻辑要能批量化。物理规则是统一的，适合。逻辑复杂、分支很多、每个实例走的路径都不同的仿真器（很多现成的游戏、需要调用外部程序的环境）很难搬上 GPU。3.4 讲过分支发散对 GPU 的代价。</li><li>所有环境的状态要放得下显存。带相机图像的环境，每个实例的观测很大，能并行的数量就少得多。</li><li>仿真要足够逼真，学到的策略才能用到真实世界（10.4）。为了速度而简化的物理，可能让策略学到只在仿真里成立的窍门。</li></ul><p><strong class="h">算法也要跟着变。</strong> 一万个环境并行时，每个环境只需要走很短的一段（几十步），就凑够了一大批数据。<mark>数据的特点从“少数几条很长的轨迹”变成了“海量很短的片段”</mark>。PPO 这类算法天然适合这种模式，这也是它在机器人训练里成为主流的一个原因。</p></div>
+<p class="i-analogy"><b>打个比方</b>以前是一万个工人各自在工位上手工做一个零件，每做一步都要把半成品送到质检室再取回来。现在换成一台冲床，一次压出一万个零件，质检就在旁边的同一条线上。</p>
+<p class="i-impl">所以一张 GPU 就能达到以前需要一个 CPU 集群才有的采集速度。机器人领域近几年的快速进展，很大程度上来自这个变化。它的前提是仿真本身能写成规整的、可以批量执行的运算。</p>
+<div class="i-builds">承接 <a href="10-3.html#c-p10-3-actor-learner">采集和学习分开：很多个 actor，少数几个 learner</a><a href="3-6.html#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a><a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="3-1.html#c-2-1-cpu-gpu">CPU 是超跑，GPU 是公交</a><a href="9-1.html#c-6-1-batching">批处理：读一次权重，服务一批请求</a></div>
+<div class="i-builds">后面会用到 <a href="10-3.html#c-p10-3-replay">经验回放：把数据存起来，反复用</a><a href="10-4.html#c-p10-4-robots">机器人与控制：在仿真里训练，迁移到真机</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2108.10470" target="_blank" rel="noopener">Isaac Gym 论文：High Performance GPU-Based Physics Simulation For Robot Learning</a></div>
+</li>
+<li class="i-lead">前两节都在让数据产生得更快。另一个方向是让每条数据多发挥几次作用。</li>
+<li class="icard" id="c-p10-3-replay"><h3><span class="i-num">4</span>经验回放：把数据存起来，反复用</h3>
+<p class="i-essence">产生数据很贵，那就别用一次就扔。经验回放把智能体经历过的每一步存进一个大缓冲区，训练时从中反复抽样。每条数据平均能被用上很多次，需要的环境交互次数因此少得多。它只适用于能使用旧数据的算法，也就是 10.2 讲的异策略方法。</p>
+<div class="i-detail"><p><strong class="h">两种效率。</strong></p><ul><li>*样本效率*：学会一个任务需要多少步环境交互。</li><li>*计算效率（墙上时间）*：学会一个任务需要多长时间、多少算力。</li></ul><p>它们不是一回事。一个算法可能需要十倍的样本，但如果每个样本的产生和处理都快一百倍，它反而更早学会。</p><p><strong class="h">回放缓冲区。</strong> 一个容量很大的存储（比如一百万步），存着最近的经验：（状态，动作，奖励，下一个状态）。新数据进来，最老的被挤出去。训练时每次从中随机抽一个 batch。</p><p>10.2 讲 DQN 时说过它的两个作用：打破相邻样本之间的相关性；让每条数据被多次使用。这里关心的是后者。带回放的方法，每采集一步数据可以做好几次梯度更新；PPO 每条数据只用几轮就扔。</p><p><strong class="h">为什么只能是异策略。</strong> 缓冲区里的数据是过去很多个不同版本的策略产生的。10.2 讲过：</p><ul><li>Q-learning 类的方法只需要“环境里真实发生过的一步转移”，不在乎是哪个策略产生的。可以直接用。</li><li>策略梯度类的方法要求数据来自当前策略。旧数据不能直接用（上上节的 V-trace 那样的修正只能处理“稍微旧一点”的数据）。</li></ul><p>所以有回放的系统，核心算法通常是价值路线，或者是为了能用旧数据而专门设计的 actor-critic 变体。</p><p><strong class="h">不是所有的经验都一样有用。</strong> 均匀地随机抽样，大部分抽到的是早就学会了的平凡经验。优先回放的做法是：TD 误差大的经验（“这一步的结果出乎我的意料”）被抽中的概率更高。上上节的 Ape-X 就是分布式的优先回放。</p><p><strong class="h">怎么选。</strong></p><table><thead><tr><th></th><th>用完即扔（PPO 类）</th><th>带回放（DQN 类、异策略 actor-critic）</th></tr></thead><tbody><tr><td>每条数据用几次</td><td>几次</td><td>很多次</td></tr><tr><td>样本效率</td><td>低</td><td>高</td></tr><tr><td>稳定性、调参</td><td>容易</td><td>较难（10.2 的致命三角）</td></tr><tr><td>适合</td><td>仿真极便宜，可以大规模并行</td><td>每步交互都很贵</td></tr><tr><td>瓶颈常在</td><td>仿真的速度</td><td>学习的速度（GPU）</td></tr></tbody></table><p>有了上一节的 GPU 并行仿真之后，天平向左边倾斜了很多：<mark>数据便宜到几乎不用在乎样本效率，简单稳定的 PPO 就成了首选</mark>。而在真实的机器人上直接学习、或者奖励需要人来给的场景，样本效率仍然是第一位的。</p><p><strong class="h">回放缓冲区自己也是个系统问题。</strong> 存一百万步带图像的经验要几十 GB；从中随机抽样是随机访存（0.3）；分布式的时候它是一个被很多 actor 写、被 learner 读的共享服务。2.4 讲的数据加载的那些考虑，在这里换了一种形式又出现了。</p></div>
+<p class="i-analogy"><b>打个比方</b>像做题：一本习题集只做一遍就扔，要学会得买很多本。把做过的题整理成错题本，隔一阵拿出来重做，同样的题目能学到更多。</p>
+<p class="i-impl">所以算法的选择和系统的形态是连在一起的：仿真便宜时，用 PPO 这类“用完即扔”的方法，靠并行堆数量；每条数据都很贵时（真机、需要人参与），用带回放的方法，靠反复使用提高效率。</p>
+<div class="i-builds">承接 <a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a><a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a><a href="0-3.html#c-p0-3-latency">存储层次：数据每远一层，就慢一到三个数量级</a></div>
+<div class="i-builds">后面会用到 <a href="10-3.html#c-p10-3-compare">对照第 0 部分：同一条管道，不同的瓶颈</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://www.nature.com/articles/nature14236" target="_blank" rel="noopener">DQN 论文：经验回放</a><a class="src" href="https://arxiv.org/abs/1803.00933" target="_blank" rel="noopener">Ape-X 论文：分布式优先回放</a></div>
+</li>
+<li class="i-lead">最后把这一单元放回整门课的框架里。</li>
+<li class="icard" id="c-p10-3-compare"><h3><span class="i-num">5</span>对照第 0 部分：同一条管道，不同的瓶颈</h3>
+<p class="i-essence">把强化学习的训练放回 0.1 的框架里看，需要的知识前面都学过，只是各段的轻重变了。大模型训练的模型大、数据现成，瓶颈在计算和通信；强化学习的模型通常小、数据要现产，瓶颈在数据的产生和 CPU 与 GPU 之间的协调。</p>
+<div class="i-detail"><p><strong class="h">逐项对照。</strong></p><table><thead><tr><th></th><th>大模型训练</th><th>强化学习训练（典型情况）</th></tr></thead><tbody><tr><td>模型大小</td><td>几亿到几千亿参数</td><td>常常只有几十万到几千万</td></tr><tr><td>数据从哪来</td><td>存储</td><td>环境仿真 + 策略推理</td></tr><tr><td>等数据</td><td>一般不是主要问题</td><td><strong>常常是最大的瓶颈</strong></td></tr><tr><td>等发令</td><td>大模型里可以忽略</td><td><strong>小网络、小 kernel，很突出</strong></td></tr><tr><td>等计算</td><td>主要矛盾（矩阵乘法）</td><td>通常不是；网络大了才是</td></tr><tr><td>等别的卡</td><td>多机时的主要矛盾</td><td>很多任务一张卡就够</td></tr><tr><td>GPU 利用率</td><td>应该接近满</td><td>低是常态</td></tr><tr><td>衡量吞吐</td><td>token/秒、MFU</td><td>环境步数/秒</td></tr></tbody></table><p><strong class="h">前面哪些单元直接用得上。</strong></p><ul><li>0.2：GPU 利用率低，先分清是系统有问题，还是瓶颈本来就不在 GPU。在强化学习里常常是后者。</li><li>2.3、3.6：小网络的推理是开销受限的。torch.compile、CUDA Graph、把 batch 开大，在这里效果明显。CPU 仿真和 GPU 推理之间的每一次往返都是同步点。</li><li>2.4：环境的并行和 DataLoader 的 worker 是同一类问题：多进程、进程间传数据、CPU 核不够。</li><li>5.1：CPU 仿真很重时，CPU 的核数、NUMA 的位置比 GPU 的型号更重要。</li><li>9.1、9.3：集中式的策略推理就是一个小型的推理服务。</li><li>7.4：训练时间长、进程多，同样需要检查点和容错。actor 的故障比较好处理（少一个只是数据来得慢一点），learner 要有检查点。</li></ul><p><strong class="h">例外：模型很大的强化学习。</strong> 上面说的是“小网络 + 仿真环境”的经典情形。当策略本身是一个大语言模型时（10.4），情况倒过来了：</p><ul><li>采集阶段 = 让大模型生成文本，这是 9.1 的 decode，很贵；</li><li>学习阶段 = 大模型的反向传播，是第 7 部分的分布式训练；</li><li>环境（比如执行代码、检查答案）相对便宜，但可能很慢、耗时不均匀。</li></ul><p>这时的系统是“一个推理集群 + 一个训练集群”的组合，这门课前面九个部分的内容几乎全部用得上。</p><p><strong class="h">一个统一的看法。</strong> 不管是哪种训练，问的都是同样的几个问题：数据从哪来、多快；计算在哪做、被什么限制；各部分之间怎样协调、谁在等谁。<mark>强化学习没有带来新的原理，它只是把 0.1 那条管道的各段重新排了一遍轻重</mark>。这也是这门课从“管道和四种等”讲起的原因：换一个领域，这套问法照样管用。</p></div>
+<p class="i-analogy"><b>打个比方</b>同样是开餐厅，一家是大型中央厨房，食材成车运来，难处在灶台够不够、几个厨房怎么协作；另一家是自己种菜的小馆子，灶台常常闲着，难处在菜长得太慢。经营的道理相通，头疼的地方不同。</p>
+<p class="i-impl">所以排查强化学习训练的性能，用的还是 11.1 的那套办法：先量，再拆，找最大的一段。只是答案多半会落在“等数据”和“等发令”上，而不是矩阵乘法上。</p>
+<div class="i-builds">承接 <a href="10-3.html#c-p10-3-replay">经验回放：把数据存起来，反复用</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a><a href="0-2.html#c-p0-2-util">GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</a><a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="2-4.html#c-p2-4-knobs">每个参数调的是管道的哪一站</a></div>
+<div class="i-builds">后面会用到 <a href="10-4.html#c-p10-4-verifiable">训练推理能力：用可以验证的结果当奖励</a><a href="10-4.html#c-p10-4-when">什么问题适合用强化学习</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>强化学习的数据是<strong>跑出来的</strong>：环境的仿真和策略的推理占了大部分时间。经典的架构把<strong>采集（actor）和学习（learner）分开</strong>，用很多 CPU 进程喂少数 GPU。<strong>GPU 上的并行仿真</strong>把环境也变成了张量运算，省掉了 CPU 和 GPU 之间的来回。<strong>经验回放</strong>让数据被反复使用。和大模型训练相比，它更常卡在<strong>等数据</strong>和<strong>等发令</strong>上。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>强化学习训练的管道和大模型训练的管道有什么不同？它的时间主要花在哪里？</li><li>actor-learner 架构里两种进程各做什么？actor 和 learner 不同步带来了什么问题，怎样处理？</li><li>GPU 并行仿真相对于“CPU 仿真 + GPU 网络”省掉了什么？它适用的前提是什么？</li><li>经验回放解决什么问题？为什么它只能用于异策略的算法？怎样在“样本效率”和“计算效率”之间选择？</li><li>用第 0 部分的四种“等”来分析，强化学习训练的瓶颈通常在哪里？和大模型训练有什么不同？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>actor</dt><dd>采集数据的进程</dd></div><div><dt>learner</dt><dd>更新模型的进程</dd></div><div><dt>rollout</dt><dd>一段交互轨迹</dd></div><div><dt>replay buffer</dt><dd>经验回放缓冲区</dd></div><div><dt>sample efficiency</dt><dd>样本效率</dd></div><div><dt>vectorized environment</dt><dd>向量化环境</dd></div><div><dt>sim-to-real</dt><dd>仿真到现实</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="10-2.html"><small>上一单元</small>10.2 价值与策略：两条路线</a>
+<a class="next" href="10-4.html"><small>下一单元</small>10.4 业界怎么用强化学习</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

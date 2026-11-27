@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 214" width="760" height="214" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="离群值把尺子撑大">
+  <title>离群值把尺子撑大</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="214" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一千个数里有一个 5.0，其余都在 0.1 以内：按整个张量定一把尺子</text>
+  <line x1="60" y1="104" x2="700" y2="104" stroke="#2b303b" stroke-width="1.4"/>
+  <line x1="60.0" y1="95" x2="60.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="100.0" y1="95" x2="100.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="140.0" y1="95" x2="140.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="180.0" y1="95" x2="180.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="220.0" y1="95" x2="220.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="260.0" y1="95" x2="260.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="300.0" y1="95" x2="300.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="340.0" y1="95" x2="340.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="380.0" y1="95" x2="380.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="420.0" y1="95" x2="420.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="460.0" y1="95" x2="460.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="500.0" y1="95" x2="500.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="540.0" y1="95" x2="540.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="580.0" y1="95" x2="580.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="620.0" y1="95" x2="620.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="660.0" y1="95" x2="660.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <line x1="700.0" y1="95" x2="700.0" y2="113" stroke="#2b303b" stroke-width="1.2"/>
+  <rect x="60" y="70" width="14" height="22" rx="4" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <circle cx="700" cy="80" r="5.5" fill="#dc97a3"/>
+  <text x="82" y="86" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">其余 999 个数全挤在这里</text>
+  <text x="688" y="84" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">那一个 5.0</text>
+  <text x="60" y="134" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">0</text>
+  <text x="700" y="134" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">5.0</text>
+  <text x="24" y="170" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">尺子被一个离群值撑大，绝大多数数值只能用到寥寥几格</text>
+  <text x="24" y="192" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">又不能把它截掉：这些大数虽然少，对模型的输出却很重要</text>
+</svg>

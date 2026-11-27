@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 212" width="760" height="212" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="torch.compile 的三层栈">
+  <title>torch.compile 的三层栈</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="212" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">torch.compile 的三层，每层交给下一层的东西</text>
+  <rect x="72" y="84" width="170" height="62" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="157.0" y="111.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">TorchDynamo</text>
+  <text x="157.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">关心 Python 的动态性</text>
+  <rect x="294" y="84" width="170" height="62" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="379.0" y="111.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">AOTAutograd</text>
+  <text x="379.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">关心求导和简化</text>
+  <rect x="516" y="84" width="170" height="62" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="601.0" y="111.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">Inductor</text>
+  <text x="601.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">关心性能</text>
+  <text x="60" y="70" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">Python 字节码</text>
+  <text x="268" y="172" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">前向图 + guard</text>
+  <text x="490" y="70" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">前向 + 反向的图</text>
+  <text x="700" y="172" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">融合后的 kernel</text>
+  <line x1="244" y1="115" x2="292" y2="115" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="466" y1="115" x2="514" y2="115" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="26" y1="115" x2="70" y2="115" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="688" y1="115" x2="734" y2="115" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="24" y="200" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">抓不成图的地方退回普通 Python 执行：最坏只是没有加速</text>
+</svg>

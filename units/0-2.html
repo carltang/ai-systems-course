@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>0.2 度量语言：利用率、吞吐与 MFU · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="分清利用率、吞吐和 MFU 各自量的是什么，知道怎样建立基线、怎样把时间拆到管道的每一段。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="0-1.html" title="0.1 一次训练 step 的旅程" data-step="prev">‹ 0.1</a>
+<a href="0-3.html" title="0.3 系统基础回顾" data-step="next">0.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 0 部分 · 全景与度量</span>0.2 度量语言：利用率、吞吐与 MFU</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>怎么知道一次训练跑得“好不好”？该看哪个数字？</div><div class="frame-c">承接 0.1：知道了管道长什么样，接下来要会量它。量错了，后面所有的优化都可能是白费力气。</div></div>
+<div class="story"><p>线索是：最常看的“GPU 利用率”其实量的不是效率 → 真正的目标是吞吐 → 吞吐还要和硬件的上限比，这就是 MFU → 任何数字都要建立在可复现的基线上 → 最后把一步的时间拆开，看每一段各占多少。</p></div>
+<ol class="thread"><li><a href="#c-p0-2-util">GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</a></li><li><a href="#c-p0-2-throughput">目标是吞吐：每秒处理多少样本、多少 token</a></li><li><a href="#c-p0-2-mfu">MFU：实际用上了硬件峰值算力的百分之几</a></li><li><a href="#c-p0-2-baseline">先有一个可复现的基线，才谈得上优化</a></li><li><a href="#c-p0-2-attribution">把一步的时间拆开：每一段各占多少</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p0-2-util"><h3><span class="i-num">1</span>GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</h3>
+<p class="i-essence">nvidia-smi 显示的 GPU 利用率，含义是：过去一小段采样时间里，GPU 上有 kernel 在执行的时间占百分之几。它不管这个 kernel 用了多少运算单元，也不管它算得有没有用。</p>
+<div class="i-detail"><p>这个数字的定义很窄：驱动每隔一小段时间采样一次，看这段时间里“至少有一个 kernel 在运行”的时间比例。</p><p>由此可以直接推出它的三个盲区：</p><ul><li><strong>一个很小的 kernel 也算“在忙”。</strong> 一个只用了 1% 运算单元的 kernel 连续不断地跑，利用率是 100%。</li><li><strong>带宽受限也算“在忙”。</strong> kernel 在执行，但运算单元大部分时间在等数据从显存送来，利用率还是 100%。</li><li><strong>无用功也算“在忙”。</strong> 重复的计算、可以融合却没有融合的中间读写，都计入利用率。</li></ul><p>反过来，它能可靠地告诉你一件事：<mark>如果利用率明显低于 100%，说明有一部分时间 GPU 上什么都没在跑</mark>，也就是 0.1 里说的“等数据”“等发令”或“等别的卡”。这是它唯一适合回答的问题。</p><p>还要小心这个数字本身的测量方式。它是采样得到的平均值：如果监控系统每 5 分钟取一次平均，一段“半分钟满载、半分钟空闲”的锯齿就会被抹平成 50%，看不出规律；如果采集有缺失而系统把缺失补成 0，还会凭空出现“利用率为 0”的时段。分析之前，先弄清你看到的曲线是怎么采出来的。</p></div>
+<details class="i-more"><summary>排查：三种典型的利用率曲线各说明什么</summary><div class="i-detail"><p>用每秒一次的采样看一两分钟（<code>nvidia-smi dmon</code> 或 <code>nvidia-smi --query-gpu=utilization.gpu --format=csv -l 1</code>），曲线的形状比平均值有用得多。</p><p><strong class="h">锯齿形：一会儿接近 100%，一会儿掉到很低，有规律地重复。</strong><br>最常见的原因是数据供给跟不上：GPU 算完一个 batch，下一个还没到。检查 DataLoader 的 worker 数量、CPU 是否占满、存储读取速度。如果周期很长（几十秒一次），看看是不是在定期做验证、存检查点或写日志。</p><p><strong class="h">长期稳定在中等水平，比如 40%–60%。</strong><br>说明 GPU 的活是断断续续发过来的，每次都很短。常见于模型由大量小算子组成、时间花在 Python 和框架调度上（等发令）。加大 batch 如果吞吐几乎成比例上升，就确认了这一点。</p><p><strong class="h">一直接近 100%，但训练仍然慢。</strong><br>利用率在这里已经不提供信息了。要改看吞吐和 MFU（下面两节），再用 profiler 找出最耗时的 kernel。</p><p><strong class="h">多卡时：所有卡同步地周期性下降。</strong><br>多半和梯度同步有关：每一步同步时大家都在等。对比单卡的吞吐，算出扩展效率。如果只有某一张卡的曲线和别人不同，重点查那张卡和它的链路。</p><p><strong class="h">两个容易被忽略的干扰</strong>：用很高的频率轮询 nvidia-smi 本身会影响采样结果；在容器里或云平台的监控面板上看到的数字，可能经过了聚合，先确认它的采样间隔。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像看一家店“有客人的时间占比”：一整天都有一位客人坐着，占比就是 100%，可这家店也许一百张桌子只坐了一张。</p>
+<p class="i-impl">所以利用率低一定有问题（GPU 在空等），但利用率高不代表没问题。它只能用来发现“GPU 在等”，不能用来证明“GPU 用得好”。</p>
+<div class="i-builds">承接 <a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
+<div class="i-builds">后面会用到 <a href="0-2.html#c-p0-2-throughput">目标是吞吐：每秒处理多少样本、多少 token</a><a href="3-6.html#c-p3-6-sharing">几个进程共用一张卡：默认是轮流用，不是同时用</a><a href="5-3.html#c-p5-3-traffic">训练的流量：流很少，每条极大，同时爆发，周期重复</a><a href="8-2.html#c-p8-2-operator">GPU Operator：把让 GPU 在容器里能用的一整套组件装齐</a></div>
+</li>
+<li class="i-lead">既然利用率不能代表效率，那该看什么？回到训练的目的本身。</li>
+<li class="icard" id="c-p0-2-throughput"><h3><span class="i-num">2</span>目标是吞吐：每秒处理多少样本、多少 token</h3>
+<p class="i-essence">训练要的是“单位时间完成多少有效的工作”，也就是吞吐：每秒多少个样本，或者每秒多少个 token。所有优化最终都要落在这个数字上。</p>
+<div class="i-detail"><p>吞吐的好处是它直接对应你关心的结果：训练完这些数据要多少小时、要花多少钱。吞吐翻倍，训练时间就减半。</p><p>用吞吐时要注意三点。</p><p><strong class="h">单位要选对。</strong> 语言模型用 token 每秒，因为每个样本长度不同；图像模型用样本每秒。多卡时要说清是每张卡的还是全部加起来的。</p><p><strong class="h">要测稳定状态。</strong> 开头几步包含模型加载、编译、缓存预热，比稳定后慢很多。跳过开头，取中间一段的平均。</p><p><strong class="h">吞吐不是唯一要守住的数字。</strong> 有些“提速”其实是换来的：</p><ul><li>减小了 batch 或序列长度，每步快了，但每步处理的数据也少了；</li><li>降低了精度，速度上去了，模型效果却变差了；</li><li>省掉了某些计算，显存却超了。</li></ul><p>所以一次完整的记录至少包括四样：<strong>吞吐、MFU、峰值显存、模型效果</strong>（损失或评测指标）。<mark>四样放在一起看，才知道这次改动是真的赚了，还是只是挪了位置</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>评价一家工厂看的是每天出多少合格的产品，而不是机器的开机率。</p>
+<p class="i-impl">所以报告任何一次优化，都要给出优化前后的吞吐；同时记下峰值显存和模型效果，确认速度不是用别的东西换来的。</p>
+<div class="i-builds">承接 <a href="0-2.html#c-p0-2-util">GPU 利用率量的是“有没有在忙”，不是“忙得值不值”</a></div>
+<div class="i-builds">后面会用到 <a href="0-2.html#c-p0-2-mfu">MFU：实际用上了硬件峰值算力的百分之几</a><a href="0-2.html#c-p0-2-baseline">先有一个可复现的基线，才谈得上优化</a><a href="6-3.html#c-p6-3-busbw">两种带宽：algbw 是你感受到的，busbw 用来和硬件比</a><a href="9-3.html#c-p9-3-metrics">三个指标：吞吐、首个 token 的延迟、每个 token 的延迟</a></div>
+</li>
+<li class="i-lead">吞吐是个绝对数字：每秒 10 万 token 算快还是慢？要回答这个问题，得有一把尺子。</li>
+<li class="icard" id="c-p0-2-mfu"><h3><span class="i-num">3</span>MFU：实际用上了硬件峰值算力的百分之几</h3>
+<p class="i-essence">MFU（Model FLOPs Utilization）= 训练实际完成的有效运算速度 ÷ 硬件理论上的峰值运算速度。它回答的是：这块 GPU 能做的事，你用上了多少。</p>
+<div class="i-detail"><p>计算 MFU 需要两个数。</p><p><strong class="h">分子：训练实际需要的运算速度。</strong> 对 Transformer 有一个好用的估算：每处理 1 个 token，前向加反向大约需要 6N 次浮点运算，N 是参数个数。（前向时每个参数参与一次乘加，约 2N；反向要算对激活值和对权重的两份梯度，约 4N。）所以实际运算速度 ≈ 6N × 每秒处理的 token 数。</p><p><strong class="h">分母：硬件的峰值运算速度。</strong> 显卡规格里的 TFLOPS。要选和你使用的精度对应的那个数：用 bf16 训练，就用 Tensor Core 的半精度峰值。</p><p>两者相除就是 MFU。注意分子只算“模型本身需要的运算”，不管你实际让 GPU 做了多少。所以重复计算、无用功都不会抬高 MFU，这正是它比利用率诚实的地方：<mark>利用率量“GPU 忙不忙”，MFU 量“忙出了多少成果”</mark>。</p><p>怎么看这个数字：</p><ul><li>PaLM 论文报告的 MFU 是 46.2%，这在大模型训练里算很好的水平。</li><li>永远到不了 100%，因为模型里有很多带宽受限的算子（归一化、激活函数），还有数据加载、通信这些不做浮点运算的环节。</li><li>如果只有个位数，问题通常不在 kernel，而在管道的其他段：数据、发令、通信。</li></ul><p>MFU 也有它的盲区。多卡训练时，为了让通信和计算重叠而做的调整，可能让单步的 MFU 下降，整体吞吐却上升。所以 MFU 和吞吐要一起看，目标始终是吞吐。</p></div>
+<details class="i-more"><summary>动手：给自己的训练算一次 MFU</summary><div class="i-detail"><p>以 124M 参数的 GPT-2、在一张 A100 上用 bf16 训练为例。</p><p><strong class="h">第一步：量出吞吐。</strong> 跳过开头的预热，取稳定后的一段。假设每步处理 16 × 1024 = 16384 个 token，每步耗时 0.11 秒（计时前后都同步过，见 3.1 的计时方法），吞吐 = 16384 ÷ 0.11 ≈ 14.9 万 token/秒。</p><p><strong class="h">第二步：算分子。</strong> 每个 token 约 6N = 6 × 1.24×10⁸ = 7.44×10⁸ 次运算。实际运算速度 = 7.44×10⁸ × 1.49×10⁵ ≈ 1.11×10¹⁴ 次/秒，也就是 111 TFLOPS。</p><p><strong class="h">第三步：查分母。</strong> A100 用 Tensor Core 做半精度运算的峰值是 312 TFLOPS。</p><p><strong class="h">第四步：相除。</strong> MFU = 111 ÷ 312 ≈ 36%。</p><p>几个要注意的地方：</p><ul><li>6N 是近似。它忽略了注意力里和序列长度平方有关的那部分运算，序列很长时会低估；也忽略了词嵌入表（查表不算乘法），小模型里会高估。要更准，可以用工具（如 <code>fvcore</code> 或 <code>torch.utils.flop_counter</code>）数出前向的运算次数再乘 3。</li><li>分母要和精度匹配。如果实际跑的是 fp32 而你用了半精度的峰值做分母，MFU 会被严重低估。</li><li>多卡时，分子用所有卡的总吞吐，分母用所有卡的峰值之和。</li></ul><p>算出这个数之后，把它和吞吐、峰值显存一起记下来。以后每做一次优化，这三个数就是比较的基准。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像一条设计时速 300 公里的高铁线路，实际平均时速 120 公里：MFU 就是 40%。它告诉你还有多大空间，也提醒你有些差距是免不了的。</p>
+<p class="i-impl">所以吞吐告诉你“现在多快”，MFU 告诉你“还能快多少”。大模型训练做得好的，MFU 在四五成；如果只有百分之几，说明有基本的问题没解决。</p>
+<div class="i-builds">承接 <a href="0-2.html#c-p0-2-throughput">目标是吞吐：每秒处理多少样本、多少 token</a></div>
+<div class="i-builds">后面会用到 <a href="1-5.html#c-1-4-6n">训练每个 token，大约要 6N 次浮点运算</a><a href="11-1.html#c-6-2-ceiling">先算出理论上限，才知道还差多远</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2204.02311" target="_blank" rel="noopener">PaLM 论文（MFU 的出处）</a></div>
+</li>
+<li class="i-lead">吞吐和 MFU 都是量出来的。量的方法不对，再好的指标也没有意义。</li>
+<li class="icard" id="c-p0-2-baseline"><h3><span class="i-num">4</span>先有一个可复现的基线，才谈得上优化</h3>
+<p class="i-essence">基线是一组固定条件下、能重复测出来的数字。没有它，你无法判断一次改动是变好了、变坏了，还是只是测量的波动。</p>
+<div class="i-detail"><p>一个可信的测量要做到下面几点。</p><p><strong class="h">固定输入。</strong> 用同样的 batch 大小、同样的序列长度。最好用一个固定的 batch 反复喂，把数据加载的影响先隔离出去；需要评估数据管线时，再单独测它。</p><p><strong class="h">预热。</strong> 前几步包含一次性的开销：加载库、分配显存、torch.compile 的编译、缓存变热。这些不能算进稳定状态的性能。</p><p><strong class="h">同步后再计时。</strong> GPU 是异步执行的，CPU 发出任务就返回了。不先等 GPU 把活干完就停表，量到的只是“下单”的时间（3.1 会细讲）。</p><p><strong class="h">多次测量，看波动。</strong> 跑几十步取平均，同时看最快和最慢的差距。如果两次运行之间本身就有 5% 的波动，那么一次“提升了 3%”的优化就说明不了什么。</p><p><strong class="h">记录环境。</strong> 显卡型号、驱动和 PyTorch 版本、精度设置、是否开了编译。几周后想复现时，这些就是依据。</p><p>有了基线之后的工作方式很简单：<mark>改一处 → 用同样的方法测 → 和基线比 → 记下来</mark>。慢，但每一步都站得住。跳步骤看起来快，一旦结果和预期不符，就得全部退回去重查。</p></div>
+<p class="i-analogy"><b>打个比方</b>像称体重：每次都在早上空腹、用同一台秤称，前后的数字才能比较。</p>
+<p class="i-impl">所以每次只改一处，用同样的方法再测一遍，和基线比。改了三处才测一次，就不知道是哪一处起的作用。</p>
+<div class="i-builds">承接 <a href="0-2.html#c-p0-2-throughput">目标是吞吐：每秒处理多少样本、多少 token</a></div>
+<div class="i-builds">后面会用到 <a href="0-2.html#c-p0-2-attribution">把一步的时间拆开：每一段各占多少</a><a href="1-3.html#c-p1-3-debug">排查的顺序：从最小的规模开始，先让模型过拟合一个 batch</a><a href="2-4.html#c-p2-4-precompute">最省事的优化：能提前做的预处理，就不要留到训练时做</a><a href="6-3.html#c-p6-3-expect">先算出“应该是多少”，再看测出来差多少</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">Best Practices §8.1 计时</span></div>
+</li>
+<li class="i-lead">基线给了你一个总数。总数只能告诉你“快还是慢”，要知道“慢在哪”，得把它拆开。</li>
+<li class="icard" id="c-p0-2-attribution"><h3><span class="i-num">5</span>把一步的时间拆开：每一段各占多少</h3>
+<p class="i-essence">一步训练的总时间 = 等数据 + 拷贝 + 前向 + 反向 + 梯度同步 + 优化器 + 其他。把总时间拆到这些段上，哪一段最大，就先看哪一段。</p>
+<div class="i-detail"><p>拆分时间有粗细两种做法，先粗后细。</p><p><strong class="h">粗拆：自己打点。</strong> 在训练循环里几个关键位置同步后记时间：取到 batch 之后、拷到 GPU 之后、前向之后、反向之后、优化器之后。相邻两点的差就是那一段的耗时。这样十几行代码就能得到一张表，比如：</p><ul><li>等数据 45 毫秒</li><li>拷贝 5 毫秒</li><li>前向 60 毫秒</li><li>反向 110 毫秒</li><li>优化器 10 毫秒</li></ul><p>一眼就能看出：等数据占了五分之一，值得先看；优化器只占 4%，优化它没有意义。</p><figure class="fig"><img src="../assets/figures/step-time.svg" alt="粗拆之后的样子（数字是讲解里的例子）" loading="lazy"><figcaption>粗拆之后的样子（数字是讲解里的例子）</figcaption></figure><p>（为了打点而加的同步会让程序变慢，因为它打断了 CPU 和 GPU 的重叠。所以这种测法只用来看各段的比例，测总吞吐时要去掉。）</p><p><strong class="h">细拆：用 profiler。</strong> <code>torch.profiler</code> 会记录每个算子在 CPU 和 GPU 上各花了多少时间，还能画出时间线，看到 GPU 上哪里有空白、空白的时候 CPU 在干什么。3.1 会具体讲怎么读它的输出。</p><p>拆完之后，对着 0.1 的管道图做三件事：</p><ul><li>找最大的一段。它决定了优化的上限：一段占总时间的 20%，把它优化到零，整体也只快 25%。</li><li>判断它属于哪种“等”（等数据、等计算、等发令、等别的卡）。</li><li>到课程对应的部分找手段，改完再拆一次。瓶颈消除后，下一个最大的段会浮出来。</li></ul><p>这就是性能工作的全部循环：<mark>量总数 → 拆开 → 找最大的 → 改 → 再量</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像查家里的电费：总数高没有用，得知道空调、热水器、冰箱各用了多少，才知道该从哪里省。</p>
+<p class="i-impl">所以 profiler 的作用就是做这件拆分。拆完之后，回到 0.1 的管道图，看最大的那一段属于哪种“等”，再去对应的部分找办法。</p>
+<div class="i-builds">承接 <a href="0-2.html#c-p0-2-baseline">先有一个可复现的基线，才谈得上优化</a><a href="0-1.html#c-p0-1-pipeline">训练的一步是一条串联的管道，最慢的一段决定速度</a></div>
+<div class="i-builds">后面会用到 <a href="2-4.html#c-4-1-feed">GPU 在等数据：先查数据管线</a><a href="3-1.html#c-2-1-measure">先测量，再优化：瓶颈常常不在你以为的地方</a><a href="6-3.html#c-p6-3-layers">分层排除，自下而上：链路 → 裸 RDMA → NCCL → 框架</a><a href="7-4.html#c-p7-4-interval">多久存一次：存的代价和丢的代价之间的平衡</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html" target="_blank" rel="noopener">PyTorch Performance Tuning Guide</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">GPU 利用率</strong>只说明 GPU 有没有在忙，不说明忙得值不值；<strong>吞吐</strong>才是目标；<strong>MFU</strong> 告诉你离硬件上限还有多远；这些数字要在<strong>可复现的基线</strong>上测；最后把时间<strong>拆到管道的每一段</strong>，才知道该优化哪里。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>nvidia-smi 的 GPU 利用率到底测的是什么？为什么 100% 不代表高效？</li><li>为什么优化目标应该是吞吐而不是利用率？除了吞吐，还应该同时记录什么？</li><li>MFU 是怎么定义的？它和 GPU 利用率的区别在哪里？</li><li>测量训练性能时，怎样才算一个“可复现的基线”？</li><li>怎样把一步训练的时间拆到管道的各段上？拆开之后怎么用？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>utilization</dt><dd>利用率</dd></div><div><dt>throughput</dt><dd>吞吐</dd></div><div><dt>MFU</dt><dd>模型浮点运算利用率</dd></div><div><dt>baseline</dt><dd>基线</dd></div><div><dt>profiler</dt><dd>性能分析器</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="0-1.html"><small>上一单元</small>0.1 一次训练 step 的旅程</a>
+<a class="next" href="0-3.html"><small>下一单元</small>0.3 系统基础回顾</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

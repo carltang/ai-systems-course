@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2.3 从一行 Python 到一个 kernel · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="跟着一次算子调用从 Python 走到 GPU，弄清中间每一层做什么、花多少时间。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="2-2.html" title="2.2 autograd 引擎" data-step="prev">‹ 2.2</a>
+<a href="2-4.html" title="2.4 数据供给" data-step="next">2.4 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 2 部分 · PyTorch 执行栈</span>2.3 从一行 Python 到一个 kernel</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>写下 torch.add(a, b) 之后，到 GPU 上真的开始算之间，隔着多少层？</div><div class="frame-c">承接 2.1–2.2。它解释 0.1 里的“等发令”从哪里来，也是读 PyTorch 源码时找入口的地图。</div></div>
+<div class="story"><p>线索是：一次算子调用要穿过五层 → 其中最特别的一层是 dispatcher，它决定这次调用依次经过哪些“功能” → 这五层加起来每次要花掉若干微秒，算子多而小的时候就成了瓶颈 → 最后给出一张总目录，告诉你任何一个算子的入口在哪。读完这一单元，你应该能在 PyTorch 仓库里，从任何一个 Python 函数一路找到它的 CUDA 实现。</p></div>
+<ol class="thread"><li><a href="#c-p2-3-journey">一次算子调用要穿过五层：绑定、dispatcher、autograd、后端实现、CUDA</a></li><li><a href="#c-p2-3-dispatcher">dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</a></li><li><a href="#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a></li><li><a href="#c-p2-3-yaml">native_functions.yaml 是所有算子的总目录，读源码从这里找入口</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p2-3-journey"><h3><span class="i-num">1</span>一次算子调用要穿过五层：绑定、dispatcher、autograd、后端实现、CUDA</h3>
+<p class="i-essence">写下 torch.add(a, b)，到 GPU 上开始计算之间依次发生：Python 绑定解析参数；dispatcher 查表决定交给谁；autograd 层记账；后端的实现准备好输出张量并选定 kernel；最后调用 CUDA，把 kernel 放进 GPU 的任务队列，然后立刻返回。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/op-journey.svg" alt="前四层是每个算子都要付的固定开销" loading="lazy"><figcaption>前四层是每个算子都要付的固定开销</figcaption></figure><p>以 <code>c = torch.add(a, b)</code> 为例，a、b 是 GPU 上需要求梯度的张量。</p><p><strong class="h">一、Python 绑定。</strong> Python 解释器查到 <code>torch.add</code> 这个函数，它是 C++ 写的。绑定代码把 Python 的参数解析成 C++ 的类型：检查参数个数和类型，在多个重载里选出匹配的那个。然后<strong>释放 GIL</strong>（0.3），调用 C++ 的 <code>at::add</code>。</p><p><strong class="h">二、dispatcher。</strong> <code>at::add</code> 并不直接是实现，它先进入 dispatcher：看输入张量带着哪些“功能”（需要求梯度、在 CUDA 上……），找出优先级最高的一项，转给负责它的函数。下一节细讲。</p><p><strong class="h">三、autograd 层。</strong> 因为输入需要求梯度，最先接手的是 autograd 的包装函数（2.2 说过它是生成的）。它做三件事：创建加法的反向节点；再次通过 dispatcher 调用“真正的加法”（这次跳过 autograd 这一层）；拿到结果后，把节点挂到结果上。</p><p><strong class="h">四、后端实现。</strong> 第二次分发落到 CUDA 后端的加法实现。它在 CPU 上做一些准备：检查两个输入的形状能否广播、数据类型怎么提升；算出输出的形状；向分配器要一块显存放输出（2.1）；根据数据类型选出要用的 kernel。</p><p><strong class="h">五、CUDA。</strong> 调用 CUDA 的接口启动 kernel。这一步只是把“执行这个 kernel，参数是这些”放进 GPU 的任务队列，CPU 不等它执行就返回了（3.1 讲过异步）。</p><p>然后一路返回：结果被包成一个 Python 的 <code>Tensor</code> 对象，重新拿回 GIL，交还给解释器，赋值给 <code>c</code>。这时 GPU 上的加法可能还没开始算。</p><p><strong class="h">从这条路上看到的三件事。</strong></p><ul><li><mark>第一到第四层全在 CPU 上，单线程，花的时间和张量的大小无关</mark>。</li><li>一行 Python 对应的不一定是一个 kernel。有些算子内部会调用别的算子，每一次都要再走一遍二到五层。</li><li>输出的显存是每次调用时现分配的。所以 2.1 的分配器必须快。</li></ul><p>这条路也是读源码的路线图：每一层对应仓库里的一个位置，下面的源码导读会带你走一遍。</p></div>
+<details class="i-more"><summary>源码导读：跟着 torch.add 走一遍</summary><div class="i-detail"><p>目标是在仓库里把上面五层各找到一处。文件路径是 PyTorch 2.x 的，以你手头的版本为准。其中有几个文件是构建时生成的，没有编译过的源码树里看不到，可以看生成它们的模板，或者直接看安装包里带的头文件。</p><p><strong class="h">总目录：<code>aten/src/ATen/native/native_functions.yaml</code>。</strong> 搜 <code>func: add.Tensor</code>，会看到这个算子的签名，以及它的实现叫什么名字。这是所有路线的起点。</p><p><strong class="h">一、绑定。</strong> 生成的文件 <code>torch/csrc/autograd/generated/python_torch_functions_*.cpp</code> 里有 <code>THPVariable_add</code>。里面能看到三样东西：一个参数解析器（列出了 <code>add</code> 的所有重载签名）；一个 <code>pybind11::gil_scoped_release</code>（释放 GIL）；对 <code>self.add(other)</code> 的调用。生成它的脚本是 <code>tools/autograd/gen_python_functions.py</code>。</p><p><strong class="h">二、dispatcher。</strong> <code>at::add</code> 的定义在生成的 <code>Functions.h</code> / <code>Operators.cpp</code> 里，内容很短：取到这个算子的句柄，调用 <code>Dispatcher::call</code>。dispatcher 本身在 <code>aten/src/ATen/core/dispatch/Dispatcher.h</code>，分发键的定义在 <code>c10/core/DispatchKey.h</code>，那个文件开头的注释把每个键是干什么的写得很清楚，值得读。</p><p><strong class="h">三、autograd 层。</strong> 生成的 <code>torch/csrc/autograd/generated/VariableType_*.cpp</code> 里有 <code>add_Tensor</code>。找这几行：判断是否需要梯度（<code>compute_requires_grad</code>）；创建 <code>AddBackward0</code> 节点并设置下一站；在一个 guard 的作用域里调用 <code>at::redispatch::add</code>（这就是“再次分发，跳过 autograd”）；最后 <code>set_history</code> 把节点挂到结果上。</p><p><strong class="h">四、后端实现。</strong> 逐元素的二元运算有一套共用的框架。在 <code>aten/src/ATen/native/BinaryOps.cpp</code> 里能找到 <code>add</code> 的“结构化”定义：一个 <code>meta</code> 函数负责算输出的形状和类型，一个 <code>impl</code> 函数负责执行。CUDA 版本的 <code>impl</code> 在 <code>aten/src/ATen/native/cuda/</code> 下（文件名里带 <code>BinaryMiscOps</code> 或 <code>BinaryMulKernel</code> 之类，加法和几个相近的运算放在一起）。</p><p><strong class="h">五、kernel 的启动。</strong> CUDA 的逐元素运算最终都调用 <code>gpu_kernel</code> 这一族函数，定义在 <code>aten/src/ATen/native/cuda/Loops.cuh</code> 和 <code>CUDALoops.cuh</code>。在那里能看到真正的 <code>__global__</code> 函数（3.2 讲过它的写法）和启动它的那一行：grid 和 block 的大小是怎么算出来的，用的是哪条 stream。</p><p><strong class="h">走完之后试着回答：</strong></p><ul><li>两个形状不同的张量相加，广播是在第几层处理的？</li><li>如果 a 不需要求梯度，第三层还会经过吗？（不会。dispatcher 直接把调用交给后端。）</li><li><code>a.add_(b)</code>（原地版本）和 <code>torch.add(a, b)</code> 在哪一层开始走不同的代码？</li></ul></div></details>
+<p class="i-analogy"><b>打个比方</b>像去政府窗口办一件事：先在导办台确认材料（绑定），取号机按业务类型分到窗口（dispatcher），第一个窗口登记备案（autograd），第二个窗口实际办理（后端），最后把文件投进“待处理”的传送带（CUDA 队列）。你拿到回执就走了，文件真正处理是之后的事。</p>
+<p class="i-impl">所以一个算子在 CPU 上花的时间和它在 GPU 上的计算量无关：算一个标量加法和算一个大矩阵乘法，前面这五层花的时间差不多。</p>
+<div class="i-builds">承接 <a href="2-1.html#c-p2-1-keys">说明里还有三个属性：设备、数据类型、布局，它们决定算子走哪条实现</a><a href="2-2.html#c-p2-2-derivatives">每个算子“怎么往回走”，写在一张表里，代码是照着它生成的</a><a href="0-3.html#c-p0-3-process">进程、线程与 GIL：为什么数据加载要开多个进程</a><a href="0-1.html#c-p0-1-layers">同一条管道分六层来看，每往下一层换一种语言</a></div>
+<div class="i-builds">后面会用到 <a href="2-3.html#c-p2-3-dispatcher">dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</a><a href="3-6.html#c-p3-6-queue">CPU 和 GPU 之间隔着一条队列：发出任务不等于任务做完</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://blog.ezyang.com/2019/05/pytorch-internals/" target="_blank" rel="noopener">PyTorch internals（Edward Yang）：一次算子调用的旅程</a><a class="src" href="https://docs.pytorch.org/devlogs/dispatcher/2026-04-16-how-does-the-dispatcher-work/" target="_blank" rel="noopener">How Does the Dispatcher Work?（PyTorch devlog）</a></div>
+</li>
+<li class="i-lead">五层里最特别的是第二层。它决定了这次调用要经过哪些“功能”、按什么顺序。</li>
+<li class="icard" id="c-p2-3-dispatcher"><h3><span class="i-num">2</span>dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</h3>
+<p class="i-essence">可以把 dispatcher 想成一张二维表：每一行是一个算子，每一列是一种“功能”（自动求导、混合精度、CUDA 后端、CPU 后端……），格子里是处理函数。调用算子时，根据输入张量算出这次涉及哪些列，从优先级最高的那一列开始；那一格的函数做完自己的事，把自己这一列屏蔽掉，再分发一次，就落到下一列。</p>
+<div class="i-detail"><p><strong class="h">要解决的问题。</strong> 一次 <code>add</code> 可能同时需要好几件事：记下反向节点、转换精度、被编译器追踪、最后在某种硬件上执行。如果把这些全写进 <code>add</code> 的实现里，上千个算子每个都要写一遍，再加一种功能又要全部改一遍。</p><p><strong class="h">分发键。</strong> 每种功能对应一个键（dispatch key）。键有固定的优先级顺序：像自动求导、混合精度这类“包装”功能排在前面，各种硬件后端排在最后。</p><p><strong class="h">算出这次调用的键集合。</strong> 来源有三处：</p><ul><li>每个输入张量自己带的键：它在哪个后端（CPU、CUDA），是否需要求梯度。</li><li>当前线程“额外打开”的键：比如进入了混合精度的 <code>autocast</code> 上下文。</li><li>当前线程“屏蔽掉”的键：比如在 <code>no_grad</code> 里，自动求导被屏蔽。</li></ul><p>把前两者合并，再去掉第三者，<mark>剩下的集合里优先级最高的那个键，决定了这次调用交给表里的哪一格</mark>。</p><p><strong class="h">再分发。</strong> 以一个需要求梯度的 CUDA 张量为例：</p><ul><li>第一次分发：集合是 {自动求导, CUDA}，最高的是自动求导。进入 autograd 的包装函数。</li><li>包装函数做完记账后，把“自动求导”加入屏蔽集合，再调用一次这个算子。</li><li>第二次分发：自动求导被屏蔽，剩下 {CUDA}。进入 CUDA 的实现。</li><li>返回时，屏蔽被撤销（用的是 2.1“预备”里讲的 guard 写法）。</li></ul><p>如果还开着混合精度，中间会多一站：自动求导 → 混合精度（把输入转成 16 位）→ CUDA。</p><p><strong class="h">表里的格子怎么填。</strong> 有三种填法：</p><ul><li>给一个算子在一个键上登记一个实现（一格）。</li><li>给一个算子登记一个不分键的通用实现（一整行）。</li><li>给一个键登记一个适用于所有算子的“兜底”函数（一整列）。一些功能就是这样用一个函数覆盖了全部算子。</li></ul><p><strong class="h">这对你有什么用。</strong></p><ul><li>它解释了一批行为：为什么 <code>no_grad</code> 里算子更快（少走一站）；为什么混合精度不用改模型代码（它是路上的一站）；为什么 torch.compile 能“看见”所有算子（它在追踪时接管了分发）。</li><li>读源码时，一个算子的“实现”不止一处。先问清楚你要找的是哪一列：它的反向？它的 CUDA kernel？它在混合精度下的行为？</li><li>它也是每次调用固定开销的一部分：每多一站，就多一次查表和函数调用。</li></ul></div>
+<p class="i-analogy"><b>打个比方</b>像一份文件要过好几个部门盖章：收发室按文件类型算出要经过哪些部门，先送到排在最前面的那个；每个部门办完自己的事，在流转单上划掉自己，再交回收发室送往下一个。</p>
+<p class="i-impl">所以自动求导、混合精度、追踪、后端选择这些互不相干的功能，可以各自独立地实现，再自由叠加。新增一种功能或一种硬件后端，只是在表上加一列。</p>
+<div class="i-builds">承接 <a href="2-3.html#c-p2-3-journey">一次算子调用要穿过五层：绑定、dispatcher、autograd、后端实现、CUDA</a><a href="2-1.html#c-p2-1-keys">说明里还有三个属性：设备、数据类型、布局，它们决定算子走哪条实现</a></div>
+<div class="i-builds">后面会用到 <a href="2-3.html#c-p2-3-overhead">这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</a><a href="2-3.html#c-p2-3-yaml">native_functions.yaml 是所有算子的总目录，读源码从这里找入口</a><a href="2-6.html#c-p2-6-autocast">autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://blog.ezyang.com/2020/09/lets-talk-about-the-pytorch-dispatcher/" target="_blank" rel="noopener">Let&#x27;s talk about the PyTorch dispatcher（Edward Yang）</a><a class="src" href="https://docs.pytorch.org/devlogs/dispatcher/2026-04-16-how-does-the-dispatcher-work/" target="_blank" rel="noopener">How Does the Dispatcher Work?（PyTorch devlog）</a></div>
+</li>
+<li class="i-lead">这五层加起来要花多少时间？对大多数模型可以忽略，但有一类情况它是主角。</li>
+<li class="icard" id="c-p2-3-overhead"><h3><span class="i-num">3</span>这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</h3>
+<p class="i-essence">前四层都在 CPU 上、单线程执行，每个算子大约花几微秒到几十微秒，和张量多大无关。如果 GPU 执行这个算子只需要几微秒，那么时间主要花在了 CPU 的“发令”上，GPU 大部分时间在等下一个任务。</p>
+<div class="i-detail"><p><strong class="h">算一笔账。</strong> 一个 GPU 上的算子，时间分两部分：</p><ul><li>CPU 一侧：走完前四层，把 kernel 放进队列。量级是几微秒到几十微秒，取决于经过了几站、算子本身的准备工作多复杂。</li><li>GPU 一侧：kernel 实际执行的时间，取决于数据量。</li></ul><p>一个中等大小的 Transformer，一步前向加反向大约是几千次算子调用。按每次 20 微秒算，CPU 一侧就要几十毫秒。</p><ul><li>如果 GPU 上每个算子要算几百微秒（大矩阵乘法），CPU 发令比 GPU 执行快得多，队列里总有任务在排队，GPU 一直在忙。开销可以忽略。</li><li>如果每个算子在 GPU 上只要几微秒（小模型、小 batch、大量逐元素的小运算），GPU 每做完一个都要等 CPU 发下一个。<mark>这时整体速度由 CPU 上那个单线程决定</mark>，GPU 利用率可能只有百分之二三十。这就是 0.1 里的“等发令”，3.1 的三面墙里叫“开销受限”。</li></ul><p><strong class="h">怎么判断。</strong></p><ul><li>*加倍 batch。* 把 batch 加倍，如果一步的时间几乎不变（吞吐接近翻倍），说明时间主要是和数据量无关的固定开销。如果时间也接近翻倍，说明 GPU 的计算才是主体。这是 Horace He 那篇文章给的办法，最简单也最可靠。</li><li>*看 profiler。* 比较每个算子的 CPU 时间和 CUDA 时间。CPU 时间的总和接近一步的总时间、而 CUDA 时间的总和小得多，就是开销受限。时间线上会看到 GPU 那一行是稀疏的小块，中间有空隙。</li><li>*看 GPU 利用率的形状。* 0.2 讲过：长期稳定在中等水平，是这种情况的典型曲线。</li></ul><p><strong class="h">怎么解决</strong>，都是 0.1 里“成批处理，摊薄固定成本”的不同做法：</p><ul><li>加大 batch：同样的发令次数，每次让 GPU 多干活。</li><li>减少算子个数：把循环改成向量化的写法；用一个现成的大算子代替一串小算子（比如用 <code>F.scaled_dot_product_attention</code> 代替手写的注意力）。</li><li>torch.compile（2.5）：把一整段计算编译成少数几个 kernel，还省掉了 Python 和 dispatcher 这几层。</li><li>CUDA Graph（3.6）：连“启动 kernel”这一步的开销也一起省掉。</li><li>2.6 的 fused 优化器：把几百个参数张量的更新合成一次。</li></ul><p><strong class="h">反向也一样。</strong> 反向时不经过 Python，但引擎每执行一个节点，同样要走 dispatcher 和后端实现。所以算子碎的模型，前向和反向都受这个限制。</p></div>
+<details class="i-more"><summary>排查：用 profiler 判断瓶颈是不是框架开销</summary><div class="i-detail"><pre>from torch.profiler import profile, ProfilerActivity
+
+with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+    for _ in range(3):
+        loss = model(x).sum()
+        loss.backward()
+    torch.cuda.synchronize()
+
+print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=20))</pre><p>（先跑几步预热再采，3.1 讲过原因。）</p><p><strong class="h">看表的最后几行。</strong> 表尾有 CPU 时间和 CUDA 时间的总计。</p><ul><li>CPU 总时间 ≈ 墙上时间，CUDA 总时间只有它的几分之一：开销受限。</li><li>CUDA 总时间 ≈ 墙上时间：GPU 一直在忙，瓶颈在计算，去第 3、4 部分找办法。</li></ul><p><strong class="h">看每一行。</strong> 按 <code>self_cpu_time_total</code> 排序后，排在前面的是 CPU 上最花时间的算子。留意两类：</p><ul><li>调用次数（<code># of Calls</code>）特别多、每次时间很短的：它们就是“碎”的来源。想想能不能向量化或换成一个大算子。</li><li>名字不是运算、而是 <code>aten::to</code>、<code>aten::item</code>、<code>aten::copy_</code> 这类的：前两个常常意味着数据在 CPU 和 GPU 之间来回搬，或者有隐藏的同步点。<code>.item()</code> 会让 CPU 停下来等 GPU 把之前的任务全部做完，在循环里每步调用它，等于放弃了异步带来的重叠。</li></ul><p><strong class="h">看时间线。</strong></p><pre>prof.export_chrome_trace("trace.json")   # 用 chrome://tracing 或 Perfetto 打开</pre><p>CPU 那几行是密密麻麻的函数调用，GPU 那一行是 kernel。开销受限时，GPU 行是一个个很短的小块，块与块之间的空隙比块本身还宽；点开空隙对应的 CPU 时间，就能看到那段时间 Python 和框架在做什么。</p><p><strong class="h">想知道 Python 层的时间花在哪。</strong> profiler 主要记录的是算子。Python 自身的开销（模型的 <code>forward</code> 里大量的小函数调用、属性访问）可以用 <code>py-spy</code> 这类采样工具看：<code>py-spy top --pid &lt;进程号&gt;</code> 会列出当前最耗时的 Python 函数。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像一个手脚极快的厨师配了一个写单子很慢的服务员：每道菜炒 5 秒，但下一张单子要 20 秒才递进来。厨师再快也没用。</p>
+<p class="i-impl">所以这种情况下换更快的 GPU 没有用。有效的办法是减少单子的数量：加大 batch 让每个算子干更多的活，用融合把多个算子合成一个，或者用 torch.compile 把这层开销整体去掉。</p>
+<div class="i-builds">承接 <a href="2-3.html#c-p2-3-dispatcher">dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</a><a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="2-5.html#c-p2-5-why">逐个算子执行看不到全局，所以做不了跨算子的优化</a><a href="2-5.html#c-p2-5-limits">编译对付的是开销和带宽，不是算力</a><a href="2-6.html#c-4-1-foreach">优化器也会慢：几百个小 kernel，不如几个大 kernel</a><a href="3-6.html#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://horace.io/brrr_intro.html" target="_blank" rel="noopener">Making Deep Learning Go Brrrr（Horace He）：Overhead</a><a class="src" href="https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html" target="_blank" rel="noopener">PyTorch Performance Tuning Guide</a></div>
+</li>
+<li class="i-lead">最后给你一张地图。有了它，前面讲的每一层都能在仓库里找到对应的位置。</li>
+<li class="icard" id="c-p2-3-yaml"><h3><span class="i-num">4</span>native_functions.yaml 是所有算子的总目录，读源码从这里找入口</h3>
+<p class="i-essence">PyTorch 的每一个算子都在 native_functions.yaml 里登记了一条：名字、参数和返回值的签名、它在各个后端上的实现叫什么。绑定代码、dispatcher 的注册、autograd 的包装，都是构建时照着这张表（和 derivatives.yaml）生成的。</p>
+<div class="i-detail"><p><strong class="h">一条记录长什么样。</strong></p><pre>- func: add.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -&gt; Tensor
+  structured_delegate: add.out
+  variants: function, method
+
+- func: add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -&gt; Tensor(a!)
+  structured: True
+  dispatch:
+    CPU, CUDA: add_out
+    ...</pre><p>（这是示意，实际的条目更长，各版本也略有不同。）读法：</p><ul><li><code>func</code>：算子的全名和签名。点号后面是重载名：<code>add.Tensor</code> 是“张量加张量”，另外还有 <code>add.Scalar</code> 等。签名里的 <code>Tensor(a!)</code> 表示这个参数会被原地修改。</li><li><code>variants</code>：它在 Python 里以什么形式出现。<code>function</code> 是 <code>torch.add(a, b)</code>，<code>method</code> 是 <code>a.add(b)</code>。</li><li><code>dispatch</code>：在哪些后端上，由哪个 C++ 函数实现。这就是 dispatcher 那张表里“后端”那几列的内容。没有这一项的算子，通常是用其他算子组合出来的，一份实现通用于所有后端。</li><li><code>structured</code> / <code>structured_delegate</code>：一种减少重复的写法。<code>add</code>、<code>add_</code>（原地）、<code>add.out</code>（指定输出）三个变体共用一份核心实现，区别只在输出放在哪。真正的实现登记在 <code>.out</code> 那一条上。</li></ul><p><strong class="h">用它找实现的步骤。</strong></p><ul><li>在表里搜 <code>func: &lt;算子名&gt;</code>。Python 里的名字和这里的名字基本一致。</li><li>看 <code>dispatch</code>。如果有 <code>CUDA: xxx</code>，就去 <code>aten/src/ATen/native/cuda/</code> 下搜 <code>xxx</code>；如果写的是 <code>CPU, CUDA: xxx</code>，说明两个后端共用一个入口函数，具体的 kernel 在更下面一层分开，搜到入口后再往下跟。</li><li>如果只有 <code>CompositeImplicitAutograd</code> 或 <code>CompositeExplicitAutograd</code>，说明它是用别的算子拼出来的，实现在 <code>aten/src/ATen/native/</code> 下的某个 <code>.cpp</code> 里，是一段调用其他算子的普通 C++。</li><li>想看它的反向：去 <code>tools/autograd/derivatives.yaml</code> 搜同一个名字（2.2）。</li></ul><p><strong class="h">一个常见的意外。</strong> 很多你以为是“一个运算”的函数，其实是组合出来的。比如 <code>torch.nn.functional.layer_norm</code> 最后落到一个专门的算子上，而有些看起来简单的函数内部调用了三四个算子，每个都要完整地走一遍 2.3 的五层。看 profiler 时，一个 Python 调用下面挂着好几个 <code>aten::</code> 开头的条目，就是这个原因。</p><p><strong class="h">这张表和 torch.compile 的关系。</strong> 编译器把模型变成图之后，图里的节点就是这张表里的算子。2.5 会讲到，编译的中间一步是把上千个算子“分解”成一两百个基本算子，分解的规则也是对着这张表写的。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一栋大楼的总索引牌：想找任何一家公司，先在牌子上查到楼层和房间号，再上去找。</p>
+<p class="i-impl">所以遇到“这个函数的实现在哪”的问题，不要在仓库里盲搜函数名。先在这张表里找到它，看它的实现登记的是什么名字，再去搜那个名字。</p>
+<div class="i-builds">承接 <a href="2-3.html#c-p2-3-dispatcher">dispatcher 是一张“算子 × 功能”的表，一次调用按优先级逐层往下传</a><a href="2-2.html#c-p2-2-derivatives">每个算子“怎么往回走”，写在一张表里，代码是照着它生成的</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://blog.ezyang.com/2019/05/pytorch-internals/" target="_blank" rel="noopener">PyTorch internals（Edward Yang）：native_functions.yaml 与代码生成</a><a class="src" href="https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/README.md" target="_blank" rel="noopener">PyTorch 仓库：aten/src/ATen/native/README.md</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>一次算子调用依次经过：<strong>Python 绑定</strong>（解析参数、释放 GIL）→ <strong>dispatcher</strong>（查表）→ <strong>autograd 层</strong>（记账）→ <strong>后端实现</strong>（选好的 kernel）→ <strong>CUDA</strong>（把任务放进队列）。dispatcher 是一张“算子 × 功能”的表，按优先级一层层往下传。这条路每次要花若干微秒的<strong>固定开销</strong>。所有算子都登记在 <strong>native_functions.yaml</strong> 里，读源码从它找入口。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>一次 PyTorch 算子调用从 Python 到 GPU 依次经过哪几层？每层做什么？</li><li>dispatcher 是怎样决定一次算子调用交给哪个函数的？“再分发”是怎么回事？</li><li>什么是“框架开销受限”？怎样判断一个模型是不是这种情况？有哪些解决办法？</li><li>native_functions.yaml 里记录了算子的哪些信息？怎样用它找到一个算子的 CUDA 实现？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>dispatcher</dt><dd>分发器</dd></div><div><dt>dispatch key</dt><dd>分发键</dd></div><div><dt>redispatch</dt><dd>再分发</dd></div><div><dt>binding</dt><dd>绑定（Python 到 C++ 的接口）</dd></div><div><dt>codegen</dt><dd>代码生成</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="2-2.html"><small>上一单元</small>2.2 autograd 引擎</a>
+<a class="next" href="2-4.html"><small>下一单元</small>2.4 数据供给</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

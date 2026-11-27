@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" width="760" height="262" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="跨机通信的分工和三档路径">
+  <title>跨机通信的分工和三档路径</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="262" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">跨机的一跳：GPU 上的 kernel 送不出机器，要靠主机上的代理线程</text>
+  <rect x="24" y="52" width="128" height="54" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="88.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">kernel</text>
+  <text x="88.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">在 GPU 上搬数据</text>
+  <rect x="170" y="52" width="128" height="54" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="234.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">中转缓冲区</text>
+  <text x="234.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一格一格地写</text>
+  <line x1="154" y1="79" x2="168" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="316" y="52" width="128" height="54" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="380.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">代理线程</text>
+  <text x="380.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">在 CPU 上，驱动网卡</text>
+  <line x1="300" y1="79" x2="314" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="462" y="52" width="128" height="54" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="526.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡</text>
+  <text x="526.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">RDMA</text>
+  <line x1="446" y1="79" x2="460" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="608" y="52" width="128" height="54" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="672.0" y="84.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">另一台机器</text>
+  <line x1="592" y1="79" x2="606" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="24" y="144" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">这一跳从好到差有三档，掉到哪一档都不报错：</text>
+  <rect x="24" y="160" width="228" height="54" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="138.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">IB + GPUDirect RDMA</text>
+  <text x="138.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">网卡直接读写显存</text>
+  <rect x="266" y="160" width="228" height="54" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="380.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">IB，经主内存中转</text>
+  <text x="380.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">两端各多一次拷贝</text>
+  <rect x="508" y="160" width="228" height="54" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="622.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">TCP socket</text>
+  <text x="622.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">只有预期的百分之几</text>
+  <text x="24" y="246" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">代理线程抢不到 CPU 时通信也会变慢，而 GPU 和网络看起来都没有问题</text>
+</svg>

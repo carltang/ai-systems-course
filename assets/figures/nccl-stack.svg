@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="NCCL 的四层选择">
+  <title>NCCL 的四层选择</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一次集合通信背后的四层选择</text>
+  <rect x="24" y="50" width="186" height="40" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="117.0" y="66.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">算法</text>
+  <text x="117.0" y="87.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">数据在卡之间怎么走</text>
+  <rect x="224" y="54" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="306.0" y="75.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">环：带宽最好</text>
+  <rect x="396" y="54" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="478.0" y="75.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">树：步数最少</text>
+  <rect x="568" y="54" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="650.0" y="75.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">依赖特定硬件的几种</text>
+  <rect x="24" y="100" width="186" height="40" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="117.0" y="116.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">协议</text>
+  <text x="117.0" y="137.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">怎样确认读到的数据有效</text>
+  <rect x="224" y="104" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="306.0" y="125.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">Simple：要带宽</text>
+  <rect x="396" y="104" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="478.0" y="125.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">LL：要低延迟</text>
+  <rect x="568" y="104" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="650.0" y="125.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">LL128：两头兼顾</text>
+  <rect x="24" y="150" width="186" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="117.0" y="166.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">通道</text>
+  <text x="117.0" y="187.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">切成几路并行</text>
+  <rect x="224" y="154" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="306.0" y="175.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">每路占一个 SM</text>
+  <rect x="396" y="154" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="478.0" y="175.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">消息小时自动减少</text>
+  <rect x="24" y="200" width="186" height="40" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="117.0" y="216.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">传输</text>
+  <text x="117.0" y="237.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每一对卡之间走哪条路</text>
+  <rect x="224" y="204" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="306.0" y="225.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">机内：P2P 或共享内存</text>
+  <rect x="396" y="204" width="164" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="478.0" y="225.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">跨机：IB verbs 或 socket</text>
+  <text x="24" y="264" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">拓扑、环和树、连接在初始化时一次定好，之后不再换路；都会写在日志里</text>
+</svg>

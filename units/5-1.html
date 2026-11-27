@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>5.1 机内互联：PCIe、NVLink 与 NVSwitch · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清一台多卡服务器内部，GPU、CPU、网卡之间是怎样连接的，每条路有多宽，怎样查看。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="4-5.html" title="4.5 矩阵乘法的极限与 Tensor Core" data-step="prev">‹ 4.5</a>
+<a href="5-2.html" title="5.2 RDMA 与 InfiniBand" data-step="next">5.2 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 5 部分 · 高速互联</span>5.1 机内互联：PCIe、NVLink 与 NVSwitch</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>一台机器里的八张卡，彼此之间、和 CPU 之间是怎么连的？各条路有多宽？</div><div class="frame-c">第 5 部分的起点。承接 0.3 的 DMA：数据在设备之间直接搬运，走的就是这里讲的这些通道。</div></div>
+<div class="story"><p>线索是：机内其实有两张路网 → 先看通用的那张（PCIe），它的带宽怎么算 → 再看 GPU 专用的那张（NVLink） → 有了两张网，两个设备之间走哪条路就取决于它们的“距离” → 最后把 CPU 和内存也放进来（NUMA）。这一单元的数字和命令，在排查多卡性能时会反复用到。</p></div>
+<ol class="thread"><li><a href="#c-p5-1-two-nets">机内有两张路网：通用的 PCIe 和 GPU 专用的 NVLink</a></li><li><a href="#c-p5-1-pcie">PCIe 的带宽 = 每条通道的速率 × 通道数，取路上最窄的一段</a></li><li><a href="#c-p5-1-nvlink">NVLink 加 NVSwitch：每一对 GPU 之间都有专线</a></li><li><a href="#c-p5-1-distance">两个设备的“距离”，决定数据走哪条路</a></li><li><a href="#c-p5-1-numa">NUMA：进程、内存和设备要放在同一侧</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p5-1-two-nets"><h3><span class="i-num">1</span>机内有两张路网：通用的 PCIe 和 GPU 专用的 NVLink</h3>
+<p class="i-essence">一台多卡服务器里，所有设备（GPU、网卡、NVMe 硬盘）都通过 PCIe 挂在 CPU 下面；此外 GPU 之间还有一张单独的网：NVLink。前者谁都能用，后者只在 GPU 之间传数据。</p>
+<div class="i-detail"><figure class="fig"><img src="../assets/figures/machine-topology.svg" alt="一台多卡服务器里的连接（示意，只画了 4 张卡和一块网卡）" loading="lazy"><figcaption>一台多卡服务器里的连接（示意，只画了 4 张卡和一块网卡）</figcaption></figure><p>把机箱里和数据传输有关的部件摆出来，一共四类：CPU（连着主内存）、GPU、网卡、NVMe 硬盘。它们之间的连接有两种。</p><p><strong class="h">PCIe</strong> 是通用的。它是一棵树：树根在 CPU（叫 root complex），下面可以接交换芯片（PCIe switch），再往下才是一个个设备。所有“设备和 CPU 之间”的流量都走它：</p><ul><li>主内存 → 显存（0.1 里的第 3 步，把 batch 拷上 GPU）</li><li>显存 ↔ 网卡（跨机通信时，数据出入这台机器）</li><li>硬盘 → 主内存或显存</li></ul><p><strong class="h">NVLink</strong> 是专用的，只连接 GPU 和 GPU（经过 NVSwitch 芯片时，可以连到任意一张卡）。多卡之间同步梯度、张量并行里每一层的数据交换，走的都是它。</p><p>没有 NVLink 的机器（比如消费级显卡组的多卡机器），<mark>GPU 之间的数据只能走 PCIe，慢一个量级</mark>，这也是它们多卡扩展效率差的主要原因。</p><p>这张图决定了第 0 部分那条管道里好几段的宽度。后面三节分别把 PCIe、NVLink 和“走哪条路”讲清。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一座城市：普通道路（PCIe）通到每家每户，什么车都能走；几个大工厂之间另修了专用的货运铁路（NVLink），只运它们之间的货。</p>
+<p class="i-impl">所以看一次数据传输快不快，先问它走的是哪张网：CPU 到 GPU、GPU 到网卡只能走 PCIe；GPU 到 GPU 有 NVLink 就走 NVLink。</p>
+<div class="i-builds">承接 <a href="0-3.html#c-p0-3-dma">DMA：让设备自己搬数据，CPU 只负责发令</a><a href="0-1.html#c-p0-1-pipeline">训练的一步是一条串联的管道，最慢的一段决定速度</a></div>
+<div class="i-builds">后面会用到 <a href="5-1.html#c-p5-1-pcie">PCIe 的带宽 = 每条通道的速率 × 通道数，取路上最窄的一段</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/" target="_blank" rel="noopener">NVIDIA Hopper Architecture In-Depth</a></div>
+</li>
+<li class="i-lead">先看通用的那张网。它的带宽有一个简单的算法，也有两个常见的坑。</li>
+<li class="icard" id="c-p5-1-pcie"><h3><span class="i-num">2</span>PCIe 的带宽 = 每条通道的速率 × 通道数，取路上最窄的一段</h3>
+<p class="i-essence">PCIe 每升一代，每条通道（lane）的速率翻一倍；一个设备最多用 16 条通道。Gen4 x16 每个方向约 32 GB/s，Gen5 x16 每个方向约 64 GB/s。数据从一个设备到另一个设备要经过几段链路，实际带宽由其中最窄的一段决定。</p>
+<div class="i-detail"><p><strong class="h">怎么算。</strong> 记两个数就够了：</p><ul><li>每条通道每个方向的速率：Gen3 约 1 GB/s，Gen4 约 2 GB/s，Gen5 约 4 GB/s。</li><li>通道数：显卡和高速网卡通常是 x16。</li></ul><p>于是 Gen4 x16 每个方向约 32 GB/s（A100 这一代），Gen5 x16 每个方向约 64 GB/s（H100 这一代）。厂商有时把两个方向加起来报成 64 和 128，<mark>看数字时要分清是单向还是双向</mark>。</p><p>把它和别的数字放在一起，就知道它在管道里是宽是窄：</p><ul><li>主内存带宽：每个 CPU 插槽上百 GB/s。</li><li>一块 400 Gb/s 的网卡：约 50 GB/s，一条 Gen5 x16 刚好喂得满。</li><li>NVLink：每张卡几百 GB/s（下一节）。</li></ul><p><strong class="h">第一个坑：协商降级。</strong> PCIe 链路在开机时“训练”，两端协商出能稳定工作的代数和通道数。插槽没插紧、转接线质量差、BIOS 设置不对，都可能让一条本该是 Gen4 x16 的链路跑在 Gen3 或 x8 上，带宽只剩一半甚至四分之一，而系统不会报错。</p><p><strong class="h">第二个坑：共享上游。</strong> 为了在一个 CPU 下面挂 8 张卡和若干网卡，服务器会用 PCIe 交换芯片把一条上行链路分给好几个设备。这些设备各自到交换芯片是 x16，但它们同时和 CPU 通信时，要共享那一条上行链路。比如 4 张卡共用一条 x16 上行，同时从主内存加载数据时，每张卡只能分到四分之一。</p><p>（同一个交换芯片下面的两个设备互相传数据时，可以不经过上行链路，这一点后面讲“距离”时会用到。）</p></div>
+<details class="i-more"><summary>排查：查看一条 PCIe 链路实际跑在什么速度上</summary><div class="i-detail"><p><code>lspci</code> 能看到每个设备“能支持的”和“实际协商到的”两组数。</p><pre># 找到 GPU 的总线地址
+lspci | grep -i nvidia
+
+# 看某个设备的链路状态（需要 root）
+sudo lspci -vv -s 3b:00.0 | grep -E "LnkCap|LnkSta"</pre><p>输出里有两行要对比：</p><ul><li><code>LnkCap</code>：设备支持的最高速率和宽度，比如 <code>Speed 16GT/s, Width x16</code>。</li><li><code>LnkSta</code>：现在实际跑的速率和宽度。</li></ul><p>速率的写法对应代数：8GT/s 是 Gen3，16GT/s 是 Gen4，32GT/s 是 Gen5。如果 <code>LnkSta</code> 的速率或宽度低于 <code>LnkCap</code>，这条链路就被降级了（有的版本会直接在后面标出 downgraded）。</p><p>对网卡也做同样的检查：一块 400 Gb/s 的网卡如果只协商到 x8，就永远跑不满。</p><p>想直接量出结果，可以用 NVIDIA 的 <code>nvbandwidth</code> 工具测主内存到每张卡、卡到卡的实际带宽，再和上面算出的数对比。八张卡里有一张明显偏低，多半就是它的链路或插槽有问题。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像高速公路：每代把每条车道的限速翻倍，车道数另算。从 A 到 B 途中只要有一段只剩 4 车道，整趟的通行能力就按 4 车道算。</p>
+<p class="i-impl">所以 PCIe 很少是标称的那个数：链路可能协商成了更低的代数或更少的通道，上游可能被几个设备共享。排查时要看的是“实际协商到的速率和宽度”。</p>
+<div class="i-builds">承接 <a href="5-1.html#c-p5-1-two-nets">机内有两张路网：通用的 PCIe 和 GPU 专用的 NVLink</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="5-1.html#c-p5-1-nvlink">NVLink 加 NVSwitch：每一对 GPU 之间都有专线</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/" target="_blank" rel="noopener">NVIDIA Hopper Architecture In-Depth（PCIe Gen4、Gen5 的带宽）</a></div>
+</li>
+<li class="i-lead">PCIe 是为“各种设备都能接”设计的。GPU 之间要交换的数据量太大，于是 NVIDIA 另修了一张网。</li>
+<li class="icard" id="c-p5-1-nvlink"><h3><span class="i-num">3</span>NVLink 加 NVSwitch：每一对 GPU 之间都有专线</h3>
+<p class="i-essence">NVLink 是 GPU 之间专用的高速链路。A100 每张卡有 12 条，合计 600 GB/s；H100 每张卡有 18 条，合计 900 GB/s，按 NVIDIA 的说法是 PCIe Gen5 的 7 倍。NVSwitch 是它的交换芯片：每张卡的链路都接到交换芯片上，于是任意两张卡之间都能全速通信。</p>
+<div class="i-detail"><p><strong class="h">有多宽。</strong> NVIDIA 给出的官方数字（都是每张卡所有链路、两个方向合计）：</p><ul><li>A100：12 条第三代 NVLink，合计 600 GB/s。</li><li>H100：18 条第四代 NVLink，合计 900 GB/s。</li><li>对比：H100 的 PCIe Gen5 x16 合计 128 GB/s，所以官方说 NVLink 是它的 7 倍。</li></ul><p><strong class="h">为什么需要交换芯片。</strong> 链路是点对点的。如果不用交换芯片，8 张卡要互相直连，每张卡就得把自己的链路分给另外 7 张卡，每一对之间只有一两条。这时两张卡之间能用的带宽只是总数的几分之一，而且不同的卡对之间可能还不一样。</p><p>NVSwitch 改变了接法：每张卡的全部链路都接到交换芯片上，由交换芯片在任意两张卡之间转发。于是任意一对卡通信时，都能用上各自的全部链路。这也让环形的 all-reduce（6.1）变得简单：环上的每一跳都是全速的。</p><p><strong class="h">放回全局看。</strong> 一张 H100 的几个“出口”：</p><ul><li>到同机的其他 GPU：NVLink，合计 900 GB/s。</li><li>到主内存或网卡：PCIe，每个方向 64 GB/s。</li><li>经网卡到其他机器：一块 400 Gb/s 的网卡，约 50 GB/s。</li></ul><p><mark>机内和跨机之间差了一个量级</mark>。这个落差是第 7 部分所有并行方案的出发点：通信最频繁的并行方式（张量并行）必须留在机内，跨机只能放通信较少的并行方式。</p><figure class="fig"><img src="../assets/figures/link-bandwidth.svg" alt="三条路的宽度" loading="lazy"><figcaption>三条路的宽度</figcaption></figure><p>新一代的机柜级系统把 NVLink 延伸到了机器之间（一个机柜里几十张卡都用 NVLink 相连），原理不变，只是“机内”的范围变大了。</p></div>
+<details class="i-more"><summary>排查：NVLink 是否都在正常工作</summary><div class="i-detail"><pre># 每条 NVLink 的状态和速率
+nvidia-smi nvlink -s
+
+# 每条 NVLink 的错误计数
+nvidia-smi nvlink -e
+
+# 两两之间能不能通过 NVLink 直接访问
+nvidia-smi topo -p2p n</pre><p>读法：</p><ul><li><code>-s</code> 的输出里每条链路都应该是激活的，速率一致。有链路显示为未激活，说明这张卡少了一部分带宽。</li><li><code>-e</code> 的错误计数应该基本不增长。隔一段时间再看一次，如果某条链路的计数一直在涨，这条链路有问题。</li><li><code>topo -p2p n</code> 的矩阵里，卡与卡之间应该都是 OK。</li></ul><p><strong class="h">内核日志里的线索。</strong> GPU 出硬件类问题时，驱动会在内核日志里写一条带编号的 Xid 记录：</p><pre>sudo dmesg -T | grep -i xid</pre><p>编号的含义查 NVIDIA 的 Xid 文档（https://docs.nvidia.com/deploy/xid-errors/）。和互联有关、比较常见的两个：74 是 NVLink 错误，79 是 GPU 从总线上掉线。训练中途莫名卡住或报错时，先看一眼这里，能省掉很多在软件层的猜测。</p><p>用 <code>nvbandwidth</code> 测一遍卡到卡的带宽，可以把“状态正常但实际偏慢”的情况也找出来。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像电话：早期两两之间拉专线，8 个人就要把自己的线分给 7 个对象；有了交换机，每个人把所有的线都接到交换机上，想和谁说话都能用上全部线路。</p>
+<p class="i-impl">所以同一台机器内的集合通信（梯度同步、张量并行）几乎不会是瓶颈；瓶颈通常出现在数据离开这台机器的那一刻，带宽一下子窄了一个量级。</p>
+<div class="i-builds">承接 <a href="5-1.html#c-p5-1-pcie">PCIe 的带宽 = 每条通道的速率 × 通道数，取路上最窄的一段</a></div>
+<div class="i-builds">后面会用到 <a href="5-1.html#c-p5-1-distance">两个设备的“距离”，决定数据走哪条路</a><a href="6-3.html#c-p6-3-expect">先算出“应该是多少”，再看测出来差多少</a><a href="7-3.html#c-5-4-compose">并行方式按带宽分层组合</a><a href="8-2.html#c-p8-2-device-plugin">设备插件：把 GPU 上报成可以申请的整数资源</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://developer.nvidia.com/blog/nvidia-hopper-architecture-in-depth/" target="_blank" rel="noopener">NVIDIA Hopper Architecture In-Depth（NVLink 与 NVSwitch）</a><span class="src">Demystifying NCCL 第 4 页 机内传输路径</span></div>
+</li>
+<li class="i-lead">两张路网都清楚了。那么具体到两个设备之间，数据走哪条路？答案取决于它们的相对位置。</li>
+<li class="icard" id="c-p5-1-distance"><h3><span class="i-num">4</span>两个设备的“距离”，决定数据走哪条路</h3>
+<p class="i-essence">两个设备之间的数据走哪条路，取决于它们在 PCIe 这棵树上离得多近：有 NVLink 直连最好；在同一个 PCIe 交换芯片下面，可以不经过 CPU 直接互传；隔着 CPU 的根端口就要绕一下；分属两个 CPU 插槽最远。</p>
+<div class="i-detail"><p><code>nvidia-smi topo -m</code> 会打印一张矩阵，列出每两个设备（GPU 和网卡）之间的关系。它的图例从近到远是：</p><ul><li><strong>NV#</strong>：有 # 条 NVLink 相连。只会出现在 GPU 和 GPU 之间。</li><li><strong>PIX</strong>：中间最多隔一个 PCIe 桥，也就是在同一个 PCIe 交换芯片下面。</li><li><strong>PXB</strong>：隔着多个 PCIe 桥，但不经过 CPU 的主桥。</li><li><strong>PHB</strong>：要经过 CPU 上的 PCIe 主桥。</li><li><strong>NODE</strong>：在同一个 NUMA 节点内，但要跨不同的主桥。</li><li><strong>SYS</strong>：分属不同的 NUMA 节点，要跨 CPU 插槽之间的互联。</li></ul><p>距离为什么重要，看两个最常见的配对。</p><p><strong class="h">GPU 和网卡。</strong> 跨机通信时，数据要从显存到网卡。如果 GPU 和网卡在同一个 PCIe 交换芯片下面（PIX），网卡可以直接读写显存（GPUDirect RDMA，5.2 会讲），数据不经过 CPU 和主内存。如果它们离得远，数据就得先拷到主内存再交给网卡，多一次拷贝，还要占用 CPU 一侧的带宽。所以为训练设计的服务器，通常给每一两张 GPU 配一块网卡，并把它们放在同一个交换芯片下面。</p><p><strong class="h">GPU 和 GPU（没有 NVLink 时）。</strong> 同一个交换芯片下的两张卡可以直接互传；隔着 CPU 的两张卡，流量要上行到 CPU 再下来，更慢，而且受上行链路共享的影响。</p><p><strong class="h">一个会让“近路”失效的设置。</strong> 服务器开启 IO 虚拟化（IOMMU、PCIe 的 ACS）后，同一个交换芯片下的设备互传会被强制绕道 CPU 检查。NCCL 的文档明确提醒：<mark>这会让性能显著下降，甚至卡死</mark>。裸机上跑训练时，通常要把它关掉。</p></div>
+<details class="i-more"><summary>排查：读懂 nvidia-smi topo -m，并检查“近路”有没有被堵</summary><div class="i-detail"><pre>nvidia-smi topo -m</pre><p>拿到矩阵后看三件事：</p><ul><li><strong>GPU 之间</strong>是不是都是 NV 加一个数字，数字是否一致。出现 PHB 或 SYS，说明那一对卡之间没有 NVLink 可用。</li><li><strong>每张 GPU 和哪块网卡最近</strong>（PIX 或 PXB）。记下这个配对，它就是这张卡跨机通信时应该走的网卡。</li><li>矩阵后面的 <strong>CPU Affinity 和 NUMA Affinity</strong> 两列：每张卡属于哪个 NUMA 节点、对应哪些 CPU 核。</li></ul><p><strong class="h">检查 ACS。</strong></p><pre>sudo lspci -vvv | grep ACSCtl</pre><p>输出里出现 <code>SrcValid+</code> 的行，说明那个桥上的 ACS 可能是开着的。</p><p><strong class="h">检查 IOMMU。</strong></p><pre>cat /proc/cmdline
+sudo dmesg | grep -i -E "iommu|dmar"</pre><p><strong class="h">检查 GPU 之间能否直接互访。</strong></p><pre>nvidia-smi topo -p2p p    # 经 PCIe
+nvidia-smi topo -p2p n    # 经 NVLink</pre><p>这些检查都来自 NCCL 官方的排查文档。在容器或虚拟机里还要多确认一点：NCCL 是通过读 <code>/sys</code> 来了解 PCIe 拓扑的，如果容器里看到的 <code>/sys</code> 不完整，或者虚拟机给出的是一棵“假”的 PCIe 树，NCCL 就可能选错路。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像同一栋楼里送文件：同一个办公室递过去就行；同一层要走一段走廊；不同楼层得等电梯；在另一栋楼就要出大门。</p>
+<p class="i-impl">所以硬件怎么插、软件把哪张卡和哪块网卡配成一对，直接决定带宽。NCCL 启动时做的第一件事就是摸清这些距离，再据此选路。</p>
+<div class="i-builds">承接 <a href="5-1.html#c-p5-1-nvlink">NVLink 加 NVSwitch：每一对 GPU 之间都有专线</a><a href="0-3.html#c-p0-3-dma">DMA：让设备自己搬数据，CPU 只负责发令</a></div>
+<div class="i-builds">后面会用到 <a href="5-1.html#c-p5-1-numa">NUMA：进程、内存和设备要放在同一侧</a><a href="5-2.html#c-p5-2-gdr">GPUDirect RDMA：注册的不是主内存，而是显存</a><a href="6-2.html#c-p6-2-init">大部分工作在初始化时一次做完：探测拓扑、建环和树、连好每一对卡</a><a href="6-3.html#c-p6-3-faults">几种典型故障，各有各的指纹</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/gpu_troubleshooting.html" target="_blank" rel="noopener">NCCL 用户指南：GPU Direct、ACS 与拓扑检测</a><span class="src">Demystifying NCCL 第 5 页 GPUDirect RDMA 的条件</span></div>
+</li>
+<li class="i-lead">最后把 CPU 和内存也放进这张图。它们同样有“在哪一侧”的问题。</li>
+<li class="icard" id="c-p5-1-numa"><h3><span class="i-num">5</span>NUMA：进程、内存和设备要放在同一侧</h3>
+<p class="i-essence">双路服务器有两个 CPU 插槽，各带一半内存，各挂一半 GPU 和网卡。访问“自己这一侧”的内存和设备快，访问另一侧要经过两个 CPU 之间的互联，更慢，也更容易拥挤。</p>
+<div class="i-detail"><p>NUMA 的意思是“访问不同位置的内存，速度不一样”。在双路服务器上：</p><ul><li>每个 CPU 插槽和它直连的内存组成一个 NUMA 节点。</li><li>每张 GPU、每块网卡通过 PCIe 挂在其中一个插槽下面。</li><li>两个插槽之间有互联，但带宽有限，而且所有跨侧的流量都要共用它。</li></ul><p>把第 0 部分的管道套进来，看一个放错位置的例子：GPU 3 挂在第二个插槽下，但给它准备数据的 DataLoader 进程被操作系统调度到了第一个插槽的核上，锁页内存也分配在第一个插槽的内存里。于是每个 batch 都要从第一侧的内存出发，穿过插槽间的互联，才能到达第二侧的 PCIe，再进 GPU 3。多张卡同时这样做，互联就会成为瓶颈。</p><figure class="fig"><img src="../assets/figures/numa.svg" alt="放错位置的例子" loading="lazy"><figcaption>放错位置的例子</figcaption></figure><p>通信也一样。NCCL 在主机一侧有负责收发的线程（6.2 会讲）。它如果跑在远离对应网卡的那一侧，效率就会打折。NCCL 默认会把自己的线程绑到 GPU 所在一侧的核上，但前提是外层（容器、调度系统）给它的可用核里包含这些核。</p><p>怎么看：</p><pre>numactl --hardware            # 有几个 NUMA 节点，各有哪些核、多少内存
+nvidia-smi topo -m            # 每张卡的 NUMA Affinity
+lscpu --extended=CPU,NODE,SOCKET,CORE</pre><p>怎么放对：在 Kubernetes 上由 kubelet 的拓扑管理策略负责（第 8 部分），裸机上可以用 <code>numactl</code> 或 <code>taskset</code> 绑定。原则只有一条：<mark>一个进程用哪张卡，就让它的 CPU 核和内存都在那张卡所在的一侧。</mark></p></div>
+<p class="i-analogy"><b>打个比方</b>像一栋有东西两翼的办公楼，每翼有自己的资料室。在东翼办公却总去西翼的资料室取文件，路上的时间就白白花掉了。</p>
+<p class="i-impl">所以给某张 GPU 准备数据的进程，应该跑在这张卡所在一侧的 CPU 上，用这一侧的内存。放错了不会报错，只是悄悄变慢。</p>
+<div class="i-builds">承接 <a href="5-1.html#c-p5-1-distance">两个设备的“距离”，决定数据走哪条路</a><a href="0-3.html#c-p0-3-process">进程、线程与 GIL：为什么数据加载要开多个进程</a></div>
+<div class="i-builds">后面会用到 <a href="6-2.html#c-p6-2-transports">传输层：机内走 P2P 或共享内存，跨机走 IB verbs 或 socket</a><a href="8-2.html#c-p8-2-placement">卡放在哪：节点内对齐 NUMA，节点间考虑网络拓扑</a><a href="11-1.html#c-p11-1-case-scaling">案例二：8 张卡只有 5 倍的速度</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting/performance_and_tuning.html" target="_blank" rel="noopener">NCCL 用户指南：CPU and memory affinity</a><span class="src">Demystifying NCCL 第 2 页 每张卡一个进程与 NUMA</span></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>机内有<strong>两张路网</strong>：PCIe 连接一切，NVLink 只连 GPU。<strong>PCIe</strong> 的带宽取链路上最窄的一段；<strong>NVLink</strong> 比它宽一个量级，是机内集合通信的主力。两个设备<strong>离得越近</strong>（同一个交换芯片下），能走的路越直；<strong>NUMA</strong> 则提醒你，CPU 和内存也有“在哪一侧”的问题。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>多卡服务器内部有哪两张互联网络？各自连接什么？</li><li>PCIe 的带宽是怎么算出来的？为什么实际值常常低于标称值？</li><li>NVLink 的带宽大约是 PCIe 的多少倍？NVSwitch 解决了什么问题？</li><li>nvidia-smi topo -m 输出里的 NV、PIX、PXB、PHB、NODE、SYS 各表示什么？哪种最近、哪种最远？</li><li>什么是 NUMA？它怎样影响多卡训练的数据加载和通信？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>PCIe</dt><dd>高速外设互联总线</dd></div><div><dt>NVLink</dt><dd>NVIDIA 的 GPU 专用互联</dd></div><div><dt>NVSwitch</dt><dd>NVLink 交换芯片</dd></div><div><dt>root complex</dt><dd>根复合体</dd></div><div><dt>NUMA</dt><dd>非一致内存访问</dd></div><div><dt>peer-to-peer</dt><dd>设备间直接传输</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="4-5.html"><small>上一单元</small>4.5 矩阵乘法的极限与 Tensor Core</a>
+<a class="next" href="5-2.html"><small>下一单元</small>5.2 RDMA 与 InfiniBand</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

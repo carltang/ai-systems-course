@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" width="760" height="290" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="并行方式按链路分层组合">
+  <title>并行方式按链路分层组合</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="290" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">512 张卡，每台机器 8 张：三种并行套在一起</text>
+  <rect x="24" y="50" width="169" height="150" rx="12" fill="none" stroke="#e0b860" stroke-width="1.4"/>
+  <text x="108" y="70" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第 1 段</text>
+  <rect x="36" y="82" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="108.5" y="101.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="36" y="118" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="108.5" y="137.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="36" y="154" width="145" height="28" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="108.5" y="173.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…… 共 16 台</text>
+  <rect x="205" y="50" width="169" height="150" rx="12" fill="none" stroke="#e0b860" stroke-width="1.4"/>
+  <text x="289" y="70" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第 2 段</text>
+  <rect x="217" y="82" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="289.5" y="101.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="217" y="118" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="289.5" y="137.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="217" y="154" width="145" height="28" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="289.5" y="173.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…… 共 16 台</text>
+  <line x1="194" y1="125" x2="204" y2="125" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="386" y="50" width="169" height="150" rx="12" fill="none" stroke="#e0b860" stroke-width="1.4"/>
+  <text x="470" y="70" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第 3 段</text>
+  <rect x="398" y="82" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="470.5" y="101.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="398" y="118" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="470.5" y="137.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="398" y="154" width="145" height="28" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="470.5" y="173.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…… 共 16 台</text>
+  <line x1="375" y1="125" x2="385" y2="125" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="567" y="50" width="169" height="150" rx="12" fill="none" stroke="#e0b860" stroke-width="1.4"/>
+  <text x="651" y="70" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">第 4 段</text>
+  <rect x="579" y="82" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="651.5" y="101.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="579" y="118" width="145" height="28" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="651.5" y="137.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">一台机器：8 张卡</text>
+  <rect x="579" y="154" width="145" height="28" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="651.5" y="173.0" font-size="12" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">…… 共 16 台</text>
+  <line x1="556" y1="125" x2="566" y2="125" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="24" y="211" width="12" height="12" rx="3" fill="#8aa2e6"/>
+  <text x="44" y="222" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">蓝色框内</text>
+  <text x="170" y="222" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">张量并行：每层几次，在关键路径上，走 NVLink</text>
+  <rect x="24" y="233" width="12" height="12" rx="3" fill="#7fbf99"/>
+  <text x="44" y="244" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">一段之内的 16 台</text>
+  <text x="170" y="244" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">FSDP 或数据并行：可以重叠，走后端网络</text>
+  <rect x="24" y="255" width="12" height="12" rx="3" fill="#e0b860"/>
+  <text x="44" y="266" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">段与段之间</text>
+  <text x="170" y="266" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">流水线并行：每步一次，量很小</text>
+</svg>

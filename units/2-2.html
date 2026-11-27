@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2.2 autograd 引擎 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="弄清前向时计算图是怎样记下来的，backward() 又是怎样沿着它把梯度算回来的。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="2-1.html" title="2.1 张量与内存" data-step="prev">‹ 2.1</a>
+<a href="2-3.html" title="2.3 从一行 Python 到一个 kernel" data-step="next">2.3 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 2 部分 · PyTorch 执行栈</span>2.2 autograd 引擎</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>调用 backward() 时，PyTorch 到底做了什么？</div><div class="frame-c">承接 1.1 的反向传播（原理）和 2.1 的张量（数据结构）：这一单元看框架怎样把反向传播自动化。</div></div>
+<div class="story"><p>线索是：前向计算时，每个算子除了算出结果，还顺手记了一笔账 → backward() 就是照着这本账从后往前走一遍 → 为了能走回去，前向的很多中间结果必须留着，这是训练显存的大头 → 每个算子“怎么往回走”的公式集中写在一张表里 → 最后是几种让记账暂停或出错的情况。7.1 讲过的 DDP 钩子、FSDP 的反向预取，都挂在这台引擎上。</p></div>
+<ol class="thread"><li><a href="#c-p2-2-record">前向时，每个算子顺手记下一个“反向节点”，连成一张图</a></li><li><a href="#c-p2-2-engine">backward() 是对这张图的一次遍历：谁的上游都到齐了，就执行谁</a></li><li><a href="#c-p2-2-saved">为了能反向，前向的中间结果要一直留着：训练显存的大头</a></li><li><a href="#c-p2-2-derivatives">每个算子“怎么往回走”，写在一张表里，代码是照着它生成的</a></li><li><a href="#c-p2-2-modes">不记账、剪断、和改了被记下的东西：no_grad、detach 与原地操作</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-p2-2-record"><h3><span class="i-num">1</span>前向时，每个算子顺手记下一个“反向节点”，连成一张图</h3>
+<p class="i-essence">只要输入里有需要求梯度的张量，一个算子在算出结果的同时，还会创建一个节点，记下“将来反向经过我时该怎么算”。这个节点挂在结果张量的 grad_fn 上，并指向产生它各个输入的那些节点。一路算下去，这些节点就连成了一张从损失指回参数的图。</p>
+<div class="i-detail"><p>看一个最小的例子：</p><pre>a = torch.tensor(2.0, requires_grad=True)
+b = torch.tensor(3.0, requires_grad=True)
+c = a * b
+d = c + a</pre><p>执行 <code>c = a * b</code> 时，除了算出 6，还发生了三件事：</p><ul><li>创建一个节点，类型是“乘法的反向”（<code>MulBackward0</code>）。</li><li>节点里<strong>保存</strong>了反向需要的东西。乘法的导数是：对 a 的梯度 = 上游梯度 × b，对 b 的梯度 = 上游梯度 × a。所以要把 a 和 b 都存下来。</li><li>节点里记下它的<strong>下一站</strong>（<code>next_functions</code>）：a 和 b 各自的来源。a、b 是用户直接创建的“叶子”张量，它们的来源是一种特殊的节点，作用是把收到的梯度累加到 <code>.grad</code> 上。</li></ul><p>然后把这个节点挂在 <code>c.grad_fn</code> 上。</p><figure class="fig"><img src="../assets/figures/autograd-graph.svg" alt="例子里的两行代码记下的图" loading="lazy"><figcaption>例子里的两行代码记下的图</figcaption></figure><p>执行 <code>d = c + a</code> 时再来一遍：创建“加法的反向”节点，它的下一站是 c 的 <code>grad_fn</code>（那个乘法节点）和 a 的累加节点。加法的导数不需要输入的值，所以它什么都不用保存。</p><p>于是得到一张图：从 <code>d.grad_fn</code> 出发，沿着 <code>next_functions</code> 能走到所有参与了计算的叶子。</p><p><strong class="h">几个要点。</strong></p><ul><li><strong>图是反向的图。</strong> <mark>记下的不是“前向做了什么”，而是“反向该做什么”</mark>。节点就是反向时要执行的函数。</li><li><strong>是否记账，看输入。</strong> 所有输入都不需要求梯度时，算子不创建节点，结果的 <code>grad_fn</code> 是空的。所以数据预处理那些运算不会产生图。</li><li><strong>每次前向都重新建图。</strong> 上一步的图在反向之后就被丢弃了。这就是“动态图”：图的形状可以每一步都不一样。</li><li><strong>节点保存的是对张量的引用。</strong> 只要图还在，被保存的那些中间结果就不会释放。这一点是后面“训练为什么占显存”的关键。</li></ul></div>
+<details class="i-more"><summary>动手：在 Python 里看这张图</summary><div class="i-detail"><p>这张图可以直接从 Python 里摸到，不需要任何工具。</p><pre>import torch
+a = torch.tensor(2.0, requires_grad=True)
+b = torch.tensor(3.0, requires_grad=True)
+c = a * b
+d = c + a
+
+print(d.grad_fn)                  # &lt;AddBackward0 ...&gt;
+print(d.grad_fn.next_functions)   # ((&lt;MulBackward0 ...&gt;, 0), (&lt;AccumulateGrad ...&gt;, 0))
+
+mul = d.grad_fn.next_functions[0][0]
+print(mul.next_functions)         # 两个 AccumulateGrad：a 和 b
+print(mul._saved_self, mul._saved_other)   # 乘法节点保存的 a 和 b
+
+print(a.is_leaf, c.is_leaf)       # True False
+print(a.grad_fn)                  # None：叶子没有 grad_fn</pre><p>几个可以自己验证的现象：</p><ul><li>把 <code>a</code> 换成不需要梯度的张量，<code>c.grad_fn</code> 变成 <code>None</code>。</li><li>调用 <code>d.backward()</code> 之后再访问 <code>mul._saved_self</code>，会报错说它已经被释放。这就是“反向之后图被清理”。</li><li><code>d.backward()</code> 之后 <code>a.grad</code> 是 4：来自乘法的 3（b 的值）和加法的 1，两条路径相加。这是 1.1 讲的“一个值被用了几次，梯度就要加几次”。</li></ul><p>对一个真实的模型，<code>loss.grad_fn</code> 就是这张图的入口。有一些小工具（比如 torchviz）能沿着 <code>next_functions</code> 把整张图画出来，原理就是上面这几行。</p></div></details>
+<p class="i-analogy"><b>打个比方</b>像做饭时随手记流水账：每做一步，就在本子上写一行“这一步用了哪两样东西、怎么做的”。做完之后照着本子从最后一行往回翻，就能还原整个过程。</p>
+<p class="i-impl">所以计算图不是事先定义好的，而是每次前向“跑”出来的。这一步跑的是哪条分支，记下的就是哪条分支的图。这是 PyTorch 能直接用 Python 的 if 和 for 写模型的原因。</p>
+<div class="i-builds">承接 <a href="1-1.html#c-1-1-chain-rule">反向传播 = 链式法则 + 记账</a><a href="2-1.html#c-p2-1-storage">张量 = 一块存储，加上一张说明“怎么看它”的表</a></div>
+<div class="i-builds">后面会用到 <a href="2-2.html#c-p2-2-engine">backward() 是对这张图的一次遍历：谁的上游都到齐了，就执行谁</a><a href="2-2.html#c-p2-2-derivatives">每个算子“怎么往回走”，写在一张表里，代码是照着它生成的</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/blog/computational-graphs-constructed-in-pytorch/" target="_blank" rel="noopener">How Computational Graphs are Constructed in PyTorch</a><a class="src" href="https://pytorch.org/blog/overview-of-pytorch-autograd-engine/" target="_blank" rel="noopener">Overview of PyTorch Autograd Engine</a></div>
+</li>
+<li class="i-lead">账记好了。现在调用 backward()，看引擎怎样照着它往回走。</li>
+<li class="icard" id="c-p2-2-engine"><h3><span class="i-num">2</span>backward() 是对这张图的一次遍历：谁的上游都到齐了，就执行谁</h3>
+<p class="i-essence">调用 loss.backward() 时，引擎从损失的节点出发。每个节点要等所有指向它的上游都把梯度送到、加在一起之后才能执行；执行就是调用它记下的那个反向函数，算出要传给各个下一站的梯度。引擎用 C++ 实现，为每个设备各开一个工作线程。</p>
+<div class="i-detail"><p><strong class="h">两个阶段。</strong></p><p>*第一阶段：数依赖。* 从根节点（损失的 <code>grad_fn</code>）出发遍历整张图，数出每个节点有多少条边指向它，也就是它要等多少份梯度。</p><p>*第二阶段：执行。* 维护一个“就绪队列”，一开始只有根节点，它的输入梯度是 1。然后循环：</p><ul><li>从队列里取出一个节点。</li><li>调用它的反向函数：输入是累加好的上游梯度，输出是给每个下一站的梯度。</li><li>对每个下一站：把梯度加到它的输入缓冲区里，它的依赖数减一。减到零，说明它该收的梯度都到齐了，把它放进就绪队列。</li><li>如果下一站是叶子的累加节点，就把梯度加到那个参数的 <code>.grad</code> 上。</li></ul><p>队列空了，反向就结束了。</p><p><strong class="h">为什么要等依赖数归零。</strong> 1.1 讲过：一个值被用了几次，它的梯度就是几条路径之和。如果节点只收到一部分梯度就执行，传下去的就是错的。<mark>等所有上游到齐、加完再执行，每个节点只需要执行一次</mark>。</p><p><strong class="h">引擎在哪里跑。</strong> 引擎是 C++ 写的。它为 CPU 和每一张 GPU 各准备一个工作线程和一个就绪队列。一个节点在哪个设备上，就由哪个线程执行。你调用 <code>backward()</code> 的那个 Python 线程会等到整个遍历完成。</p><p>对 GPU 上的节点，“执行”的意思是调用对应的算子，而算子做的事是把 kernel 放进 GPU 的任务队列（异步的）。所以反向传播在 CPU 一侧的工作，其实是引擎线程在飞快地给 GPU 发任务。0.1 里说的“等发令”，在反向时指的就是这个线程的速度。</p><p><strong class="h">钩子挂在这里。</strong> 引擎在执行一个节点的前后，会调用挂在上面的钩子函数。7.1 讲的 DDP 就是在每个参数的累加节点上挂了钩子：引擎每算完一个参数的梯度，钩子被调用，DDP 借机检查“这个桶齐了没有”。梯度裁剪、打印梯度范数这类工具，用的也是同一个机制。</p><p><strong class="h">反向完成后。</strong> 默认情况下，每个节点执行完就释放它保存的中间结果，整张图随之失效。所以对同一张图再调一次 <code>backward()</code> 会报错。确实需要反向两次时，第一次传 <code>retain_graph=True</code>，代价是那些中间结果继续占着显存。</p></div>
+<details class="i-more"><summary>源码导读：引擎的主循环</summary><div class="i-detail"><p>文件路径是 PyTorch 2.x 的，以你手头的版本为准。先读 2.1 里的“预备”。</p><p><strong class="h">从 Python 进来。</strong> <code>Tensor.backward()</code> 在 <code>torch/_tensor.py</code>，它调用 <code>torch.autograd.backward()</code>（<code>torch/autograd/__init__.py</code>），后者整理好参数后进入 C++。</p><p><strong class="h">核心文件：<code>torch/csrc/autograd/engine.cpp</code>。</strong> 按下面的顺序找这几个函数：</p><ul><li><code>Engine::execute</code>：入口。创建一个 <code>GraphTask</code> 对象（代表“这一次 backward 调用”），调用 <code>compute_dependencies</code> 数依赖，然后把根节点放进就绪队列。</li><li><code>Engine::compute_dependencies</code>：第一阶段，遍历图、统计每个节点的依赖数。</li><li><code>Engine::thread_main</code>：工作线程的主循环。从 <code>ReadyQueue</code> 里取任务，调用 <code>evaluate_function</code>。</li><li><code>Engine::evaluate_function</code>：执行一个节点。调用节点的函数拿到输出梯度，然后对每个下一站做“累加梯度、依赖数减一、归零则入队”。讲解里第二阶段的那个循环，就是这个函数。</li></ul><p><strong class="h">节点的定义：<code>torch/csrc/autograd/function.h</code>。</strong> <code>Node</code> 类。看它的三样东西：<code>next_edges_</code>（下一站）、<code>apply</code>（子类要实现的反向函数）、钩子的列表。</p><p><strong class="h">每个算子的节点在哪。</strong> 这些类是生成的。<code>tools/autograd/derivatives.yaml</code> 里每个算子有一条导数公式；构建时据此生成 <code>torch/csrc/autograd/generated/Functions.cpp</code>，里面是 <code>MulBackward0::apply</code> 这样的函数。想知道某个算子反向到底算了什么，在 <code>derivatives.yaml</code> 里搜它的名字是最快的。</p><p><strong class="h">带着这几个问题读：</strong></p><ul><li>多个上游的梯度是在哪里相加的？（搜 <code>InputBuffer</code>。）</li><li>节点保存的中间结果是在哪里释放的？（搜 <code>release_variables</code>；它受 <code>keep_graph</code> 控制，对应 Python 的 <code>retain_graph</code>。）</li><li>为什么每个设备一个线程，而不是一个线程池随便分？（一个设备上的任务本来就要排队进同一条 CUDA stream，多线程发并不更快，反而要处理线程之间的同步。）</li></ul></div></details>
+<p class="i-analogy"><b>打个比方</b>像公司里层层汇总的报表：一个部门要等所有下属小组的数字都交上来，汇总之后才能往上报。谁的材料齐了，谁就先开始。</p>
+<p class="i-impl">所以反向传播在 Python 这一侧只有一行调用，真正的执行在 C++ 的线程里。Python 的开销在反向时小得多，但引擎自己的调度开销仍然是每个节点付一次。</p>
+<div class="i-builds">承接 <a href="2-2.html#c-p2-2-record">前向时，每个算子顺手记下一个“反向节点”，连成一张图</a><a href="1-1.html#c-1-1-accumulate">一个值被用了几次，梯度就要加几次</a></div>
+<div class="i-builds">后面会用到 <a href="2-2.html#c-p2-2-saved">为了能反向，前向的中间结果要一直留着：训练显存的大头</a><a href="2-5.html#c-p2-5-aot">AOTAutograd：把反向的图也提前拿到</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/blog/overview-of-pytorch-autograd-engine/" target="_blank" rel="noopener">Overview of PyTorch Autograd Engine</a><a class="src" href="https://blog.ezyang.com/2019/05/pytorch-internals/" target="_blank" rel="noopener">PyTorch internals（Edward Yang）：autograd 部分</a></div>
+</li>
+<li class="i-lead">上一节末尾提到“节点保存的中间结果”。它值得单独看，因为显存的大头就在这里。</li>
+<li class="icard" id="c-p2-2-saved"><h3><span class="i-num">3</span>为了能反向，前向的中间结果要一直留着：训练显存的大头</h3>
+<p class="i-essence">很多算子的导数要用到前向时的输入或输出。所以反向节点里保存着这些张量的引用，它们要等反向经过这个节点之后才能释放。网络有几十层，每一层的输出都这样被留住，加起来就是 2.1 里那笔最大的账：激活值。</p>
+<div class="i-detail"><p><strong class="h">哪些算子要保存东西。</strong> 看导数公式里出现了什么：</p><ul><li>乘法 <code>c = a * b</code>：对 a 的梯度要用到 b，对 b 的梯度要用到 a。两个输入都要存。</li><li>矩阵乘法、线性层：要存输入（算权重的梯度要用）。</li><li>ReLU：只需要知道输出哪些位置大于零，存输出就够了。</li><li>加法：导数是常数，什么都不用存。</li></ul><p>“存”的是引用，不是拷贝。但只要有引用在，那个张量的存储就不能释放。</p><p><strong class="h">什么时候释放。</strong> 前向时一路保存；反向从最后一层往回走，走过一个节点，它保存的东西才能放掉。所以<mark>显存占用在前向过程中一路上升，前向结束、反向开始的那一刻达到峰值</mark>，然后随着反向的推进逐步下降。这就是 2.1 里说“量峰值要用 max_memory_allocated”的原因。</p><figure class="fig"><img src="../assets/figures/memory-peak.svg" alt="量显存要量峰值，而峰值出现在一步的中间" loading="lazy"><figcaption>量显存要量峰值，而峰值出现在一步的中间</figcaption></figure><p><strong class="h">对比推理。</strong> 在 <code>torch.no_grad()</code> 里，算子不创建节点，也就没有人保存这些中间结果。第 k 层的输入在第 k 层算完之后就没人引用了，立刻释放。任何时刻只有一两层的激活值活着。</p><p><strong class="h">减少这笔显存的办法。</strong></p><ul><li>*让每个激活值更小。* 混合精度（存 16 位的而不是 32 位的）；减小 batch 或序列长度。</li><li>*少存一些，用到时重算。* activation checkpointing：把模型分成若干段，前向时只保存每段的输入，段内的中间结果不留。反向到某一段时，从保存的输入出发把这一段的前向重算一遍，这次才保存中间结果，用完马上释放。代价是每一段的前向多算了一次，大约多花三成的时间，换来的是激活值显存从“和层数成正比”降到“和层数的平方根成正比”量级。这是 0.1 里“用计算换存储”的标准例子；4.4 的 Flash Attention 在反向时重算注意力，是同一个思路。</li><li>*用不需要保存的写法。* 有些运算可以原地进行（下一节会讲它的限制）。</li></ul><p><strong class="h">一个常见的泄漏。</strong> 在训练循环里写 <code>total_loss += loss</code>，<code>total_loss</code> 就成了一个带着 <code>grad_fn</code> 的张量，它通过图引用着每一步的所有中间结果。于是每一步的图都没法释放，显存一步步涨到溢出。正确的写法是 <code>total_loss += loss.item()</code> 或 <code>loss.detach()</code>：只取数值，不带图。</p></div>
+<p class="i-analogy"><b>打个比方</b>像爬山时沿途留下的路标：上山时每走一段插一面旗，下山时要靠它们认路，所以旗子不能提前拔。山越高，插的旗越多。</p>
+<p class="i-impl">所以训练的显存和网络深度成正比，而推理只需要留住当前这一层。省这笔显存的办法只有两类：让每面“旗”更小（低精度、小 batch），或者少插一些、下山时重新走一段来补（重算）。</p>
+<div class="i-builds">承接 <a href="2-2.html#c-p2-2-engine">backward() 是对这张图的一次遍历：谁的上游都到齐了，就执行谁</a><a href="2-1.html#c-p2-1-budget">训练时的显存是五笔账：参数、梯度、优化器状态、激活值、缓存与碎片</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="2-2.html#c-p2-2-modes">不记账、剪断、和改了被记下的东西：no_grad、detach 与原地操作</a><a href="2-5.html#c-p2-5-aot">AOTAutograd：把反向的图也提前拿到</a><a href="4-2.html#c-p4-2-backward">训练时的融合：被融合掉的中间结果，反向要用怎么办</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/blog/computational-graphs-constructed-in-pytorch/" target="_blank" rel="noopener">How Computational Graphs are Constructed in PyTorch</a><a class="src" href="https://docs.pytorch.org/docs/stable/checkpoint.html" target="_blank" rel="noopener">PyTorch 文档：torch.utils.checkpoint</a></div>
+</li>
+<li class="i-lead">引擎只负责“按顺序调用每个节点的函数”。每个节点具体算什么，是另一处定义的。</li>
+<li class="icard" id="c-p2-2-derivatives"><h3><span class="i-num">4</span>每个算子“怎么往回走”，写在一张表里，代码是照着它生成的</h3>
+<p class="i-essence">PyTorch 有上千个算子，每个都需要一个反向节点。这些节点不是手写的：所有算子的导数公式集中在 derivatives.yaml 这张表里，构建时由脚本读这张表，为每个算子生成它的节点类，以及前向时“创建节点、保存输入、连上下一站”的那段包装代码。</p>
+<div class="i-detail"><p><strong class="h">表里写的是什么。</strong> <code>tools/autograd/derivatives.yaml</code> 里每个算子一条，大意是这样的：</p><pre>- name: mul.Tensor(Tensor self, Tensor other) -&gt; Tensor
+  self:  mul_tensor_backward(grad, other, self.scalar_type())
+  other: mul_tensor_backward(grad, self, other.scalar_type())</pre><p>读法：对输入 <code>self</code> 的梯度，等于用上游梯度 <code>grad</code> 和另一个输入 <code>other</code> 算出来的某个量。<mark>公式里出现了哪个输入，生成器就知道前向时要把它保存下来</mark>。</p><p>这里的公式不是数学课上的“导数”，而是“给定上游梯度，算出传给这个输入的梯度”。数学上叫向量和雅可比矩阵的乘积。好处是永远不需要把巨大的雅可比矩阵真的写出来，只需要它和一个向量相乘的结果。</p><p><strong class="h">生成了什么。</strong> 对每一条，构建脚本生成两样东西：</p><ul><li>一个节点类（比如 <code>MulBackward0</code>），它的函数体就是表里的公式。</li><li>一段包装代码：在调用真正的乘法实现之前和之后，判断是否需要求梯度、创建节点、保存输入、把节点挂到输出上。这段包装代码就是 2.3 要讲的“autograd 层”，一次算子调用会先经过它。</li></ul><p><strong class="h">对你写的模型意味着什么。</strong></p><ul><li>用已有算子拼出来的任何计算，都自动可导：每个算子记下自己的节点，连起来就是整体的反向。</li><li>只有当你要用一个 autograd 不认识的运算（比如自己写的 CUDA kernel），或者想用一个更省事的反向公式替代自动推导出来的那个，才需要自己定义反向：继承 <code>torch.autograd.Function</code>，写 <code>forward</code> 和 <code>backward</code> 两个函数。4.4 的 Flash Attention 就属于后者，它的反向是专门设计的。</li></ul><p><strong class="h">读源码时的用法。</strong> 遇到“这个算子的梯度为什么是这样”“这个算子反向会不会保存输入”这类问题，直接看这张表。表里写着用到了哪些输入，就知道它保存了什么；公式调用的辅助函数在 <code>torch/csrc/autograd/FunctionsManual.cpp</code> 里。</p></div>
+<p class="i-analogy"><b>打个比方</b>像一本菜谱和一条按菜谱自动配菜的流水线：想知道某道菜怎么做，不用去车间里看机器，翻菜谱就行。</p>
+<p class="i-impl">所以想知道某个算子的梯度到底是怎么算的，最快的办法是在这张表里搜它的名字。自己用现有算子组合出来的运算不需要写导数，autograd 会把各个算子的导数自动串起来。</p>
+<div class="i-builds">承接 <a href="2-2.html#c-p2-2-record">前向时，每个算子顺手记下一个“反向节点”，连成一张图</a></div>
+<div class="i-builds">后面会用到 <a href="2-3.html#c-p2-3-journey">一次算子调用要穿过五层：绑定、dispatcher、autograd、后端实现、CUDA</a><a href="2-3.html#c-p2-3-yaml">native_functions.yaml 是所有算子的总目录，读源码从这里找入口</a><a href="2-5.html#c-p2-5-aot">AOTAutograd：把反向的图也提前拿到</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://pytorch.org/blog/overview-of-pytorch-autograd-engine/" target="_blank" rel="noopener">Overview of PyTorch Autograd Engine（derivatives.yaml 的说明）</a><a class="src" href="https://blog.ezyang.com/2019/05/pytorch-internals/" target="_blank" rel="noopener">PyTorch internals（Edward Yang）：代码生成</a></div>
+</li>
+<li class="i-lead">最后是几种改变记账行为的情况。它们在日常代码里很常见，报错信息也常常和它们有关。</li>
+<li class="icard" id="c-p2-2-modes"><h3><span class="i-num">5</span>不记账、剪断、和改了被记下的东西：no_grad、detach 与原地操作</h3>
+<p class="i-essence">no_grad 让一段代码里的算子都不创建节点。detach 得到一个共用存储、但和图断开的张量。原地操作（名字以下划线结尾的，比如 add_）直接修改张量的内容，如果被改的张量正被某个节点保存着等反向用，autograd 会在反向时发现并报错。</p>
+<div class="i-detail"><p><strong class="h">no_grad：这一段不记账。</strong></p><pre>with torch.no_grad():
+    y = model(x)</pre><p>里面的算子都不创建节点，结果没有 <code>grad_fn</code>。好处有两个：省掉了创建节点的时间；更重要的是<mark>没有人保存中间结果，显存占用小得多</mark>（上一节）。评估、推理、以及优化器更新参数的那一步，都在这种模式下进行。还有一个更彻底的 <code>torch.inference_mode()</code>，连下面要讲的版本计数都省了，推理时可以优先用它。</p><p><strong class="h">detach：把一个张量从图上摘下来。</strong> <code>y = x.detach()</code> 得到的 <code>y</code> 和 <code>x</code> 共用存储（是一个视图，2.1），但没有 <code>grad_fn</code>，梯度不会经过它流回去。用途：把某个中间结果当作常数来用；把损失的数值拿出来记录而不留住整张图。</p><p><strong class="h">原地操作和版本计数器。</strong> 每个张量有一个版本号，每被原地修改一次就加一。节点保存一个张量时，同时记下当时的版本号。反向执行到这个节点时，如果发现版本号变了，说明保存的数据已经不是前向时的值，用它算出的梯度是错的。这时 autograd 直接报错，信息里会出现 “modified by an inplace operation”。</p><p>例如：</p><pre>a = torch.randn(3, requires_grad=True)
+b = a * 2
+c = b * b      # 乘法节点保存了 b
+b.add_(1)      # 原地修改 b：版本号加一
+c.sum().backward()   # 报错</pre><p>这个检查是保护你的：没有它，梯度会悄悄算错。遇到这个报错，把对应的原地操作改成普通的（<code>b = b + 1</code>）即可，代价是多一个临时张量。</p><p><strong class="h">原地操作什么时候是安全的。</strong> 被修改的张量没有被任何节点保存时。比如 ReLU 保存的是输出，所以 <code>relu_</code> 可以安全地原地进行；优化器更新参数是在 <code>no_grad</code> 里原地改的，那时图已经用完了。</p><p><strong class="h">视图让情况更复杂。</strong> 视图和原张量共用存储，也共用版本号。原地改了其中一个，另一个的版本号也变了。所以有时报错指向的张量，你并没有直接改过它，改的是它的某个视图。</p></div>
+<p class="i-analogy"><b>打个比方</b>还是那本流水账：no_grad 是这一段不记；detach 是把某样东西从账上勾掉，之后它的去向与这本账无关；原地操作是把账上记着“用了 3 勺”的那罐东西偷偷换了，回头照着账复原时就对不上了。</p>
+<p class="i-impl">所以推理和评估要包在 no_grad 里，省时间也省显存；想把一个值当常数用，就 detach；原地操作能省显存，但 autograd 会检查它是否破坏了反向需要的数据。</p>
+<div class="i-builds">承接 <a href="2-2.html#c-p2-2-saved">为了能反向，前向的中间结果要一直留着：训练显存的大头</a><a href="2-1.html#c-p2-1-views">view、转置、切片只改说明，不拷贝数据</a></div>
+<div class="i-builds">后面会用到 <a href="3-6.html#c-p3-6-sync">同步点：只要 CPU 需要 GPU 上的一个具体的值，它就得停下来等</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://docs.pytorch.org/docs/stable/notes/autograd.html" target="_blank" rel="noopener">PyTorch 文档：Autograd mechanics</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>前向时每个算子生成一个<strong>反向节点</strong>（grad_fn），节点之间连成图，并<strong>保存</strong>反向需要的中间结果。backward() 由 C++ 的<strong>引擎</strong>按依赖顺序执行这些节点。保存的中间结果要到反向用完才释放，所以训练比推理占显存。每个算子的导数公式在 <strong>derivatives.yaml</strong> 里，节点的代码由它生成。no_grad 不记账，detach 剪断图，<strong>原地修改</strong>被保存的张量会被版本计数器抓到。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>前向计算时，autograd 为每个算子记录了什么？grad_fn 和 next_functions 各是什么？</li><li>autograd 引擎按什么顺序执行反向节点？为什么一个节点要等“依赖数归零”才能执行？</li><li>为什么训练时前向的中间结果不能立刻释放？有哪些办法减少这部分显存？</li><li>PyTorch 里每个算子的导数定义在哪里？它是怎样变成可执行的反向节点的？</li><li>torch.no_grad() 和 detach() 有什么区别？原地操作为什么有时会导致反向报错？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>grad_fn</dt><dd>产生这个张量的反向节点</dd></div><div><dt>leaf tensor</dt><dd>叶子张量</dd></div><div><dt>vector-Jacobian product</dt><dd>向量-雅可比积</dd></div><div><dt>version counter</dt><dd>版本计数器</dd></div><div><dt>retain_graph</dt><dd>保留计算图</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="2-1.html"><small>上一单元</small>2.1 张量与内存</a>
+<a class="next" href="2-3.html"><small>下一单元</small>2.3 从一行 Python 到一个 kernel</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

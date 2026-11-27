@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="KV cache：新位置只需要前面位置的 K 和 V">
+  <title>KV cache：新位置只需要前面位置的 K 和 V</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">生成第 5 个 token 时，某一层的注意力</text>
+  <rect x="60" y="58" width="92" height="36" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="106.0" y="81.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 1 的 K</text>
+  <rect x="60" y="100" width="92" height="36" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="106.0" y="123.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 1 的 V</text>
+  <rect x="170" y="58" width="92" height="36" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="216.0" y="81.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 2 的 K</text>
+  <rect x="170" y="100" width="92" height="36" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="216.0" y="123.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 2 的 V</text>
+  <rect x="280" y="58" width="92" height="36" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="326.0" y="81.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 3 的 K</text>
+  <rect x="280" y="100" width="92" height="36" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="326.0" y="123.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 3 的 V</text>
+  <rect x="390" y="58" width="92" height="36" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="436.0" y="81.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 4 的 K</text>
+  <rect x="390" y="100" width="92" height="36" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="436.0" y="123.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">位置 4 的 V</text>
+  <rect x="48" y="48" width="446" height="98" rx="12" fill="none" stroke="#d9d4c8" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="271" y="168" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">KV cache：以前算过的，存着不再算</text>
+  <rect x="560" y="58" width="176" height="36" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="648.0" y="81.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">新位置自己的 Q</text>
+  <rect x="560" y="100" width="176" height="36" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="648.0" y="114.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">新位置的 K、V</text>
+  <text x="648.0" y="135.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">算完追加进缓存</text>
+  <line x1="558" y1="76" x2="496" y2="76" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="527.0" y="69.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">查</text>
+  <line x1="558" y1="118" x2="496" y2="118" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="527.0" y="111.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">追加</text>
+  <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每一步真正新算的只有最后这一个位置；前面位置的 Q 和其他中间结果都不需要</text>
+  <text x="24" y="228" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">代价：每一层、每个并发请求都要存一份，上下文越长越大</text>
+</svg>

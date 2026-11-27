@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 268" width="760" height="268" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="注意力是一次软查表">
+  <title>注意力是一次软查表</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="268" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一个位置的注意力：按匹配程度，把所有位置的内容混合起来</text>
+  <rect x="24" y="60" width="130" height="50" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="89.0" y="81.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">Q</text>
+  <text x="89.0" y="102.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">我在找什么</text>
+  <rect x="24" y="130" width="130" height="50" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="89.0" y="151.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">K</text>
+  <text x="89.0" y="172.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">各位置有什么</text>
+  <rect x="24" y="200" width="130" height="50" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="89.0" y="221.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">V</text>
+  <text x="89.0" y="242.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">各位置的内容</text>
+  <rect x="220" y="92" width="130" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="285.0" y="116.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">点积</text>
+  <text x="285.0" y="137.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一组分数</text>
+  <rect x="410" y="92" width="130" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="475.0" y="116.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">softmax</text>
+  <text x="475.0" y="137.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">加起来等于 1 的权重</text>
+  <rect x="600" y="146" width="136" height="56" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="668.0" y="170.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">加权求和</text>
+  <text x="668.0" y="191.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">这个位置的输出</text>
+  <line x1="156" y1="86" x2="218" y2="108" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="156" y1="154" x2="218" y2="132" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="352" y1="120" x2="408" y2="120" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="542" y1="124" x2="598" y2="162" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="156" y1="226" x2="598" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">所有位置同时这样做：分数是一个 N×N 的矩阵</text>
+</svg>

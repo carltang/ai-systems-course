@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 226" width="760" height="226" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPU 是异步执行的">
+  <title>GPU 是异步执行的</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="226" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">时间从左到右：CPU 发任务，GPU 稍后才做</text>
+  <text x="24" y="82" font-size="14" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">CPU</text>
+  <text x="24" y="152" font-size="14" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">GPU</text>
+  <rect x="84" y="62" width="36" height="34" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="102.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">1</text>
+  <rect x="126" y="62" width="36" height="34" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="144.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">2</text>
+  <rect x="168" y="62" width="36" height="34" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="186.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">3</text>
+  <rect x="210" y="62" width="36" height="34" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="228.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">4</text>
+  <rect x="262" y="62" width="356" height="34" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="440.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">需要结果里的数：停下来等</text>
+  <rect x="90" y="132" width="150" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="165.0" y="154.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">执行任务 1</text>
+  <rect x="244" y="132" width="110" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="299.0" y="154.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">执行任务 2</text>
+  <rect x="358" y="132" width="160" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="438.0" y="154.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">执行任务 3</text>
+  <rect x="522" y="132" width="104" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="574.0" y="154.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">执行任务 4</text>
+  <rect x="624" y="62" width="112" height="34" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="680.0" y="84.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">继续</text>
+  <line x1="620" y1="52" x2="620" y2="176" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="3 4"/>
+  <text x="166" y="116" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">下单：每次只要几微秒</text>
+  <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">在“下单”之后立刻停表，量到的只是下单的时间；计时前后要先同步</text>
+</svg>

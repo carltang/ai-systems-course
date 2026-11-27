@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 268" width="760" height="268" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="RDMA 的四样东西">
+  <title>RDMA 的四样东西</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="268" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">应用（用户态）</text>
+  <text x="736" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">网卡</text>
+  <rect x="24" y="52" width="220" height="60" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="134.0" y="78.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">内存区域 MR</text>
+  <text x="134.0" y="99.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">先注册：锁页，地址写进网卡</text>
+  <rect x="24" y="132" width="220" height="60" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="134.0" y="158.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">工作请求 WR</text>
+  <text x="134.0" y="179.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一张单子：发哪块内存、多长</text>
+  <rect x="300" y="132" width="200" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="400.0" y="158.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">队列对 QP</text>
+  <text x="400.0" y="179.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">发送队列 + 接收队列</text>
+  <rect x="300" y="52" width="200" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="400.0" y="78.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">完成队列 CQ</text>
+  <text x="400.0" y="99.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">做完一张单子，放一条记录</text>
+  <rect x="566" y="92" width="170" height="60" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="651.0" y="118.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">网卡硬件</text>
+  <text x="651.0" y="139.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">可靠传输在这里做</text>
+  <line x1="246" y1="162" x2="298" y2="162" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="272.0" y="155.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">放进</text>
+  <line x1="502" y1="150" x2="564" y2="130" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="564" y1="112" x2="502" y2="84" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="298" y1="82" x2="246" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="272.0" y="81.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">轮询</text>
+  <text x="24" y="228" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">注册内存和建连接是慢操作，放在启动时；之后每次收发都不进内核、不拷贝、不用中断</text>
+  <text x="24" y="248" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">两把钥匙：lkey 自己用，rkey 交给对方，对方凭它才能直接读写这块内存</text>
+</svg>

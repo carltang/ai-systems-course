@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="张量并行：把一层的计算切开">
+  <title>张量并行：把一层的计算切开</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">MLP 的两次矩阵乘法由几张卡各算一部分（画了 2 张卡）</text>
+  <rect x="24" y="110" width="90" height="50" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="69.0" y="131.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">输入</text>
+  <text x="69.0" y="152.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每张卡都有</text>
+  <text x="172" y="52" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">卡 0</text>
+  <rect x="170" y="60" width="130" height="46" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="235.0" y="79.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">A 的一份</text>
+  <text x="235.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">按列切</text>
+  <rect x="330" y="60" width="110" height="46" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="385.0" y="79.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">激活函数</text>
+  <text x="385.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">逐元素</text>
+  <rect x="470" y="60" width="130" height="46" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="535.0" y="79.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">B 的一份</text>
+  <text x="535.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">按行切</text>
+  <line x1="116" y1="135" x2="168" y2="83" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="302" y1="83" x2="328" y2="83" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="442" y1="83" x2="468" y2="83" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="602" y1="83" x2="650" y2="128" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="172" y="162" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">卡 1</text>
+  <rect x="170" y="170" width="130" height="46" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="235.0" y="189.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">A 的一份</text>
+  <text x="235.0" y="210.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">按列切</text>
+  <rect x="330" y="170" width="110" height="46" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="385.0" y="189.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">激活函数</text>
+  <text x="385.0" y="210.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">逐元素</text>
+  <rect x="470" y="170" width="130" height="46" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="535.0" y="189.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">B 的一份</text>
+  <text x="535.0" y="210.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">按行切</text>
+  <line x1="116" y1="135" x2="168" y2="193" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="302" y1="193" x2="328" y2="193" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="442" y1="193" x2="468" y2="193" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="602" y1="193" x2="650" y2="142" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="652" y="110" width="84" height="50" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="694.0" y="131.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">all-reduce</text>
+  <text x="694.0" y="152.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">相加</text>
+  <text x="385" y="142" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">这一段各算各的，不需要通信</text>
+  <text x="24" y="250" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">每层都要做，又在计算的关键路径上，很难藏住：所以张量并行留在一台机器内，走 NVLink</text>
+</svg>

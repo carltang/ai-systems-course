@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="强化学习的基本循环">
+  <title>强化学习的基本循环</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <rect x="90" y="86" width="200" height="78" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="190.0" y="121.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">智能体</text>
+  <text x="190.0" y="142.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">策略：看到状态，选动作</text>
+  <rect x="470" y="86" width="200" height="78" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="570.0" y="121.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">环境</text>
+  <text x="570.0" y="142.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">游戏、仿真器、真实世界</text>
+  <path d="M290 104 C 350 60, 410 60, 470 104" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="58" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">动作 a</text>
+  <path d="M470 146 C 410 196, 350 196, 290 146" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="212" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">新的状态 s′ 和奖励 r</text>
+  <text x="380" y="130" font-size="12" fill="#9aa0aa" font-weight="400" text-anchor="middle" letter-spacing=".02em">反复很多次</text>
+  <text x="380" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">目标：让整个过程累积的奖励尽量多，而不是某一步的奖励</text>
+</svg>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>9.1 LLM 推理与服务 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="理解 KV cache、批处理调度和推理引擎的主要优化。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="8-2.html" title="8.2 GPU 在集群里：设备、调度与排队" data-step="prev">‹ 8.2</a>
+<a href="9-2.html" title="9.2 量化与低精度" data-step="next">9.2 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 9 部分 · 推理系统（选读）</span>9.1 LLM 推理与服务</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>生成一段文字时，GPU 在忙什么？怎样让一张卡同时服务很多人？</div><div class="frame-c">承接 4.1 的矩阵乘向量：推理的瓶颈和训练完全不同。量化放在 9.2 接着讲。</div></div>
+<div class="story"><p>线索是：生成一段文字分成两个阶段，它们的瓶颈不一样 → decode 阶段单独一个请求很浪费，把很多请求批在一起才高效 → 批处理的上限由一样东西决定：KV cache 占的显存 → 所以怎样管理这块显存，成了推理引擎的核心问题。这一单元讲“一个请求怎么算、一张卡能放多少请求”；很多请求同时来时怎样安排，放在 9.3。</p></div>
+<ol class="thread"><li><a href="#c-6-1-prefill-decode">prefill 受算力限制，decode 受带宽限制</a></li><li><a href="#c-6-1-batching">批处理：读一次权重，服务一批请求</a></li><li><a href="#c-6-1-kv-memory">KV cache 是推理显存的大头</a></li><li><a href="#c-6-1-paged">PagedAttention：像操作系统管内存一样管 KV cache</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-6-1-prefill-decode"><h3><span class="i-num">1</span>prefill 受算力限制，decode 受带宽限制</h3>
+<p class="i-essence">推理分两个阶段：prefill 一次性处理整段提示词，是大矩阵乘法；decode 每次只生成一个 token，是矩阵乘向量（4.1）。首字延迟主要由 prefill 决定，之后每个字的速度主要由 decode 决定。</p>
+<div class="i-detail"><p>用户发来一段提示词，模型要接着写下去。整个过程分两段。</p><figure class="fig"><img src="../assets/figures/prefill-decode.svg" alt="先一次读完提示词，再一个一个地写" loading="lazy"><figcaption>先一次读完提示词，再一个一个地写</figcaption></figure><p><strong class="h">prefill：把提示词“读”进去。</strong> 提示词的 N 个 token 是已知的，一次性送进模型。这和训练时的前向完全一样（1.4）：所有位置同时计算，每一层是大矩阵乘大矩阵。这一阶段的产出有两样：最后一个位置的输出（用来预测第一个新 token），以及每一层、每个位置的 K 和 V，它们被存进 KV cache（4.1）。</p><p>4.1 分析过：权重读一遍，被 N 个位置反复使用，算术强度高。瓶颈在算力。提示词越长，这一阶段越久，大致成正比（注意力部分增长得更快）。</p><p><strong class="h">decode：一个一个地写。</strong> 之后每一步：把刚生成的那一个 token 送进模型；每一层为它算出 Q、K、V，K 和 V 追加进缓存，用 Q 和缓存里所有的 K、V 做注意力；最后得到下一个 token。重复，直到生成结束符。</p><p>每一步只有一个新位置。4.1 分析过：这是矩阵乘向量，权重读一遍只用一次。瓶颈在显存带宽。每一步的时间和已经生成了多长关系不大（注意力要看整个缓存，但那只占一小部分），主要取决于模型有多大。</p><p><strong class="h">两个阶段决定了两种延迟。</strong></p><ul><li>首 token 延迟 ≈ 排队 + prefill 的时间。</li><li>之后每个 token 的间隔 = decode 一步的时间。</li></ul><p><strong class="h">用 4.1 的估算感受一下。</strong> 一个 7B 的模型，16 位权重 14 GB，显存带宽 1 TB/s 左右的卡：</p><ul><li>decode：每一步至少要读一遍权重，约 14 毫秒，每秒最多 70 个 token 左右。算力几乎闲着。</li><li>prefill 2000 个 token：运算量约 2 × 7×10⁹ × 2000 = 2.8×10¹³ 次（每个 token 前向约 2N）。按 300 TFLOPS 的峰值、五成的利用率，约 0.2 秒。算力是满的。</li></ul><p>同一个模型、同一张卡，两个阶段分别顶在了硬件的两个不同的上限上。</p><p><strong class="h">所以它们要分开优化。</strong></p><ul><li>prefill 想要的：更强的算力、Flash Attention（4.4）、以及尽量别重复算（9.3 的前缀缓存）。</li><li>decode 想要的：更少的字节（9.2 的量化）、把多个请求批在一起（下一节）、更高的显存带宽。</li></ul><p>9.3 会讲到，<mark>把这两种性格的工作混在同一个 batch 里会互相妨碍</mark>，有的系统干脆用不同的 GPU 分别做。</p></div>
+<p class="i-analogy"><b>打个比方</b>像回答问题：prefill 是一口气读完整个问题，decode 是一个字一个字地写出答案。</p>
+<p class="i-impl">所以两个阶段的优化手段不同：prefill 要算力，decode 要带宽和批处理；有些系统甚至把两者放到不同的 GPU 上分开跑。</p>
+<div class="i-builds">承接 <a href="4-1.html#c-3-1-decode-matvec">生成一个词时，矩阵乘法退化成了矩阵乘向量</a><a href="3-4.html#c-2-4-roofline">Roofline：先看你撞的是哪面墙</a></div>
+<div class="i-builds">后面会用到 <a href="9-1.html#c-6-1-batching">批处理：读一次权重，服务一批请求</a><a href="9-3.html#c-p9-3-metrics">三个指标：吞吐、首个 token 的延迟、每个 token 的延迟</a><a href="9-3.html#c-p9-3-interference">prefill 和 decode 混在一起，会互相拖累</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">第 35 讲讲义</span><a class="src" href="https://kipply.github.io/blog/transformer-inference-arithmetic/" target="_blank" rel="noopener">Transformer Inference Arithmetic（kipply）</a><a class="src" href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How to Scale Your Model：Inference</a></div>
+</li>
+<li class="i-lead">decode 时算力闲着、带宽吃紧。这种不平衡正好可以利用。</li>
+<li class="icard" id="c-6-1-batching"><h3><span class="i-num">2</span>批处理：读一次权重，服务一批请求</h3>
+<p class="i-essence">decode 时权重读一遍只用来算一个 token，太浪费。把 B 个请求放在一起，读一次权重就能为 B 个请求各算一个 token，算术强度提高 B 倍。continuous batching 更进一步：每生成一步，就让已结束的请求离开、新请求加入。</p>
+<div class="i-detail"><p><strong class="h">单个请求的浪费。</strong> decode 一步，把 14 GB 的权重从显存搬出来，每个权重只做了一次乘加，算出一个 token。GPU 的运算单元大部分时间在等数据。</p><p><strong class="h">批处理。</strong> 把 B 个用户的请求放在一起，每一步同时为每个请求算一个新 token。每一层的运算从“权重矩阵 × 1 个向量”变成“权重矩阵 × B 个向量”。</p><ul><li>权重还是只读一遍。</li><li>每个权重现在做了 B 次乘加。</li><li><mark>这一步的时间几乎不变（瓶颈是读权重，而读的量没变），却产出了 B 个 token</mark>。</li></ul><p>用 3.3 的话说，算术强度提高了 B 倍，运算单元从“闲着”变成“有活干”。这是 0.1 里“成批处理，摊薄固定成本”最直接的例子：读一遍权重是固定成本，分摊给了 B 个请求。</p><p><strong class="h">能涨到多高。</strong> 吞吐随 B 近似线性上升，直到碰到下面三个上限之一：</p><ul><li>*算力。* B 大到运算单元忙不过来，瓶颈从带宽变成算力。之后再加大 B，每一步的时间开始成比例变长，吞吐不再增加。这个转折点大约在“B × 每个位置的运算量 ÷ 峰值算力 ≈ 读一遍权重的时间”处，对常见的模型是几十到几百。</li><li>*KV cache 的显存。* 每个请求都有自己的一份缓存（下一节）。常常在算力用满之前，显存先放不下了。</li><li>*延迟。* B 越大，每一步越慢（即使在带宽受限的区间，KV cache 的读写也随 B 增加），每个用户的每 token 延迟变差。服务有延迟要求时，B 不能无限大（9.3）。</li></ul><p><strong class="h">这解释了一个常见的现象。</strong> 在自己电脑上跑一个模型，每秒几十个 token；云上的服务同一个模型，一张卡每秒能产出几千个 token。差别主要不在硬件，而在云上同时服务着上百个请求。单个用户感受到的速度差不多，但每个 token 分摊的成本低了两个数量级。</p><p><strong class="h">实际的批处理要处理的麻烦。</strong> 训练时一个 batch 里的序列可以补齐到一样长。推理时请求陆续到达，各自处于不同的进度，各自的 KV cache 长度不同，结束的时间也不同。怎样让请求随时加入、随时离开，是 9.3 讲的连续批处理。</p></div>
+<p class="i-analogy"><b>打个比方</b>公交车又回来了：一趟车的成本几乎固定，多拉一个人几乎不增加成本；而且每到一站都可以有人上下车。</p>
+<p class="i-impl">所以吞吐几乎随并发线性增长，直到变成算力受限或者 KV cache 放不下；服务端推理比单机聊天高效得多，原因就在这里。</p>
+<div class="i-builds">承接 <a href="9-1.html#c-6-1-prefill-decode">prefill 受算力限制，decode 受带宽限制</a><a href="3-3.html#c-2-3-intensity">算术强度：每搬 1 字节，能做几次运算</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-continuous">连续批处理：请求随到随进，做完就走</a><a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://jax-ml.github.io/scaling-book/inference/" target="_blank" rel="noopener">How to Scale Your Model：Inference（批处理与算术强度）</a></div>
+</li>
+<li class="i-lead">批处理的三个上限里，最先碰到的通常是显存。</li>
+<li class="icard" id="c-6-1-kv-memory"><h3><span class="i-num">3</span>KV cache 是推理显存的大头</h3>
+<p class="i-essence">每个请求的 KV cache 大小 = 2（K 和 V）× 层数 × 隐藏维度 × 序列长度 × 每个数的字节数。长上下文、高并发时，它比模型权重还大。</p>
+<div class="i-detail"><p>4.1 讲过 KV cache 是什么：每一层把已经算过的 K 和 V 存下来，避免重复计算。这里算它有多大。</p><p><strong class="h">公式。</strong> 一个请求的缓存 = 2（K 和 V）× 层数 × 序列长度 × 隐藏维度 × 每个数的字节数。</p><p>（隐藏维度 = 头数 × 每个头的维度。用了后面说的 GQA 时，要把它换成“K、V 的头数 × 每个头的维度”。）</p><p><strong class="h">代入一个中等的模型。</strong> 32 层，隐藏维度 4096，16 位存储：</p><ul><li>每个 token：2 × 32 × 4096 × 2 字节 ≈ 0.5 MB。</li><li>一个 4000 token 的对话：约 2 GB。</li><li>一个 10 万 token 的长文档：约 50 GB，超过了模型权重本身。</li></ul><figure class="fig"><img src="../assets/figures/kv-memory.svg" alt="上面几个数字放在一起看" loading="lazy"><figcaption>上面几个数字放在一起看</figcaption></figure><p><strong class="h">一张卡能放多少请求。</strong> 80 GB 的卡，模型权重占 14 GB，剩下约 60 GB 给 KV cache。平均每个请求 4000 token 的话，只能同时放 30 个左右。上一节说吞吐随并发线性增长，而并发在这里被卡在了 30。算力还远远没有用满。</p><p>所以推理的容量规划，第一步算的是显存而不是算力：能同时放下多少请求的上下文。</p><p><strong class="h">缩小它的办法。</strong></p><ul><li>*让几个头共用一组 K、V。* 标准的多头注意力每个头有自己的 K 和 V（1.4）。分组查询注意力（GQA）让若干个头共用一组，比如 32 个查询头只配 8 组 K、V，缓存直接缩小到四分之一。极端的情况是所有头共用一组（MQA）。这是模型结构上的改动，要在训练时就定下来。现在的大模型大多采用了 GQA。</li><li>*用更少的位数存。* 把缓存量化到 8 位（9.2）。</li><li>*不为没用到的部分预留。* 下一节的 PagedAttention。</li><li>*跨请求共享相同的部分。* 9.3 的前缀缓存。</li><li>*挪到别处。* 把暂时不活跃的请求的缓存移到主内存甚至硬盘，需要时再搬回来。搬运的速度受 PCIe 带宽限制（5.1）。</li></ul><p><strong class="h">它也影响 decode 的速度。</strong> 每一步的注意力要把这个请求的整个缓存读一遍。上下文很长时，“读缓存”会成为每一步里和“读权重”同样重要的开销。所以<mark>长上下文的请求不只占显存，每个 token 也更慢</mark>。</p><p>回到 2.1 的显存账本：训练时最大的一笔是为反向保存的激活值；推理没有反向，取而代之的最大一笔就是 KV cache。两者都随序列长度和并发（batch）增长。</p></div>
+<p class="i-analogy"><b>打个比方</b>像餐厅：厨房（模型权重）大小固定，真正限制接待人数的是餐桌（每位客人的 KV cache）有多少张。</p>
+<p class="i-impl">所以一张卡能同时服务多少请求，往往取决于 KV cache 放不放得下；GQA/MQA（多个头共用 K、V）、KV cache 量化，都是在缩小它。</p>
+<div class="i-builds">承接 <a href="4-1.html#c-3-1-kv-cache">KV cache：算过的不再算</a></div>
+<div class="i-builds">后面会用到 <a href="9-1.html#c-6-1-paged">PagedAttention：像操作系统管内存一样管 KV cache</a><a href="9-3.html#c-p9-3-scheduling">调度是在吞吐和延迟之间做取舍</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://kipply.github.io/blog/transformer-inference-arithmetic/" target="_blank" rel="noopener">Transformer Inference Arithmetic（kipply）：KV cache 的大小</a><a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM 论文：KV cache 的显存占用</a></div>
+</li>
+<li class="i-lead">知道了缓存有多大。还有一个问题：它的大小事先不知道。</li>
+<li class="icard" id="c-6-1-paged"><h3><span class="i-num">4</span>PagedAttention：像操作系统管内存一样管 KV cache</h3>
+<p class="i-essence">每个请求最终生成多长事先不知道，按最大长度预留显存会浪费大半。vLLM 把 KV cache 切成固定大小的页，按需分配，用页表记录位置；SGLang 再用前缀树复用不同请求之间相同的前缀（比如同一个系统提示）。</p>
+<div class="i-detail"><p><strong class="h">难处。</strong> 一个请求的 KV cache 随着生成一个 token 一个 token 地变长，最终多长取决于模型什么时候输出结束符，事先无从得知。</p><p>传统的做法是把每个请求的缓存放在一块连续的显存里。连续就要求事先留够空间：</p><ul><li>按最大可能的长度预留：一个最终只生成了 50 个 token 的请求，占着能放 4000 个 token 的空间。vLLM 的论文测量过，这种做法下真正被用上的显存只有两到四成。</li><li>不预留、不够了再换一块更大的：要把已有的缓存整个拷贝过去，而且显存里会留下大大小小的空洞（2.1 讲的碎片）。</li></ul><p><strong class="h">操作系统早就遇到过同样的问题。</strong> 0.3 回顾过虚拟内存：程序以为自己有一大片连续的内存，实际上操作系统把它切成固定大小的页，每一页可以放在物理内存的任何位置，用一张页表记录对应关系。程序用到哪一页，才分配哪一页。</p><figure class="fig"><img src="../assets/figures/paged-attention.svg" alt="和操作系统的虚拟内存是同一个办法" loading="lazy"><figcaption>和操作系统的虚拟内存是同一个办法</figcaption></figure><p><strong class="h">PagedAttention 照搬了这个办法。</strong></p><ul><li>把显存里用于 KV cache 的部分切成固定大小的块，每块能放若干个 token 的 K 和 V（比如 16 个）。</li><li>每个请求有一张“块表”，记录它的第 1 块、第 2 块……分别在显存的哪个位置。这些块不需要相邻。</li><li>请求生成到当前的块写满了，再从空闲的块里拿一个，记进块表。</li><li>请求结束，它所有的块立刻归还，马上可以给别的请求用。</li></ul><p>注意力的 kernel 相应地改成按块表去读 K 和 V，而不是假设它们是连续的。</p><p><strong class="h">得到的好处。</strong></p><ul><li>没有预留的浪费：每个请求最多浪费最后一块里没填满的部分。</li><li>没有外部碎片：所有块一样大，任何一个空闲块都能用。</li><li>于是同样的显存能放下的并发请求多了几倍。上上节说吞吐随并发增长，所以吞吐也跟着上去。论文报告的吞吐提升是 2 到 4 倍。</li></ul><p><strong class="h">顺带得到的能力：共享。</strong> 页表的另一个经典用途是让两个进程共享同一段物理内存。这里也一样：两个请求如果开头相同（同一段系统提示词），它们的块表可以指向同一批物理块，这部分 K、V 只存一份、只算一次。一个请求要生成几个不同的候选时，公共的部分也可以共享，到分叉的地方再各自分配新块（操作系统里叫“写时复制”）。9.3 讲的前缀缓存建立在这个能力上。</p><p><strong class="h">为什么放在这门课里。</strong> 它是“系统的老办法解决 AI 的新问题”的一个漂亮例子。分页、缓存、调度、流水线，这些几十年前为操作系统和体系结构发明的思想，在这门课里一再出现。<mark>操作系统课上学的那些东西，并没有过时</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>像图书馆按需分配阅览座位，而不是给每位读者预留一整排。</p>
+<p class="i-impl">所以同样的显存能装下多得多的并发请求；共享的前缀还能直接复用，省掉重复的 prefill。</p>
+<div class="i-builds">承接 <a href="9-1.html#c-6-1-kv-memory">KV cache 是推理显存的大头</a><a href="0-3.html#c-p0-3-pinned">内存里的数据会被操作系统挪动，交给设备之前要先“钉住”</a><a href="2-1.html#c-p2-1-allocator">PyTorch 自己缓存显存：reserved 是它向驱动要来的，allocated 是张量实际在用的</a></div>
+<div class="i-builds">后面会用到 <a href="9-3.html#c-p9-3-continuous">连续批处理：请求随到随进，做完就走</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM / PagedAttention 论文</a><a class="src" href="https://arxiv.org/abs/2312.07104" target="_blank" rel="noopener">SGLang 论文</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p>推理分 <strong>prefill</strong>（处理提示词，受算力限制）和 <strong>decode</strong>（逐个生成，受显存带宽限制）。decode 时把很多请求<strong>批在一起</strong>，读一遍权重服务一批人，吞吐几乎随并发线性上升。并发的上限由 <strong>KV cache</strong> 的显存决定。<strong>PagedAttention</strong> 像操作系统管理内存那样按块分配它，避免了预留造成的浪费。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>推理的 prefill 和 decode 两个阶段各自在做什么？它们的瓶颈为什么不同？</li><li>为什么把多个请求批在一起做 decode，吞吐几乎随并发线性增长？增长到什么时候会停？</li><li>KV cache 的大小怎么算？为什么说它决定了一张卡能同时服务多少请求？</li><li>PagedAttention 解决了 KV cache 管理中的什么问题？它借用了操作系统的什么思想？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>KV cache</dt><dd>键值缓存</dd></div><div><dt>continuous batching</dt><dd>连续批处理</dd></div><div><dt>prefill</dt><dd>预填充</dd></div><div><dt>decode</dt><dd>解码</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="8-2.html"><small>上一单元</small>8.2 GPU 在集群里：设备、调度与排队</a>
+<a class="next" href="9-2.html"><small>下一单元</small>9.2 量化与低精度</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

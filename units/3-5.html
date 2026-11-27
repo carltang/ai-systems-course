@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3.5 并行模式：归约与扫描 · AI 系统：从深度学习原理到 GPU 与分布式训练</title>
+<meta name="description" content="会写高效的并行归约，理解 scan 这类“看似串行”的计算怎么并行。">
+<meta name="theme-color" content="#f4f1ea">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← 目录</a>
+<span class="unit-steps">
+<a href="3-4.html" title="3.4 CUDA 性能清单" data-step="prev">‹ 3.4</a>
+<a href="3-6.html" title="3.6 stream、异步与 CUDA Graph" data-step="next">3.6 ›</a>
+</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>第 3 部分 · GPU 与 CUDA 执行模型</span>3.5 并行模式：归约与扫描</h1>
+<div class="frame"><div class="frame-q"><span>这一单元回答</span>求和、前缀和这类看似只能一个接一个算的事，怎么并行？</div><div class="frame-c">承接 3.4：用分支发散和合并访存的知识看两个最常用的并行模式；softmax、LayerNorm 和 Flash Attention 都建立在它们之上。</div></div>
+<div class="story"><p>前面的例子都是“每个输出只依赖少量输入”，天然能并行。这一单元看两种看起来必须串行的计算：把一堆数合成一个（归约），和每个位置都依赖前面所有数（前缀和）。线索是：归约可以像淘汰赛那样并行 → 怎么安排线程才不浪费 → 并行改变了计算顺序会带来什么 → 更难的前缀和怎么办 → 并行算法要算两笔账 → 这些为什么对 Transformer 重要。</p></div>
+<ol class="thread"><li><a href="#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></li><li><a href="#c-2-5-compact-threads">让还在干活的线程挨在一起</a></li><li><a href="#c-2-5-float-order">浮点加法不满足结合律：并行求和每次可能差一点</a></li><li><a href="#c-2-5-scan">前缀和看似串行，其实可以“分段各算，再补上前面的总和”</a></li><li><a href="#c-2-5-work-efficiency">并行算法要算两笔账：步数和总工作量</a></li><li><a href="#c-2-5-everywhere">softmax、LayerNorm 里都藏着归约</a></li></ol>
+<div class="essence-head"><h2>讲解</h2></div><ol class="icards">
+<li class="icard" id="c-2-5-tournament"><h3><span class="i-num">1</span>归约就是淘汰赛：n 个数，log n 轮决出结果</h3>
+<p class="i-essence">求和、求最大值这类归约（reduction），串行要做 n−1 步。并行时两两配对、每轮淘汰一半，log₂n 轮就得到结果，总运算量仍是 n−1 次。前提是运算满足结合律，可以随意调整计算顺序。</p>
+<div class="i-detail"><p>归约是指把一组数用某个运算合成一个结果：求和、求最大值、求最小值都是。串行的写法是一个个累加：<code>((((a0 + a1) + a2) + a3) + ...</code>，n 个数要 n−1 步，而且每一步都依赖上一步的结果，看起来没法并行。</p><p>关键的观察是：对加法来说，先算哪两个并不影响结果。于是可以换一种加括号的方式：</p><pre>8 个数：a0 a1 a2 a3 a4 a5 a6 a7
+第 1 轮：(a0+a1) (a2+a3) (a4+a5) (a6+a7)    4 次加法，同时进行
+第 2 轮：(…+…)        (…+…)               2 次加法，同时进行
+第 3 轮：(…+…)                              1 次加法</pre><p>每一轮内部的加法互不依赖，可以同时做；每一轮把数的个数减半，所以 n 个数需要 log₂n 轮。100 万个数，串行要 100 万步，并行只要 20 轮。<mark>总的加法次数没变，还是 n−1 次，只是排列成了一棵树</mark>。</p><figure class="fig"><img src="../assets/figures/reduction-tree.svg" alt="把累加重新加括号，就成了一棵树" loading="lazy"><figcaption>把累加重新加括号，就成了一棵树</figcaption></figure><p>能这样重新加括号，要求运算满足<strong>结合律</strong>：(a+b)+c = a+(b+c)。加法、乘法、最大值、最小值都满足；减法、除法不满足，不能直接这样做。</p></div>
+<p class="i-analogy"><b>打个比方</b>像世界杯淘汰赛：32 支队不用打循环赛，5 轮就能决出冠军。PMPP 讲归约时正是用世界杯赛程举的例子。</p>
+<p class="i-impl">所以 GPU 上的并行归约是“树”状的；越往后活跃的线程越少，怎么安排哪些线程继续干活，决定了效率（见下一张卡）。</p>
+<div class="i-builds">承接 <a href="3-2.html#c-2-2-spmd">只写一个线程的代码，让它跑一百万份</a></div>
+<div class="i-builds">后面会用到 <a href="3-5.html#c-2-5-compact-threads">让还在干活的线程挨在一起</a><a href="3-5.html#c-2-5-float-order">浮点加法不满足结合律：并行求和每次可能差一点</a><a href="3-5.html#c-2-5-scan">前缀和看似串行，其实可以“分段各算，再补上前面的总和”</a><a href="3-5.html#c-2-5-everywhere">softmax、LayerNorm 里都藏着归约</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §10.2</span><span class="src">PMPP §10.2 世界杯的例子</span></div>
+</li>
+<li class="i-lead">淘汰赛每一轮都有一半的“选手”退场。在 GPU 上，退场的是线程。谁退场、谁留下，对性能影响很大。</li>
+<li class="icard" id="c-2-5-compact-threads"><h3><span class="i-num">2</span>让还在干活的线程挨在一起</h3>
+<p class="i-essence">朴素的树形归约让第 0、2、4…号线程继续工作，活跃线程散布在每个 warp 里，几乎每个 warp 都在发散。改成让前一半线程继续工作，活跃线程就集中在少数几个 warp 里，其余的 warp 整个退出。</p>
+<div class="i-detail"><p>最直接的实现是：第 1 轮，偶数号线程把右边邻居的值加到自己身上；第 2 轮，编号是 4 的倍数的线程继续；第 3 轮，8 的倍数……</p><p>看看这对 warp 意味着什么。第 1 轮，每个 warp 里有 16 个线程在工作、16 个闲着；第 2 轮，8 个工作、24 个闲着。活跃的线程均匀地散在所有 warp 里，于是每个 warp 都在发散，都要占着硬件，里面却只有少数线程在做事。</p><p>换一种安排：第 1 轮，前一半线程（0 到 n/2−1）各自加上后一半里对应位置的值；第 2 轮，前四分之一的线程继续……活跃的线程始终是编号最小的那一段，是连续的。</p><p>这样一来，<mark>一个 warp 要么 32 个线程全部在工作，要么全部已经退出</mark>（硬件可以直接跳过它）。只有在最后几轮、活跃线程少于 32 个时才会出现发散。同时，活跃线程访问的地址也是连续的，访存自动合并。</p><p>两个版本做的加法一模一样，只是“第几号线程负责第几对数”的对应关系变了。这是上一单元那句话的实例：减少发散往往靠重新安排数据，而不是改算法。</p></div>
+<p class="i-analogy"><b>打个比方</b>淘汰赛打到后面，与其让晋级的队伍分散在各个球场，不如集中到少数几个球场，其他球场直接关门。</p>
+<p class="i-impl">所以同样的算法，只改“谁继续工作”的下标规则，就能大幅减少分支发散；之后再配合共享内存和线程粗化继续优化。</p>
+<div class="i-builds">承接 <a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a><a href="3-4.html#c-2-4-divergence">分支发散：同一个 warp 走两条路，就要跑两趟</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §10.4</span></div>
+</li>
+<li class="i-lead">前面说加法满足结合律，所以可以随意改变相加的顺序。对整数这完全成立；对浮点数，只是近似成立。</li>
+<li class="icard" id="c-2-5-float-order"><h3><span class="i-num">3</span>浮点加法不满足结合律：并行求和每次可能差一点</h3>
+<p class="i-essence">数学上 (a+b)+c = a+(b+c)，但浮点数每相加一次都要舍入，顺序不同，结果就可能在最后几位不同。并行归约改变了相加的顺序；用原子操作时，顺序还取决于哪个线程先到，每次运行都可能不同。</p>
+<div class="i-detail"><p>浮点数只有有限的有效数字（float 大约 7 位十进制）。每做一次加法，结果都要舍入到这个精度，舍入会丢掉一点信息。</p><p>举个例子，假设只能保留 3 位有效数字，要算 100 + 0.4 + 0.4：</p><ul><li>从左到右：100 + 0.4 = 100.4，舍入成 100；再加 0.4，还是 100。结果是 100。</li><li>先加小数：0.4 + 0.4 = 0.8；100 + 0.8 = 100.8，舍入成 101。结果是 101。</li></ul><p><mark>顺序不同，结果就不同</mark>。真实的浮点数精度高得多，差别出现在最后一两位，但道理一样。</p><p>串行求和是一种顺序，树形归约是另一种顺序，所以两者的结果会有微小差别。这不是 bug，两个结果都是“正确到舍入误差以内”。</p><p>更进一步，有些并行实现的顺序本身是不固定的。比如多个线程用原子操作往同一个变量上累加，谁先加、谁后加取决于运行时的调度，每次运行都可能不同，结果也就每次略有不同。这是 GPU 上训练不能逐位复现的主要来源之一。</p><p>实际影响：验证自己写的 kernel 时，要用误差容限来比较（比如相对误差小于 10⁻⁵），不能要求和参考结果完全相等（见 4.1）。</p></div>
+<p class="i-analogy"><b>打个比方</b>像用一个只能显示三位有效数字的计算器算账：先把零头加在一起再加大数，和先加大数再逐个加零头，结果会不一样。</p>
+<p class="i-impl">所以在 GPU 上同一个训练跑两次，loss 在小数点后几位不同是正常的；需要完全可复现时，要用确定性的归约顺序（PyTorch 的 deterministic 选项），代价通常是更慢。</p>
+<div class="i-builds">承接 <a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></div>
+<div class="i-builds">后面会用到 <a href="4-1.html#c-3-1-verify-first">先写一个对的，再写一个快的</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §10.2</span></div>
+</li>
+<li class="i-lead">归约把一组数合成一个结果。还有一类更难的计算：每个位置都要一个结果，而且每个结果都依赖它前面的所有数。</li>
+<li class="icard" id="c-2-5-scan"><h3><span class="i-num">4</span>前缀和看似串行，其实可以“分段各算，再补上前面的总和”</h3>
+<p class="i-essence">前缀和（scan）里每个位置的结果都依赖它前面的所有元素，看起来只能顺序算。分层的做法是：每个 block 先算自己那一段的前缀和，再对各段的总和做一次前缀和，最后把“前面所有段的总和”加回每一段。</p>
+<div class="i-detail"><p>前缀和（scan）的定义：输入 <code>[3, 1, 7, 0, 4, 1, 6, 3]</code>，输出 <code>[3, 4, 11, 11, 15, 16, 22, 25]</code>，第 i 个输出是前 i 个数的和。串行算法只要一行：<code>out[i] = out[i-1] + in[i]</code>，每一步都用到上一步的结果，依赖关系是一条长链。</p><p><mark>打破这条链的办法是分段</mark>。把上面 8 个数分成两段 <code>[3, 1, 7, 0]</code> 和 <code>[4, 1, 6, 3]</code>：</p><ul><li>第一步：两段各自独立地算前缀和，得到 <code>[3, 4, 11, 11]</code> 和 <code>[4, 5, 11, 14]</code>。两段互不依赖，可以同时算。</li><li>第二步：第二段的结果还差“第一段的总和”。第一段的总和是 11，给第二段每个数加上 11，得到 <code>[15, 16, 22, 25]</code>。这一步每个位置也互不依赖，可以同时算。</li></ul><p>段数很多时，“每一段前面所有段的总和”本身又是一个前缀和（对各段总和做的前缀和），可以用同样的办法再做一层。在 GPU 上，一段就是一个 block 处理的数据。</p><p>前缀和的用处比看起来大得多。比如从 100 万个元素里挑出满足条件的那些、紧凑地排在一起：先给每个元素标 1 或 0，对这些标记做前缀和，结果正好是每个被选中的元素在输出里的位置。排序、稀疏矩阵、内存分配，背后都是它。</p></div>
+<p class="i-analogy"><b>打个比方</b>像几个收银台同时清点各自的流水，最后只要知道排在前面的收银台各收了多少，就能算出全店每一笔的累计金额。</p>
+<p class="i-impl">所以“依赖前面所有结果”的计算也能并行，代价是多走几轮。这个思路在 GPU 上反复出现：并行基数排序、流压缩（stream compaction）都建立在 scan 上。</p>
+<div class="i-builds">承接 <a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></div>
+<div class="i-builds">后面会用到 <a href="3-5.html#c-2-5-work-efficiency">并行算法要算两笔账：步数和总工作量</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §11.6</span></div>
+</li>
+<li class="i-lead">段内的前缀和怎么并行？有不止一种算法，它们快慢不同，“浪费”的程度也不同。这引出了评价并行算法的两个指标。</li>
+<li class="icard" id="c-2-5-work-efficiency"><h3><span class="i-num">5</span>并行算法要算两笔账：步数和总工作量</h3>
+<p class="i-essence">Kogge-Stone scan 步数少（log n 步），但总加法次数约 n log n；Brent-Kung 的步数多一倍左右，但总工作量只有 O(n)，和串行算法同一个量级。</p>
+<div class="i-detail"><p>评价一个并行算法要看两个数：</p><ul><li><strong>步数</strong>：假设处理器无限多，需要多少轮。它决定了理想情况下有多快。</li><li><strong>总工作量</strong>：所有轮次加起来，一共做了多少次运算。它决定了要消耗多少计算资源。</li></ul><p>Kogge-Stone 算法：每一轮，每个位置都把“距离自己 1、2、4、8……格”的那个位置的值加过来。log₂n 轮后全部完成，步数最少。但每一轮几乎所有位置都在做加法，总工作量约为 n·log₂n。n = 1024 时，大约一万次加法，而串行算法只要 1023 次。</p><p>Brent-Kung 算法：先像归约那样自底向上算一棵树（n−1 次加法），再自顶向下把结果分发下去。步数大约是 2·log₂n，多了一倍；但总工作量只有约 2n，和串行算法是同一个量级。这样的算法称为 work-efficient。</p><p>怎么选？如果数据量小、GPU 有大量空闲的运算单元，多做的工作不花时间，步数少的 Kogge-Stone 更快。如果数据量很大、GPU 已经满负荷，多出来的 10 倍工作量是实打实要排队执行的，这时 Brent-Kung 更好。</p><p>这也回应了 3.4 的线程粗化：并行不是免费的，<mark>资源有限时，“少做无用功”和“减少步数”同样重要</mark>。</p></div>
+<p class="i-analogy"><b>打个比方</b>人手充足时，可以“大家多干点、早点收工”；人手有限时，多出来的活只能排队，反而更慢。</p>
+<p class="i-impl">所以数据量小、GPU 有空闲时，步数少的算法更快；数据量远大于线程数、硬件已经跑满时，工作量少的（work-efficient）算法更好。</p>
+<div class="i-builds">承接 <a href="3-5.html#c-2-5-scan">前缀和看似串行，其实可以“分段各算，再补上前面的总和”</a></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">PMPP §11.3</span><span class="src">PMPP §11.4</span></div>
+</li>
+<li class="i-lead">最后把这一单元和课程的主线接上：这些并行模式和 Transformer 有什么关系？</li>
+<li class="icard" id="c-2-5-everywhere"><h3><span class="i-num">6</span>softmax、LayerNorm 里都藏着归约</h3>
+<p class="i-essence">softmax 要先求一行的最大值（为了数值稳定），再求指数和，这是两次归约；LayerNorm 要求均值和方差，也是归约。Transformer 里很多看起来“逐元素”的算子，瓶颈其实是行内的归约和对显存的反复读写。</p>
+<div class="i-detail"><p>看 softmax 的计算过程。对一行数 x：</p><ul><li>先求这一行的最大值 m（一次归约）。减去最大值是为了数值稳定，避免指数运算溢出。</li><li>对每个元素算 exp(x − m)（逐元素）。</li><li>把这些指数加起来得到 s（又一次归约）。</li><li>每个元素除以 s（逐元素）。</li></ul><p>两次归约、两次逐元素运算，朴素实现要把这一行数据从显存读四遍。LayerNorm 类似：求均值是一次归约，求方差又是一次，然后逐元素做归一化。</p><p>这些算子的运算量很小，算术强度很低，是典型的带宽受限（3.3）。所以<mark>优化它们的关键不是把加法做快，而是减少遍历数据的次数</mark>：能不能在一次遍历里同时得到最大值和指数和？</p><p>可以。办法是边读边维护“到目前为止的最大值”和“到目前为止的指数和”，遇到更大的值时把之前的和修正一下。这叫 online softmax。它让 softmax 不再需要先看完整行，于是注意力可以分块计算，中间结果不必写回显存。这正是 Flash Attention（4.4）的核心。</p></div>
+<p class="i-analogy"><b>打个比方</b>像给全班的成绩“按最高分折算”：看起来是给每个人各算一个数，其实先得把全班的卷子翻一遍找出最高分，再翻一遍求总和。费时间的是这两遍翻卷子，不是最后那一下除法。</p>
+<p class="i-impl">所以写好归约是写好 Transformer 算子的基础；把多次归约合并成一遍扫描（online softmax），正是 Flash Attention（4.4）的关键一步。</p>
+<div class="i-builds">承接 <a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></div>
+<div class="i-builds">后面会用到 <a href="4-4.html#c-3-3-online-softmax">在线 softmax：不必看完整行，也能算对</a></div>
+</li>
+</ol>
+<div class="recap"><h3>串起来</h3><p><strong class="h">因为</strong>加法满足结合律，求和可以两两配对、log n 轮完成；<strong>但</strong>浮点加法并不严格满足结合律，所以结果会有微小差别；<strong>前缀和</strong>用“分段各算、再补上前面的总和”也能并行；<strong>评价</strong>一个并行算法要同时看步数和总工作量。softmax 和 LayerNorm 的核心就是归约，这是通向 Flash Attention 的台阶。</p></div>
+<div class="selftest"><h3>考考自己</h3><p class="hint">不看讲解，用自己的话讲一遍。</p><ol><li>并行归约为什么只需要 log n 轮？它对运算有什么要求？</li><li>树形归约里，为什么让“前一半线程”继续工作比让“偶数号线程”继续工作要好？</li><li>为什么并行求和的结果可能和串行求和不完全一样？</li><li>前缀和每个位置都依赖前面所有元素，为什么还能并行？</li><li>Kogge-Stone 和 Brent-Kung 两种 scan 算法各自的特点是什么？什么时候该选哪个？</li><li>softmax 和 LayerNorm 里各有哪些归约？这对优化它们意味着什么？</li></ol></div>
+<div class="terms"><h3>术语</h3><dl><div><dt>reduction</dt><dd>归约</dd></div><div><dt>prefix sum</dt><dd>前缀和（scan）</dd></div><div><dt>atomic operation</dt><dd>原子操作</dd></div></dl></div>
+</section><nav class="unit-pager">
+<a href="3-4.html"><small>上一单元</small>3.4 CUDA 性能清单</a>
+<a class="next" href="3-6.html"><small>下一单元</small>3.6 stream、异步与 CUDA Graph</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a></footer>
+<script src="../assets/reading.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>
