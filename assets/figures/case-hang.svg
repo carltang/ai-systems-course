@@ -53,4 +53,5 @@
   <text x="695.0" y="157.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">8 个进程</text>
   <text x="24" y="196" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">其余 127 个进程都停在下一次 all-reduce 上等它，永远等不到</text>
   <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">它们不报错：从它们的角度看，只是对方还没准备好。所以作业显示“运行中”，利用率是 0</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

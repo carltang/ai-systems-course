@@ -19,4 +19,5 @@
   <text x="720.5217391304348" y="128" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">优化器</text>
   <text x="720.5217391304348" y="145" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">10 ms</text>
   <text x="24" y="172" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">先看最大的一段和不该有的一段：这里是反向传播，和占了五分之一的等数据</text>
+  <text x="746" y="181" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

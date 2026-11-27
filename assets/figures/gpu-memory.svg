@@ -15,4 +15,5 @@
   <rect x="24" y="204" width="712" height="40" rx="8" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
   <text x="40" y="229" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">显存</text>
   <text x="124" y="229" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">几十 GB；在芯片外，每次访问要等几百个周期</text>
+  <text x="746" y="253" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

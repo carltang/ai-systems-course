@@ -7,7 +7,7 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; font-family: var(--font); font-size: 15px; line-height: 1.6; color: var(--text); background: #f4f1ea; }
 a { color: var(--accent); }
 .main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 8px; }
-.foot { text-align: center; font-size: 13px; color: #8b909a; padding: 26px 16px 40px; }
+.foot { text-align: center; font-size: 13px; line-height: 2; color: #8b909a; padding: 26px 16px 40px; }
 .foot a { color: #8b909a; }
 .item-page { margin: 0 auto; }
 .unit-nav { display: flex; align-items: center; gap: 12px; max-width: 800px; margin: 0 auto 4px; padding: 6px 0; }
@@ -48,6 +48,7 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .unit-pager small { display: block; font-size: 12px; font-weight: 400; color: #8b909a; }
 .cover, .part { max-width: 860px; margin: 0 auto 18px; background: #fff; border: 1px solid #ebe7de; border-radius: 16px; padding: 40px 52px; }
 .cover h1 { font-family: var(--serif); font-size: 2rem; line-height: 1.4; margin: 6px 0 16px; color: #2b303b; }
+.byline { margin: -6px 0 16px; font-size: 14px; letter-spacing: .06em; color: #8b909a; }
 .eyebrow { margin: 0; font-size: 12.5px; letter-spacing: .14em; color: #a98a55; }
 .intro { font-size: 17px; line-height: 1.95; color: #4a505c; margin: 0; }
 .how { font-size: 14.5px; line-height: 1.9; color: #6b7280; margin: 0; }

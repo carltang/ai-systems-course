@@ -13,4 +13,5 @@
   <rect x="150" y="148" width="32" height="32" rx="7" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
   <text x="194" y="169" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">约 50 GB/s</text>
   <text x="24" y="204" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">机内和跨机差一个量级：通信最频繁的并行方式必须留在机内</text>
+  <text x="746" y="211" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

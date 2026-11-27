@@ -5,3 +5,5 @@
 这是这门课的静态网页版：45 个单元的讲解和配图，只读，可离线阅读。打开 `index.html` 即可；放到 GitHub Pages 之类的静态托管上就能用链接访问。
 
 页面由课程的源文件生成，不要直接改这里的 HTML；来历和需要留心的地方见 `about.html`。
+
+© 2026 Zongyao Tang。以 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 许可分享：须署名、不得商用、改编后以同样的许可分享。

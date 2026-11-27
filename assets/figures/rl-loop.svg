@@ -14,4 +14,5 @@
   <text x="380" y="212" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">新的状态 s′ 和奖励 r</text>
   <text x="380" y="130" font-size="12" fill="#9aa0aa" font-weight="400" text-anchor="middle" letter-spacing=".02em">反复很多次</text>
   <text x="380" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">目标：让整个过程累积的奖励尽量多，而不是某一步的奖励</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

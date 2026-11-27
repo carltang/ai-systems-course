@@ -27,4 +27,5 @@
   <line x1="542" y1="124" x2="598" y2="162" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="156" y1="226" x2="598" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="380" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">所有位置同时这样做：分数是一个 N×N 的矩阵</text>
+  <text x="746" y="259" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

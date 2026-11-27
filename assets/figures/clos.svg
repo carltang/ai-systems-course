@@ -73,4 +73,5 @@
   <text x="24" y="28" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">上层交换机：每台都和每一台下层相连</text>
   <text x="24" y="268" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">蓝色的两台服务器之间有 4 条等价路径（上层有几台，就有几条）</text>
   <text x="24" y="288" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">下层向上的总带宽等于向下的总带宽时，所有服务器同时全速发也装得下</text>
+  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

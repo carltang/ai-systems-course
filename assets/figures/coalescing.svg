@@ -111,4 +111,5 @@
   <text x="736.5" y="174.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
   <rect x="668" y="190" width="77" height="6" rx="3" fill="#dc97a3"/>
   <text x="24" y="226" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每次取回一大段，只用其中 4 个字节（蓝色），其余丢掉：有效带宽只剩几十分之一</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>

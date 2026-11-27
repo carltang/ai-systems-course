@@ -23,4 +23,5 @@
   <rect x="618" y="148" width="118" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="677.0" y="173.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">下一次前向</text>
   <text x="24" y="216" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">通信总量一样；换来的是每张卡不必存全部的梯度和优化器状态</text>
+  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
 </svg>
