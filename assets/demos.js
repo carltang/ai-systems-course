@@ -1206,6 +1206,593 @@
         p.loop(tick);
     };
 
+    /* ── 7.3 · Tensor parallelism, computed with real numbers ──────────────────────────────
+     * y = gelu(x·A)·B with x of 4, a hidden layer of 8, an output of 4. Megatron: A by columns,
+     * B by rows, the partial outputs summed once at the end; the sum must equal the unsplit y.
+     * Splitting A by rows instead gives partial pre-activations, and gelu of a part is not part
+     * of gelu, so the sum is wrong unless the cards talk before the activation. */
+    registry['tensor-parallel'] = function (figure) {
+        var p = new Panel(figure, { title: '张量并行：把 MLP 切到几张卡上', note: '用一组真实的小数字算一遍：各卡的结果加起来，要和不切时完全一样', ratio: 0.6, minHeight: 360 });
+        p.toggle('n', [[1, '1 张卡'], [2, '2 张'], [4, '4 张']], 2, restart);
+        p.toggle('how', [['col', 'A 按列切，B 按行切'], ['row', '反过来：A 按行切']], 'col', restart);
+        p.button('重放', function () { restart(); }, 'ghost');
+        p.readout('comm', '这个 MLP 要通信', 'peers');
+        p.readout('match', '各卡相加 vs 不切', 'ink');
+        p.readout('store', '每张卡存的权重', 'ink');
+        var PAL = [C.compute, C.peers, C.data, C.launch], clock = 0, CYCLE = 7.5;
+        function restart() { clock = 0; p.kick && p.kick(); }
+        var seed = 3;
+        function r() { seed = (seed * 16807) % 2147483647; return Math.round(((seed / 2147483647) * 2 - 1) * 10) / 10; }
+        var x = [0.8, -0.5, 0.3, 1.0], A = [], B = [], i, j;
+        for (i = 0; i < 4; i++) { A.push([]); for (j = 0; j < 8; j++) A[i].push(r()); }
+        for (i = 0; i < 8; i++) { B.push([]); for (j = 0; j < 4; j++) B[i].push(r()); }
+        function gelu(z) { return 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z * z * z))); }
+        function solve() {
+            var N = p.values.n, col = p.values.how === 'col', cards = [], k, a, b, c;
+            var z = [], ref = [0, 0, 0, 0];
+            for (b = 0; b < 8; b++) { z[b] = 0; for (a = 0; a < 4; a++) z[b] += x[a] * A[a][b]; }
+            for (c = 0; c < 4; c++) for (b = 0; b < 8; b++) ref[c] += gelu(z[b]) * B[b][c];
+            for (k = 0; k < N; k++) {
+                var card = { hidden: [], idx: [], part: [0, 0, 0, 0] };
+                if (col) {                                   // my columns of A, my rows of B
+                    for (b = k * 8 / N; b < (k + 1) * 8 / N; b++) {
+                        var zz = 0; for (a = 0; a < 4; a++) zz += x[a] * A[a][b];
+                        card.idx.push(b); card.hidden.push(gelu(zz));
+                        for (c = 0; c < 4; c++) card.part[c] += gelu(zz) * B[b][c];
+                    }
+                } else {                                     // my rows of A: a partial sum of every hidden unit
+                    for (b = 0; b < 8; b++) {
+                        var pz = 0; for (a = k * 4 / N; a < (k + 1) * 4 / N; a++) pz += x[a] * A[a][b];
+                        card.idx.push(b); card.hidden.push(gelu(pz));
+                        for (c = 0; c < 4; c++) card.part[c] += gelu(pz) * B[b][c];
+                    }
+                }
+                cards.push(card);
+            }
+            var sum = [0, 0, 0, 0];
+            cards.forEach(function (cd) { for (c = 0; c < 4; c++) sum[c] += cd.part[c]; });
+            var err = 0; for (c = 0; c < 4; c++) err = Math.max(err, Math.abs(sum[c] - ref[c]));
+            return { cards: cards, sum: sum, ref: ref, err: err };
+        }
+        function tick(dt) { clock = (clock + dt) % CYCLE; }
+        function num(v) { return (v >= 0 ? '' : '−') + Math.abs(v).toFixed(2); }
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, narrow = w < 560, S = solve(), N = p.values.n, col = p.values.how === 'col';
+            var pad = 14, L = narrow ? 46 : 64, cw = narrow ? Math.min(36, (w - L - pad) / 8) : Math.min(48, (w - L - pad - 40 - 4 * 52) / 8);
+            var ow = narrow ? Math.min(52, (w - L - pad) / 4) : 52, rowH = narrow ? 64 : 40, top = 86;
+            var cardsH = N * rowH + (N - 1) * 8, sumY = top + cardsH + (narrow ? 44 : 34), rowGap = narrow ? 46 : 34;
+            p.fit(sumY + 2 * rowGap + 30);
+            ctx = p.ctx; var h = p.h;
+            p.clear();
+            var phase = still ? 9 : clock / CYCLE * 6;            // 0 inputs, 1 hidden, 2 gelu, 3 partial, 4 sum, 5 compare
+            text(ctx, '输入 x（每张卡都有一份）', pad, 22, { size: 11.5, color: C.soft });
+            for (i = 0; i < 4; i++) {
+                round(ctx, pad + i * 50, 30, 46, 20, 4); ctx.fillStyle = alpha(C.ink, 0.1); ctx.fill();
+                text(ctx, num(x[i]), pad + i * 50 + 23, 44, { size: 11, mono: true, align: 'center', color: col || N === 1 ? C.ink : C.soft });
+            }
+            if (!col && N > 1 && !narrow) text(ctx, '（A 按行切时，每张卡只用 x 的 ' + 4 / N + ' 个分量）', pad + 210, 44, { size: 11, color: C.dim });
+            var hx = L, ox = narrow ? L : L + 8 * cw + 40;
+            S.cards.forEach(function (cd, k) {
+                var y = top + k * (rowH + 8), tone = PAL[k];
+                text(ctx, '卡 ' + (k + 1), L - 10, y + 15, { size: 11.5, weight: 600, align: 'right', color: tone });
+                cd.hidden.forEach(function (v, m) {
+                    var slot = col ? cd.idx[m] : m, cx = hx + slot * cw;
+                    var on = phase > 1 + k * 0.15, act = phase > 2;
+                    round(ctx, cx + 1, y + 2, cw - 2, 22, 4);
+                    ctx.fillStyle = on ? alpha(tone, act ? 0.85 : 0.4) : alpha(C.faint, 0.6); ctx.fill();
+                    if (on && cw > 28) text(ctx, num(v), cx + cw / 2, y + 17, { size: narrow ? 9.5 : 10.5, mono: true, align: 'center', color: act ? C.panel : C.ink });
+                });
+                if (col && N > 1) for (var e = 0; e < 8; e++) if (cd.idx.indexOf(e) < 0) { round(ctx, hx + e * cw + 1, y + 2, cw - 2, 22, 4); ctx.strokeStyle = alpha(C.faint, 0.8); ctx.lineWidth = 1; ctx.stroke(); }
+                var py = narrow ? y + 32 : y + 2, onP = phase > 3 + k * 0.1;
+                if (!narrow) text(ctx, '→', ox - 22, py + 16, { size: 13, color: C.dim });
+                for (var c = 0; c < 4; c++) {
+                    round(ctx, ox + c * ow + 1, py, ow - 4, 22, 4);
+                    ctx.fillStyle = onP ? alpha(tone, 0.25) : alpha(C.faint, 0.5); ctx.fill();
+                    if (onP) { ctx.strokeStyle = alpha(tone, 0.8); ctx.lineWidth = 1; ctx.stroke(); text(ctx, num(cd.part[c]), ox + c * ow + (ow - 4) / 2 + 1, py + 15, { size: 10.5, mono: true, align: 'center', color: C.ink }); }
+                }
+            });
+            text(ctx, col || N === 1 ? '激活后的中间层（各卡只算自己那几列）' : '激活后的中间层（各卡算的是“部分和”的激活）', hx, top - 8, { size: 11, color: C.dim });
+            if (!narrow) text(ctx, '这张卡对输出的贡献', ox, top - 8, { size: 11, color: C.dim });
+            // all-reduce: the partial outputs travel down and add up
+            if (phase > 4 && phase < 5 && !still && N > 1) {
+                var f = phase - 4;
+                S.cards.forEach(function (cd, k) {
+                    var y0 = (narrow ? top + k * (rowH + 8) + 32 : top + k * (rowH + 8) + 2) + 11;
+                    for (var c = 0; c < 4; c++) {
+                        var px = ox + c * ow + ow / 2 - 2, yy = y0 + (sumY + 11 - y0) * f;
+                        ctx.save(); ctx.shadowColor = PAL[k]; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(px, yy, 3, 0, Math.PI * 2); ctx.fillStyle = PAL[k]; ctx.fill(); ctx.restore();
+                    }
+                });
+            }
+            var rows = [['相加（all-reduce）', S.sum, phase > 5 || still], ['不切时的结果', S.ref, phase > 5 || still]];
+            rows.forEach(function (row, rI) {
+                var y = sumY + rI * rowGap;
+                if (narrow) text(ctx, row[0], ox, y - 6, { size: 11.5, weight: 600, color: rI ? C.soft : C.peers });
+                else text(ctx, row[0], ox - 10, y + 15, { size: 11.5, align: 'right', weight: 600, color: rI ? C.soft : C.peers });
+                for (var c = 0; c < 4; c++) {
+                    var ok = Math.abs(S.sum[c] - S.ref[c]) < 1e-9;
+                    round(ctx, ox + c * ow + 1, y, ow - 4, 22, 4);
+                    ctx.fillStyle = row[2] ? (rI ? alpha(C.ink, 0.12) : alpha(ok ? C.peers : C.alert, 0.3)) : alpha(C.faint, 0.5); ctx.fill();
+                    if (row[2]) text(ctx, num(row[1][c]), ox + c * ow + (ow - 4) / 2 + 1, y + 15, { size: 10.5, mono: true, align: 'center', color: C.ink });
+                }
+            });
+            if (phase > 5 || still) {
+                var good = S.err < 1e-9;
+                text(ctx, good ? '✓ 一模一样' : (narrow ? '✗ 对不上：激活作用在了部分和上' : '✗ 对不上：激活函数作用在了部分和上，加起来就不是原来的结果'), narrow ? L : ox - 260, sumY + 2 * rowGap + 10, { size: 12, weight: 600, color: good ? C.peers : C.alert });
+            }
+            p.set('comm', N === 1 ? '不需要' : col ? '1 次（最后相加）' : '激活前还要多一次', N === 1 || col ? 'peers' : 'alert');
+            p.set('match', S.err < 1e-9 ? '完全一致' : '差 ' + S.err.toFixed(2), S.err < 1e-9 ? 'peers' : 'alert');
+            p.set('store', N === 1 ? 'A、B 全部' : col ? 'A ' + 8 / N + ' 列 + B ' + 8 / N + ' 行' : 'A ' + 4 / N + ' 行 + 整个 B');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 4.2 · Fusion ──────────────────────────────────────────────────────────────────────
+     * Lesson: y = gelu(x·w + b) is 8n memory accesses as three kernels and 4n fused; a chain of k
+     * operators saves 2(k−1)n. Element-wise work is bandwidth-bound, so time follows accesses. */
+    registry.fusion = function (figure) {
+        var p = new Panel(figure, { title: '算子融合：中间结果不落地', note: '逐元素运算受带宽限制，时间约和显存访问量成正比；动画的快慢就按访问量来', ratio: 0.5, minHeight: 320 });
+        var OPS = [['×', 'w'], ['+', 'b'], ['gelu', ''], ['×', 's'], ['+', 'c'], ['tanh', '']], UNIT = 0.32, LAUNCH = 0.35;
+        p.slider('k', '链上的算子个数', 1, 6, 1, 3, function (v) { return v + ' 个'; }, restart, 'compute');
+        p.toggle('fused', [[false, '分开执行（每个算子一个 kernel）'], [true, '融合成一个 kernel']], false, restart);
+        p.readout('sep', '分开：显存访问', 'alert');
+        p.readout('fus', '融合：显存访问', 'peers');
+        p.readout('kern', 'kernel 启动', 'launch');
+        p.readout('tmp', '临时张量', 'ink');
+        var clock = 0, plan;
+        function restart() { clock = 0; plan = null; p.kick && p.kick(); }
+        function formula(k) {
+            var e = 'x', plus = false;
+            for (var i = 0; i < k; i++) {
+                var o = OPS[i];
+                if (!o[1]) { e = o[0] + '(' + e + ')'; plus = false; }
+                else if (o[0] === '×') { e = (plus ? '(' + e + ')' : e) + ' × ' + o[1]; plus = false; }
+                else { e = e + ' + ' + o[1]; plus = true; }
+            }
+            return 'y = ' + e;
+        }
+        function counts(k) {
+            var extra = 0; for (var i = 0; i < k; i++) if (OPS[i][1]) extra++;
+            return { sep: (1 + extra + (k - 1)) + k, fus: 1 + extra + 1, extra: extra };   // reads + writes, in units of n
+        }
+        function build() {
+            var k = p.values.k, fused = p.values.fused, tensors = [{ name: 'x', kind: 'in' }], ev = [], t = 0, i;
+            for (i = 0; i < k; i++) if (OPS[i][1]) tensors.push({ name: OPS[i][1], kind: 'in' });
+            if (!fused) for (i = 1; i < k; i++) tensors.push({ name: 't' + i, kind: 'tmp', made: i - 1 });
+            tensors.push({ name: 'y', kind: 'out' });
+            function idx(name) { for (var q = 0; q < tensors.length; q++) if (tensors[q].name === name) return q; }
+            if (fused) {
+                t += LAUNCH;
+                var reads = ['x']; for (i = 0; i < k; i++) if (OPS[i][1]) reads.push(OPS[i][1]);
+                reads.forEach(function (nm) { ev.push({ kind: 'read', tensor: idx(nm), kernel: 0, t0: t, t1: t + UNIT }); t += UNIT; });
+                ev.push({ kind: 'write', tensor: idx('y'), kernel: 0, t0: t, t1: t + UNIT }); t += UNIT;
+            } else {
+                for (i = 0; i < k; i++) {
+                    t += LAUNCH;
+                    var src = i ? 't' + i : 'x', dst = i === k - 1 ? 'y' : 't' + (i + 1), rs = [src];
+                    if (OPS[i][1]) rs.push(OPS[i][1]);
+                    rs.forEach(function (nm) { ev.push({ kind: 'read', tensor: idx(nm), kernel: i, t0: t, t1: t + UNIT }); t += UNIT; });
+                    ev.push({ kind: 'write', tensor: idx(dst), kernel: i, t0: t, t1: t + UNIT }); t += UNIT;
+                }
+            }
+            var c = counts(k), sepT = k * LAUNCH + c.sep * UNIT;
+            return { tensors: tensors, ev: ev, end: t, sepEnd: sepT, kernels: fused ? 1 : k };
+        }
+        function tick(dt) { if (!plan) plan = build(); clock += dt; if (clock > plan.end + 1.6) clock = 0; }
+        p.draw = function () {
+            if (!plan) plan = build();
+            var w = p.w, narrow = w < 560, k = p.values.k, fused = p.values.fused, now = still ? 1e9 : clock;
+            var pad = 16, memY = 58, kerY = narrow ? 150 : 164;
+            p.fit(kerY + 62 + 2 * 24 + 18);
+            var ctx = p.ctx;
+            p.clear();
+            var  bw = Math.min(64, (w - pad * 2) / plan.tensors.length - 10), gap = (w - pad * 2 - bw * plan.tensors.length) / Math.max(1, plan.tensors.length - 1);
+            text(ctx, formula(k), pad, 24, { size: 13, mono: true, weight: 500, color: C.ink });
+            text(ctx, '显存', w - pad, 24, { size: 11.5, align: 'right', color: C.data });
+            ctx.fillStyle = alpha(C.data, 0.06); ctx.fillRect(0, memY - 14, w, 50);
+            ctx.fillStyle = alpha(C.compute, 0.06); ctx.fillRect(0, kerY - 14, w, 62);
+            text(ctx, '芯片上：寄存器', w - pad, kerY - 20, { size: 11.5, align: 'right', color: C.compute });
+            var tx = function (q) { return pad + q * (bw + gap); };
+            plan.tensors.forEach(function (tn, q) {
+                var written = tn.kind === 'in' || plan.ev.some(function (e) { return e.kind === 'write' && e.tensor === q && now >= e.t1; });
+                var col = tn.kind === 'in' ? C.data : tn.kind === 'tmp' ? C.alert : C.peers;
+                round(ctx, tx(q), memY - 4, bw, 24, 5);
+                ctx.fillStyle = written ? alpha(col, tn.kind === 'tmp' ? 0.35 : 0.8) : alpha(C.faint, 0.4); ctx.fill();
+                if (tn.kind === 'tmp') { ctx.setLineDash([3, 3]); ctx.strokeStyle = alpha(C.alert, 0.8); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
+                text(ctx, tn.name, tx(q) + bw / 2, memY + 12, { size: 12, mono: true, weight: 600, align: 'center', color: written ? (tn.kind === 'tmp' ? C.ink : C.panel) : C.dim });
+            });
+            var kw = fused ? Math.min(w - pad * 2, 320) : Math.min(90, (w - pad * 2) / k - 8), kgap = fused ? 0 : (w - pad * 2 - kw * k) / Math.max(1, k - 1);
+            var kx = function (i) { return fused ? (w - kw) / 2 : pad + i * (kw + kgap); };
+            for (var i = 0; i < plan.kernels; i++) {
+                var active = plan.ev.some(function (e) { return e.kernel === i && now >= e.t0 && now < e.t1; });
+                round(ctx, kx(i), kerY, kw, 34, 8);
+                ctx.fillStyle = alpha(C.compute, active ? 0.4 : 0.14); ctx.fill();
+                ctx.strokeStyle = alpha(C.compute, active ? 1 : 0.5); ctx.lineWidth = 1.2; ctx.stroke();
+                var label = fused ? OPS.slice(0, k).map(function (o) { return o[1] ? o[0] + ' ' + o[1] : o[0]; }).join(' → ') : (OPS[i][1] ? OPS[i][0] + ' ' + OPS[i][1] : OPS[i][0]);
+                text(ctx, label, kx(i) + kw / 2, kerY + 21, { size: fused && k > 4 && narrow ? 10 : 11.5, mono: true, align: 'center', color: C.ink });
+            }
+            // the bytes in flight
+            plan.ev.forEach(function (e) {
+                if (now < e.t0 || now >= e.t1) return;
+                var f = (now - e.t0) / (e.t1 - e.t0), ax = tx(e.tensor) + bw / 2, ay = memY + 20, bx = kx(e.kernel) + kw / 2, by = kerY;
+                if (e.kind === 'write') { var sx = ax, sy = ay; ax = bx; ay = by; bx = sx; by = sy; }
+                ctx.strokeStyle = alpha(e.kind === 'read' ? C.data : C.peers, 0.35); ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+                for (var d = 0; d < 4; d++) {
+                    var g = (f + d / 4) % 1, px = ax + (bx - ax) * g, py = ay + (by - ay) * g;
+                    ctx.save(); if (!still) { ctx.shadowColor = C.data; ctx.shadowBlur = 8; }
+                    ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fillStyle = e.kind === 'read' ? C.data : C.peers; ctx.fill(); ctx.restore();
+                }
+            });
+            // a running count, and the two totals as bars on one time scale
+            var done = 0; plan.ev.forEach(function (e) { if (now >= e.t1) done++; });
+            var c = counts(k), by0 = kerY + 62, barL = narrow ? 60 : 96, barW = w - pad - barL - 86, sc = barW / plan.sepEnd;
+            [['分开', k * LAUNCH + c.sep * UNIT, c.sep, C.alert, !fused], ['融合', LAUNCH + c.fus * UNIT, c.fus, C.peers, fused]].forEach(function (b, n) {
+                var y = by0 + n * 24;
+                text(ctx, b[0], barL - 10, y + 12, { size: 11.5, align: 'right', color: b[4] ? C.ink : C.dim });
+                round(ctx, barL, y + 2, b[1] * sc, 12, 4); ctx.fillStyle = alpha(b[3], b[4] ? 0.9 : 0.3); ctx.fill();
+                text(ctx, b[2] + 'n 次访问', barL + b[1] * sc + 8, y + 12, { size: 11, mono: true, color: b[4] ? C.ink : C.dim });
+                if (b[4] && !still) { var cx = barL + Math.min(now, plan.end) * sc; ctx.fillStyle = C.ink; ctx.fillRect(cx - 1, y, 2, 16); }
+            });
+            p.set('sep', c.sep + 'n', 'alert');
+            p.set('fus', c.fus + 'n（省掉 ' + (c.sep - c.fus) + 'n）', 'peers');
+            p.set('kern', fused ? '1 次' : k + ' 次');
+            p.set('tmp', fused ? '0 个' : (k - 1) + ' 个');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 9.1 · PagedAttention ──────────────────────────────────────────────────────────────
+     * The same stream of requests on both sides. Left: each request reserves room for the
+     * longest possible answer in one contiguous stretch. Right: blocks of 16 tokens, taken one
+     * at a time as a request grows, from anywhere; freed the moment it ends. When blocks run out,
+     * the request that came in last steps aside and starts again later (as vLLM does). */
+    registry['paged-attention'] = function (figure) {
+        var p = new Panel(figure, { title: '按最大长度预留 vs 分页（PagedAttention）', note: '同一串请求喂给两边；一格是一个块，放 16 个 token；请求长度是示意', ratio: 0.55, minHeight: 330 });
+        var BLOCKS = 96, PER = 16, MAXB = 16, COLS = 12, sims, acc, stats;
+        p.button('重来', function () { reset(); }, 'ghost');
+        p.readout('cc', '预留：平均同时在跑', 'alert');
+        p.readout('pc', '分页：平均同时在跑', 'peers');
+        p.readout('cu', '预留：显存平均用上', 'alert');
+        p.readout('pu', '分页：显存平均用上', 'peers');
+        function rng(seed) { return function () { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
+        function lengthFrom(r) { return r() < 0.25 ? Math.round(160 + r() * (MAXB * PER - 160)) : Math.round(8 + r() * 140); }
+        function reset() {
+            var shuffle = rng(99), order = [];
+            for (var b = 0; b < BLOCKS; b++) order.push(b);
+            for (b = BLOCKS - 1; b > 0; b--) { var j = Math.floor(shuffle() * (b + 1)), t = order[b]; order[b] = order[j]; order[j] = t; }
+            function make() {
+                return [{ kind: 'contig', r: rng(5), act: [], next: 0, sumU: 0, sumC: 0, steps: 0 },
+                        { kind: 'paged', r: rng(5), act: [], queue: [], free: order.slice(), next: 0, sumU: 0, sumC: 0, steps: 0 }];
+            }
+            sims = make(); acc = 0;
+            for (var s = 0; s < 160; s++) sims.forEach(step);
+            // the numbers below the grids come from a long run of the same stream, not from the few seconds on screen
+            var long = make();
+            for (s = 0; s < 6000; s++) long.forEach(step);
+            long.forEach(function (x) { x.sumU = x.sumC = x.steps = 0; });
+            for (s = 0; s < 6000; s++) long.forEach(step);
+            stats = long;
+            p.kick && p.kick();
+        }
+        function step(s) {
+            var used = 0;
+            if (s.kind === 'contig') {
+                for (var slot = 0; slot < BLOCKS / MAXB; slot++) if (!s.act.some(function (q) { return q.slot === slot; })) s.act.push({ id: s.next++, len: lengthFrom(s.r), n: 0, slot: slot });
+                s.act.forEach(function (q) { q.n++; used += q.n; });
+                s.act = s.act.filter(function (q) { return q.n < q.len; });
+            } else {
+                while (s.free.length > s.act.length + 1) {
+                    var q0 = s.queue.length ? s.queue.shift() : { id: s.next++, len: lengthFrom(s.r) };
+                    s.act.push({ id: q0.id, len: q0.len, n: 0, blocks: [s.free.shift()] });
+                }
+                for (var i = 0; i < s.act.length; i++) {
+                    var q = s.act[i];
+                    if (q.n === q.blocks.length * PER) {
+                        if (!s.free.length) { var v = s.act.pop(); s.free = s.free.concat(v.blocks); s.queue.unshift({ id: v.id, len: v.len }); if (v === q) break; }
+                        if (!s.free.length) continue;
+                        q.blocks.push(s.free.shift());
+                    }
+                    q.n++;
+                }
+                s.act.forEach(function (q) { used += q.n; });
+                s.act = s.act.filter(function (q) { if (q.n >= q.len) { s.free = s.free.concat(q.blocks); return false; } return true; });
+            }
+            s.sumU += used / (BLOCKS * PER); s.sumC += s.act.length; s.steps++;
+        }
+        reset();
+        function tick(dt) { acc += dt * 14; while (acc >= 1) { acc -= 1; sims.forEach(step); } }
+        var PAL = [C.compute, C.peers, C.data, C.launch, '#FF9F7A', '#7FD3FF'];
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, narrow = w < 600, pad = 14, side = narrow ? w - pad * 2 : (w - pad * 3) / 2, cell = side / COLS, gridH = cell * (BLOCKS / COLS);
+            p.fit(narrow ? 2 * (gridH + 40) + 40 : gridH + 74);
+            ctx = p.ctx; var h = p.h;
+            p.clear();
+            sims.forEach(function (s, n) {
+                var ox = narrow ? pad : pad + n * (side + pad), oy = narrow ? 30 + n * (gridH + 40) : 30, owner = {}, fill = {};
+                text(ctx, n ? '分页：用到哪块拿哪块' : '预留：每个请求先占 256 个 token 的位置', ox, oy - 10, { size: 12, weight: 600, color: n ? C.peers : C.alert });
+                s.act.forEach(function (q) {
+                    if (s.kind === 'contig') for (var b = 0; b < MAXB; b++) { owner[q.slot * MAXB + b] = q.id; fill[q.slot * MAXB + b] = Math.max(0, Math.min(1, (q.n - b * PER) / PER)); }
+                    else q.blocks.forEach(function (bk, m) { owner[bk] = q.id; fill[bk] = Math.max(0, Math.min(1, (q.n - m * PER) / PER)); });
+                });
+                for (var b = 0; b < BLOCKS; b++) {
+                    var cx = ox + (b % COLS) * cell, cy = oy + Math.floor(b / COLS) * cell, id = owner[b];
+                    round(ctx, cx + 1.5, cy + 1.5, cell - 3, cell - 3, 4);
+                    if (id == null) { ctx.fillStyle = alpha(C.faint, 0.45); ctx.fill(); continue; }
+                    var tone = PAL[id % PAL.length], f = fill[b];
+                    ctx.fillStyle = alpha(tone, 0.12); ctx.fill();
+                    ctx.strokeStyle = alpha(tone, 0.55); ctx.lineWidth = 1; ctx.stroke();
+                    if (f > 0) { ctx.save(); ctx.beginPath(); ctx.rect(cx + 1.5, cy + 1.5 + (cell - 3) * (1 - f), cell - 3, (cell - 3) * f); ctx.clip(); round(ctx, cx + 1.5, cy + 1.5, cell - 3, cell - 3, 4); ctx.fillStyle = alpha(tone, 0.9); ctx.fill(); ctx.restore(); }
+                }
+            });
+            var ly = h - 12;
+            ctx.fillStyle = alpha(C.compute, 0.9); ctx.fillRect(pad, ly - 9, 10, 10);
+            text(ctx, '实心：已经写进去的 token', pad + 15, ly, { size: 11, color: C.soft });
+            ctx.strokeStyle = alpha(C.compute, 0.6); ctx.strokeRect(pad + 190.5, ly - 8.5, 9, 9);
+            text(ctx, '空心：占着但没用上', pad + 205, ly, { size: 11, color: C.soft });
+            p.set('cc', fmt(stats[0].sumC / stats[0].steps, 1) + ' 个');
+            p.set('pc', fmt(stats[1].sumC / stats[1].steps, 1) + ' 个');
+            p.set('cu', fmt(stats[0].sumU / stats[0].steps * 100) + '%');
+            p.set('pu', fmt(stats[1].sumU / stats[1].steps * 100) + '%');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 1.5 · Floating-point formats ──────────────────────────────────────────────────────
+     * fp32 (8 exponent bits, 23 mantissa), bf16 (8, 7) and fp16 (5, 10), converted bit by bit
+     * with round-to-nearest-even. Second view: 1 + a small update, the reason the lesson keeps
+     * master weights in 32 bits. */
+    function f32bits(v) { var b = new DataView(new ArrayBuffer(4)); b.setFloat32(0, v); return b.getUint32(0); }
+    function bitsF32(u) { var b = new DataView(new ArrayBuffer(4)); b.setUint32(0, u >>> 0); return b.getFloat32(0); }
+    function toBf16(v) {
+        var u = f32bits(v);
+        if ((u & 0x7f800000) === 0x7f800000 && (u & 0x7fffff)) return 0x7fc0;
+        return ((u + 0x7fff + ((u >>> 16) & 1)) >>> 16) & 0xffff;
+    }
+    function fromBf16(b) { return bitsF32(b << 16); }
+    function toF16(v) {
+        var s = v < 0 || (v === 0 && 1 / v < 0) ? 0x8000 : 0, a = Math.abs(v);
+        if (isNaN(v)) return 0x7e00;
+        if (a === 0) return s;
+        if (a >= 65520) return s | 0x7c00;                          // rounds past the largest finite value, 65504
+        var e = Math.floor(Math.log2(a));
+        if (a / Math.pow(2, e) >= 2) e++; else if (a / Math.pow(2, e) < 1) e--;
+        function rne(x) { var f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2) ? f + 1 : f; }
+        if (e < -14) { var m = rne(a / Math.pow(2, -24)); return s | m; }   // subnormal (m may reach 1024, the smallest normal)
+        var mant = rne((a / Math.pow(2, e) - 1) * 1024);
+        if (mant === 1024) { mant = 0; e++; }
+        if (e > 15) return s | 0x7c00;
+        return s | ((e + 15) << 10) | mant;
+    }
+    function fromF16(b) {
+        var s = b & 0x8000 ? -1 : 1, e = (b >> 10) & 31, m = b & 1023;
+        if (e === 31) return m ? NaN : s * Infinity;
+        if (e === 0) return s * m * Math.pow(2, -24);
+        return s * (1 + m / 1024) * Math.pow(2, e - 15);
+    }
+    registry['float-formats'] = function (figure) {
+        var p = new Panel(figure, { title: '一个数在三种格式里怎么存', note: '每一位都是真的：按 IEEE 的规则、就近舍入算出来的', ratio: 0.5, minHeight: 320 });
+        var PRESETS = [[0.1, '0.1'], [1 / 3, '1/3'], [3.14159265, 'π'], [65504, '65504'], [70000, '70000'], [1e-5, '0.00001'], [1e-8, '10⁻⁸']];
+        p.toggle('mode', [['store', '看一个数怎么存'], ['update', '1 加上一个很小的更新']], 'store');
+        p.toggle('x', PRESETS.map(function (q, i) { return [i, q[1]]; }), 0);
+        p.slider('u', '更新量（参数 1.0 加上它）', -9, -1, 0.05, -4, function (v) { return Math.pow(10, v).toExponential(1).replace('e-', '×10⁻').replace(/⁻(\d)/, function (m, d) { return '⁻' + '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]; }); }, null, 'launch');
+        p.readout('a', 'fp32', 'ink');
+        p.readout('b', 'bf16', 'data');
+        p.readout('c', 'fp16', 'compute');
+        var FMT = [['fp32', 8, 23], ['bf16', 8, 7], ['fp16', 5, 10]];
+        function encode(v) {
+            var u32 = f32bits(v), b16 = toBf16(v), h16 = toF16(v);
+            return [{ bits: u32, n: 32, back: bitsF32(u32) }, { bits: b16, n: 16, back: fromBf16(b16) }, { bits: h16, n: 16, back: fromF16(h16) }];
+        }
+        function show(v) {
+            if (!isFinite(v)) return v > 0 ? '∞（溢出）' : '−∞';
+            if (v === 0) return '0（太小，变成了 0）';
+            var s = Math.abs(v) >= 1e5 || Math.abs(v) < 1e-4 ? v.toExponential(6) : v.toPrecision(10);
+            return s.replace(/(\.\d*?)0+($|e)/, '$1$2').replace(/\.($|e)/, '$1');
+        }
+        var kids = p.controls.children;
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, narrow = w < 560, upd = p.values.mode === 'update', pad = 14;
+            kids[1].style.display = upd ? 'none' : ''; kids[2].style.display = upd ? '' : 'none';
+            var v = upd ? 1 + Math.pow(10, p.values.u) : PRESETS[p.values.x][0], E = encode(v);
+            var labelW = narrow ? 44 : 56, cw = Math.min(18, (w - pad * 2 - labelW) / 32), rowH = narrow ? 62 : 58, top = 40;
+            p.fit(top + 3 * rowH + 26);
+            ctx = p.ctx;
+            p.clear();
+            text(ctx, upd ? '1 + ' + Math.pow(10, p.values.u).toExponential(2) + '  （真值 ' + v.toPrecision(12) + '）' : '要存的数：' + PRESETS[p.values.x][1] + (p.values.x === 1 ? '（0.3333…）' : ''), pad, 24, { size: 13, mono: true, color: C.ink });
+            FMT.forEach(function (f, r) {
+                var y = top + r * rowH, enc = E[r], tone = [C.ink, C.data, C.compute][r];
+                text(ctx, f[0], pad, y + 15, { size: 12, mono: true, weight: 600, color: tone });
+                for (var i = 0; i < enc.n; i++) {
+                    var bit = (enc.bits >>> (enc.n - 1 - i)) & 1, part = i === 0 ? C.alert : i <= f[1] ? C.data : C.compute;
+                    var x = pad + labelW + i * cw;
+                    round(ctx, x + 0.5, y + 2, cw - 1.5, 18, 3);
+                    ctx.fillStyle = alpha(part, bit ? 0.9 : 0.16); ctx.fill();
+                    if (cw >= 12) text(ctx, String(bit), x + cw / 2, y + 15, { size: 10, mono: true, align: 'center', color: bit ? C.panel : alpha(part, 0.8) });
+                }
+                var back = enc.back, rel = upd ? null : Math.abs(back - v) / Math.abs(v);
+                var line = upd ? (back === 1 ? '存下来还是 1：这次更新被舍入掉了' : '存下来 ' + show(back) + '，更新保住了 ' + fmt((back - 1) / Math.pow(10, p.values.u) * 100) + '%')
+                               : '存下来是 ' + show(back) + (isFinite(back) && back !== 0 ? '，相对误差 ' + (rel === 0 ? '0' : rel.toExponential(1)) : '');
+                text(ctx, line, pad + labelW, y + 38, { size: 11.5, color: upd && back === 1 ? C.alert : C.soft });
+            });
+            var ly = top + 3 * rowH + 12;
+            [[C.alert, '符号'], [C.data, narrow ? '指数（范围）' : '指数：管范围'], [C.compute, narrow ? '有效数字（精度）' : '有效数字：管精度']].forEach(function (lg, n) {
+                var x = pad + (narrow ? 0 : labelW) + n * (narrow ? [0, 54, 150][n] / Math.max(1, n) : 120);
+                ctx.fillStyle = lg[0]; ctx.fillRect(x, ly - 9, 10, 10);
+                text(ctx, lg[1], x + 15, ly, { size: 11, color: C.soft });
+            });
+            function cell(enc) {
+                var back = enc.back;
+                if (upd) return back === 1 ? '更新丢了' : '更新保住了';
+                if (!isFinite(back)) return '溢出';
+                if (back === 0) return '变成 0';
+                var rel = Math.abs(back - v) / Math.abs(v);
+                return rel === 0 ? '精确' : '误差 ' + rel.toExponential(1);
+            }
+            p.set('a', cell(E[0]), upd && E[0].back === 1 ? 'alert' : 'ink');
+            p.set('b', cell(E[1]), (upd && E[1].back === 1) || !isFinite(E[1].back) || E[1].back === 0 ? 'alert' : 'data');
+            p.set('c', cell(E[2]), (upd && E[2].back === 1) || !isFinite(E[2].back) || E[2].back === 0 ? 'alert' : 'compute');
+        };
+        p.draw();
+    };
+
+    /* ── 7.4 · How often to checkpoint ─────────────────────────────────────────────────────
+     * Lesson: waste = c/T + T/(2M), least at T = √(2cM), where it is about √(2c/M).
+     * c = 1 min, M = 4 h → about 22 min and 9%. The strip below replays a run with random
+     * failures (mean gap M) and measures the waste for the interval you chose. */
+    registry['checkpoint-interval'] = function (figure) {
+        var p = new Panel(figure, { title: '多久存一次检查点', note: '曲线是讲解里的公式；下面的色带是一次带随机故障的模拟', ratio: 0.55, minHeight: 360 });
+        function cOf(v) { return Math.pow(10, v); }                                  // seconds
+        p.slider('c', '存一次要多久', 1, 3, 0.02, Math.log10(60), function (v) { var s = cOf(v); return s < 90 ? fmt(s) + ' 秒' : fmt(s / 60, 1) + ' 分钟'; }, null, 'launch');
+        p.slider('M', '平均多久出一次故障', 1, 100, 1, 4, function (v) { return v + ' 小时'; }, null, 'alert');
+        var Tin = p.slider('T', '你选的间隔', 0, 2.78, 0.01, Math.log10(22), function (v) { var m = Math.pow(10, v); return m < 90 ? fmt(m) + ' 分钟' : fmt(m / 60, 1) + ' 小时'; }, null, 'peers');
+        p.button('用最优间隔', function () { Tin.value = Math.log10(Math.sqrt(2 * cOf(p.values.c) / 60 * p.values.M * 60)); Tin.dispatchEvent(new Event('input')); }, 'ghost');
+        p.readout('opt', '最优间隔 √(2cM)', 'peers');
+        p.readout('waste', '你选的间隔：浪费', 'ink');
+        p.readout('best', '最优时浪费 √(2c/M)', 'peers');
+        p.readout('sim', '模拟测得', 'ink');
+        function simulate(cMin, Mmin, T, horizon, seed, keep) {
+            var r = seed, now = 0, sinceSave = 0, lost = 0, ckpt = 0, segs = [], mark = 0, nextFail;
+            function gapToFailure() { r = (r * 1103515245 + 12345) % 2147483648; return -Math.log(1 - r / 2147483648) * Mmin; }
+            function push(kind, a, b) { if (keep) segs.push([kind, a, b]); }
+            function fail() {                                                   // the work since the last finished checkpoint is gone
+                if (keep) for (var q = mark; q < segs.length; q++) if (segs[q][0] === 'work') segs[q][0] = 'lost';
+                lost += sinceSave; sinceSave = 0; push('fail', now, now); mark = segs.length; nextFail = now + gapToFailure();
+            }
+            nextFail = gapToFailure();
+            while (now < horizon) {
+                var need = T - sinceSave;
+                if (now + need > nextFail) { push('work', now, nextFail); sinceSave += nextFail - now; now = nextFail; fail(); continue; }
+                push('work', now, now + need); now += need; sinceSave += need;
+                if (now + cMin > nextFail) { push('ckpt', now, nextFail); ckpt += nextFail - now; now = nextFail; fail(); continue; }
+                push('ckpt', now, now + cMin); ckpt += cMin; now += cMin; sinceSave = 0; mark = segs.length;
+            }
+            return { segs: segs, waste: (lost + ckpt) / now };
+        }
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, narrow = w < 560, h;
+            var cMin = cOf(p.values.c) / 60, Mmin = p.values.M * 60, T = Math.pow(10, p.values.T), Topt = Math.sqrt(2 * cMin * Mmin);
+            var L = narrow ? 44 : 56, R = w - 16, top = 26, plotH = narrow ? 150 : 170, B = top + plotH, stripY = B + 74;
+            p.fit(stripY + 56);
+            ctx = p.ctx; h = p.h;
+            p.clear();
+            var X = logScale(1, 600, L, R), maxW = 0.6, Y = function (f) { return B - Math.min(f, maxW) / maxW * plotH; };
+            ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+            [[1, '1 分'], [10, '10 分'], [60, '1 时'], [600, '10 时']].forEach(function (g) { ctx.beginPath(); ctx.moveTo(X(g[0]), top); ctx.lineTo(X(g[0]), B); ctx.stroke(); text(ctx, g[1], X(g[0]), B + 16, { size: 10.5, align: 'center', color: C.dim }); });
+            [0, 0.2, 0.4, 0.6].forEach(function (f) { ctx.beginPath(); ctx.moveTo(L, Y(f)); ctx.lineTo(R, Y(f)); ctx.stroke(); text(ctx, fmt(f * 100) + '%', L - 6, Y(f) + 4, { size: 10.5, mono: true, align: 'right', color: C.dim }); });
+            if (!narrow) text(ctx, '间隔 T（对数）', R, B + 34, { size: 10.5, align: 'right', color: C.dim });
+            function curve(fn, col, dash, width) {
+                ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = width; ctx.beginPath();
+                for (var i = 0; i <= 120; i++) { var t = Math.pow(10, i / 120 * Math.log10(600)), y = Y(fn(t)); if (i) ctx.lineTo(X(t), y); else ctx.moveTo(X(t), y); }
+                ctx.stroke(); ctx.setLineDash([]);
+            }
+            ctx.save(); ctx.beginPath(); ctx.rect(L, top, R - L, plotH); ctx.clip();
+            curve(function (t) { return cMin / t; }, alpha(C.launch, 0.85), [4, 4], 1.4);
+            curve(function (t) { return t / (2 * Mmin); }, alpha(C.alert, 0.85), [4, 4], 1.4);
+            ctx.save(); if (!still) { ctx.shadowColor = alpha(C.ink, 0.5); ctx.shadowBlur = 8; }
+            curve(function (t) { return cMin / t + t / (2 * Mmin); }, C.ink, [], 2.2); ctx.restore();
+            ctx.restore();
+            [[C.launch, narrow ? 'c/T' : '存档开销 c/T', true], [C.alert, narrow ? 'T/(2M)' : '故障损失 T/(2M)', true], [C.ink, narrow ? '之和' : '两项之和', false]].forEach(function (lg, n) {
+                var lx = L + n * (narrow ? 84 : 124), ly = B + 34;
+                ctx.strokeStyle = lg[0]; ctx.lineWidth = 2; ctx.setLineDash(lg[2] ? [4, 3] : []);
+                ctx.beginPath(); ctx.moveTo(lx, ly - 4); ctx.lineTo(lx + 16, ly - 4); ctx.stroke(); ctx.setLineDash([]);
+                text(ctx, lg[1], lx + 21, ly, { size: 11, color: C.soft });
+            });
+            var wOpt = cMin / Topt + Topt / (2 * Mmin), wT = cMin / T + T / (2 * Mmin);
+            if (Topt >= 1 && Topt <= 600) { ctx.beginPath(); ctx.arc(X(Topt), Y(wOpt), 4, 0, Math.PI * 2); ctx.fillStyle = C.peers; ctx.fill(); text(ctx, '最优', X(Topt), Y(wOpt) + 18, { size: 11, align: 'center', color: C.peers }); }
+            ctx.save(); if (!still) { ctx.shadowColor = C.peers; ctx.shadowBlur = 14; }
+            ctx.beginPath(); ctx.arc(X(T), Y(wT), 7, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill(); ctx.restore();
+            // a replay: the first 3M of a run, and the waste measured over a long one
+            var horizon = 3 * Mmin, run = simulate(cMin, Mmin, T, horizon, 4242, true), long = simulate(cMin, Mmin, T, Math.min(400 * Mmin, 150000 * T), 777, false);
+            text(ctx, '模拟前 ' + fmt(horizon / 60) + ' 小时：', L, stripY - 12, { size: 11.5, color: C.soft });
+            var SX = function (t) { return L + t / horizon * (R - L); };
+            run.segs.forEach(function (s) {
+                if (s[1] >= horizon) return;
+                var x0 = SX(s[1]), x1 = SX(Math.min(s[2], horizon));
+                if (s[0] === 'fail') { ctx.fillStyle = C.alert; ctx.fillRect(x0 - 1, stripY - 4, 2, 30); return; }
+                ctx.fillStyle = s[0] === 'work' ? alpha(C.peers, 0.8) : s[0] === 'ckpt' ? C.launch : alpha(C.alert, 0.55);
+                ctx.fillRect(x0, stripY, Math.max(0.8, x1 - x0), 22);
+            });
+            legend(ctx, [[alpha(C.peers, 0.8), '有用的训练'], [C.launch, '存档'], [alpha(C.alert, 0.55), '故障白算的'], [C.alert, '故障']], L, stripY + 44, narrow ? 78 : 110);
+            p.set('opt', Topt < 90 ? fmt(Topt) + ' 分钟' : fmt(Topt / 60, 1) + ' 小时');
+            p.set('waste', fmt(wT * 100, 1) + '%', wT > wOpt * 1.15 ? 'alert' : 'peers');
+            p.set('best', fmt(Math.sqrt(2 * cMin / Mmin) * 100, 1) + '%');
+            p.set('sim', fmt(long.waste * 100, 1) + '%');
+        };
+        p.draw();
+    };
+
+    /* ── 9.2 · Quantization as a coarser ruler ─────────────────────────────────────────────
+     * Lesson: the range [−m, m] split into 255 steps (int8) or 15 (int4); every value moves to the
+     * nearest mark. 999 values in ±0.1 and one at 5.0: one ruler for all puts a step at about 0.04
+     * and squeezes the 999 into five or six marks. Groups of 128 give each group its own ruler. */
+    registry['quant-ruler'] = function (figure) {
+        var p = new Panel(figure, { title: '量化：换一把刻度更粗的尺子', note: '1000 个数：999 个在 ±0.1 之间，外加一个 5.0', ratio: 0.5, minHeight: 320 });
+        p.toggle('bits', [[8, '8 位（255 格）'], [4, '4 位（15 格）']], 8);
+        p.toggle('outlier', [[true, '有那个 5.0'], [false, '没有']], true);
+        p.toggle('group', [[false, '整个矩阵一把尺子'], [true, '每 128 个一组']], false);
+        p.readout('step', '一格多宽', 'ink');
+        p.readout('levels', '999 个数落进了几格', 'data');
+        p.readout('err', '平均误差', 'ink');
+        p.readout('extra', '额外存储（缩放因子）', 'ink');
+        var vals = [], seed = 21;
+        function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+        for (var i = 0; i < 1000; i++) { var g = (rnd() + rnd() + rnd() - 1.5) / 1.5; vals.push(Math.round(g * 0.1 * 1e4) / 1e4); }
+        var OUT = 500;
+        function quantize() {
+            var bits = p.values.bits, steps = Math.pow(2, bits) - 1, data = vals.slice();
+            data[OUT] = p.values.outlier ? 5.0 : vals[OUT];
+            var size = p.values.group ? 128 : data.length, q = new Array(data.length), scales = [];
+            for (var s = 0; s < data.length; s += size) {
+                var m = 0, e = Math.min(data.length, s + size), k;
+                for (k = s; k < e; k++) m = Math.max(m, Math.abs(data[k]));
+                var scale = 2 * m / steps;
+                scales.push({ from: s, to: e, m: m, scale: scale });
+                for (k = s; k < e; k++) q[k] = Math.round((data[k] + m) / scale) * scale - m;
+            }
+            return { data: data, q: q, scales: scales };
+        }
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, h = p.h, narrow = w < 560, Q = quantize(), pad = 18;
+            p.clear();
+            var view = 0.13, X = function (v) { return pad + (v + view) / (2 * view) * (w - pad * 2); }, lineY = h * 0.52;
+            var sc = Q.scales.filter(function (s) { return !(OUT >= s.from && OUT < s.to); })[0] || Q.scales[0];
+            if (!p.values.group) sc = Q.scales[0];
+            ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, lineY); ctx.lineTo(w - pad, lineY); ctx.stroke();
+            // the ruler's marks inside the view
+            var marks = 0;
+            for (var k = 0; k <= Math.pow(2, p.values.bits) - 1; k++) {
+                var mv = k * sc.scale - sc.m;
+                if (mv < -view || mv > view) continue;
+                marks++;
+                ctx.strokeStyle = alpha(C.data, 0.9); ctx.lineWidth = 1.4;
+                ctx.beginPath(); ctx.moveTo(X(mv), lineY - 8); ctx.lineTo(X(mv), lineY + 8); ctx.stroke();
+            }
+            [-0.1, -0.05, 0, 0.05, 0.1].forEach(function (v) { text(ctx, (v > 0 ? '+' : '') + v, X(v), h - 14, { size: 10.5, mono: true, align: 'center', color: C.dim }); });
+            if (p.values.outlier) text(ctx, narrow ? (p.values.group ? '5.0 只拖累它那一组 →' : '5.0 在远处，撑长了尺子 →') : p.values.group ? '那个 5.0 只拖累它自己那一组（128 个数）→' : '那个 5.0 在右边很远的地方，尺子被它撑长了 →', w - pad, 22, { size: 11.5, align: 'right', color: C.alert });
+            text(ctx, '原来的值', pad, 22, { size: 11.5, color: C.soft });
+            text(ctx, '挪到最近的刻度以后', pad, h - 34, { size: 11.5, color: C.soft });
+            // a sample of the 999, before and after
+            var levelSet = {}, errSum = 0, n = 0;
+            for (var t = 0; t < 1000; t++) {
+                if (t === OUT && p.values.outlier) continue;
+                levelSet[Q.q[t].toFixed(9)] = 1; errSum += Math.abs(Q.q[t] - Q.data[t]); n++;
+                if (t % 11) continue;
+                var x0 = X(Q.data[t]), x1 = X(Math.max(-view, Math.min(view, Q.q[t]))), y0 = 34 + (t * 7 % 60), y1 = lineY + 20 + (t * 13 % 40);
+                ctx.strokeStyle = alpha(C.compute, 0.25); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, lineY); ctx.stroke();
+                ctx.beginPath(); ctx.arc(x0, y0, 2.6, 0, Math.PI * 2); ctx.fillStyle = C.compute; ctx.fill();
+                ctx.beginPath(); ctx.arc(x1, y1, 2.6, 0, Math.PI * 2); ctx.fillStyle = C.data; ctx.fill();
+                ctx.strokeStyle = alpha(C.data, 0.2); ctx.beginPath(); ctx.moveTo(x1, lineY); ctx.lineTo(x1, y1); ctx.stroke();
+            }
+            var levels = Object.keys(levelSet).length;
+            p.set('step', sc.scale.toPrecision(2));
+            p.set('levels', levels + ' 格', levels < 20 ? 'alert' : 'data');
+            p.set('err', (errSum / n).toPrecision(2));
+            p.set('extra', p.values.group ? '每个数 +0.125 位' : '几乎为 0');
+        };
+        p.draw();
+    };
+
     function upgrade(root) {
         (root || document).querySelectorAll('figure.fig').forEach(function (figure) {
             if (figure.classList.contains('has-demo')) return;

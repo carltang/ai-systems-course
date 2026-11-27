@@ -189,7 +189,7 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .demo input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #E9EEF5; border: 3px solid #0D1722; box-shadow: 0 0 0 1.5px #6E9BFF; }
 .demo input[type=range]:focus-visible { outline: none; }
 .demo input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #6E9BFF, 0 0 18px rgba(110, 155, 255, .8); }
-.demo-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; box-shadow: inset 0 0 0 1px #2A3B50; }
+.demo-toggle { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 2px; padding: 3px; border-radius: 11px; box-shadow: inset 0 0 0 1px #2A3B50; }
 .demo-toggle button, .demo-button { font: inherit; font-size: 12.5px; line-height: 1.4; border: 0; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
 .demo-toggle button { background: none; color: var(--d-soft); }
 .demo-toggle button.on { background: #22344A; color: var(--d-ink); }
