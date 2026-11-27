@@ -1,14 +1,14 @@
 // Full-screen reading for a lesson: only the lesson is left on the page. The choice is kept
-// from unit to unit; the browser's own full screen is entered on a click or the F key.
+// from unit to unit (and put on <html> in the page head, so a new unit opens already in it); the browser's own full screen is entered on a click or the F key.
 (function () {
-    var KEY = 'ka-reading', body = document.body, button = document.getElementById('read-toggle'), leaving = false;
+    var KEY = 'ka-reading', page = document.documentElement, button = document.getElementById('read-toggle'), leaving = false;
     if (!button) return;
 
     function remember(on) { try { localStorage.setItem(KEY, on ? '1' : ''); } catch (e) { /* private window */ } }
-    function reading() { return body.classList.contains('reading'); }
+    function reading() { return page.classList.contains('reading'); }
 
     function set(on, screen) {
-        body.classList.toggle('reading', on);
+        page.classList.toggle('reading', on);
         button.textContent = on ? '退出全屏' : '全屏阅读';
         button.title = on ? '退出全屏阅读（Esc 或 F）' : '只留下讲解，全屏阅读（快捷键 F）';
         remember(on);
@@ -41,7 +41,7 @@
     widthButton.title = '全屏阅读时版心的宽度（快捷键 W）';
     function setWidth(i) {
         width = (i + WIDTHS.length) % WIDTHS.length;
-        WIDTHS.forEach(function (w) { if (w[0]) body.classList.toggle('read-' + w[0], w === WIDTHS[width]); });
+        WIDTHS.forEach(function (w) { if (w[0]) page.classList.toggle('read-' + w[0], w === WIDTHS[width]); });
         widthButton.textContent = '版心：' + WIDTHS[width][1];
         try { localStorage.setItem(WKEY, String(width)); } catch (e) { /* private window */ }
     }

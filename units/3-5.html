@@ -8,13 +8,13 @@
 <meta name="author" content="Zongyao Tang & Claude">
 <meta name="theme-color" content="#EBEEF2">
 <style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
-<script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
+<script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=0b5e0aab">
+<link rel="stylesheet" href="../assets/site.css?v=7286539c">
 </head>
 <body>
 <main class="main">
@@ -101,11 +101,11 @@
 </main>
 <footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
 Zongyao Tang 与 Claude 合著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=0b5e0aab"></script>
-<script src="../assets/demos.js?v=0b5e0aab"></script>
-<script src="../assets/code.js?v=0b5e0aab"></script>
-<script src="../assets/motion.js?v=0b5e0aab"></script>
-<script src="../assets/theme.js?v=0b5e0aab"></script>
+<script src="../assets/reading.js?v=7286539c"></script>
+<script src="../assets/demos.js?v=7286539c"></script>
+<script src="../assets/code.js?v=7286539c"></script>
+<script src="../assets/motion.js?v=7286539c"></script>
+<script src="../assets/theme.js?v=7286539c"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

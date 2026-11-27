@@ -16,7 +16,7 @@ a { color: var(--accent); }
 .unit-steps a { font-size: 13px; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--text-secondary); text-decoration: none; }
 .unit-title { font-size: 1.7rem; font-weight: 600; line-height: 1.4; color: var(--k-ink); margin: 0 0 28px; }
 .unit-title span { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: .04em; color: var(--k-ink-faint); margin-bottom: 10px; }
-body.reading .unit-title { font-size: 1.9rem; }
+html.reading .unit-title { font-size: 1.9rem; }
 .frame-q span { display: block; }
 .thread { margin: 0 0 8px; }
 .thread a { color: var(--text-secondary); text-decoration: none; }
@@ -223,38 +223,40 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .read-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .unit-nav .unit-steps + .read-toggle, .unit-nav .theme-toggle + .read-toggle { margin-left: 0; }
 .read-title { display: none; }
-body.reading { background: var(--k-page); --read-w: min(1180px, 92vw); --read-pad: clamp(28px, 7.5vw, 124px); --read-fs: 19px; }
-body.reading.read-narrow { --read-w: min(900px, 92vw); --read-pad: clamp(24px, 6vw, 84px); --read-fs: 17px; }
-body.reading.read-wide { --read-w: min(1480px, 94vw); --read-pad: clamp(32px, 9vw, 160px); --read-fs: 21px; }
-body.reading .nav, body.reading .subnav { display: none; }
-body.reading .main { max-width: none; }
-body.reading .item-page { max-width: none; padding-top: 10px; }
-body.reading .item-page > *:not(.unit-nav):not(.essence):not(.unit-pager) { display: none; }
-body.reading .unit-nav { position: static; max-width: var(--read-w); margin: 0 auto 6px; background: none; opacity: .6; transition: opacity .15s; }
-body.reading .unit-nav:hover { opacity: 1; }
-body.reading .read-toggle { position: fixed; top: 14px; right: 18px; z-index: 20; opacity: .45; transition: opacity .15s; }
-body.reading .read-toggle:hover { opacity: 1; }
-body.reading .essence { max-width: var(--read-w); margin-top: 4px; padding: 64px var(--read-pad) 56px; }
-body.reading .read-title { display: block; font-size: 2rem; font-weight: 600; line-height: 1.4; letter-spacing: -.01em; color: var(--ink); margin: 0 0 30px; }
-body.reading .read-title span { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: .04em; color: var(--ink-faint); margin-bottom: 10px; }
-body.reading .essence .story, body.reading .essence .i-detail, body.reading .essence .recap p { font-size: var(--read-fs); }
-body.reading .essence .icard .i-essence { font-size: calc(var(--read-fs) + 1px); }
-body.reading .essence .i-analogy, body.reading .essence .i-impl, body.reading .essence .i-lead { font-size: calc(var(--read-fs) - 1.5px); }
-body.reading .essence .i-more .i-detail { font-size: calc(var(--read-fs) - 1px); }
-body.reading .essence .i-detail table { font-size: calc(var(--read-fs) - 2px); }
-body.reading .essence .icard h3 { font-size: calc(var(--read-fs) * 1.42); }
-body.reading .essence .frame-q { font-size: calc(var(--read-fs) * 1.45); }
-body.reading .fig img { width: min(100%, 1040px); }
-body.reading .fig.has-demo { margin-left: calc(var(--read-pad) * -0.4); margin-right: calc(var(--read-pad) * -0.4); }
+/* the class sits on <html>, set in the page head before the first paint, so a new unit arrives already in reading layout */
+html.reading { --read-w: min(1180px, 92vw); --read-pad: clamp(28px, 7.5vw, 124px); --read-fs: 19px; }
+html.reading body { background: var(--k-page); }
+html.reading.read-narrow { --read-w: min(900px, 92vw); --read-pad: clamp(24px, 6vw, 84px); --read-fs: 17px; }
+html.reading.read-wide { --read-w: min(1480px, 94vw); --read-pad: clamp(32px, 9vw, 160px); --read-fs: 21px; }
+html.reading .nav, html.reading .subnav { display: none; }
+html.reading .main { max-width: none; }
+html.reading .item-page { max-width: none; padding-top: 10px; }
+html.reading .item-page > *:not(.unit-nav):not(.essence):not(.unit-pager) { display: none; }
+html.reading .unit-nav { position: static; max-width: var(--read-w); margin: 0 auto 6px; background: none; opacity: .6; transition: opacity .15s; }
+html.reading .unit-nav:hover { opacity: 1; }
+html.reading .read-toggle { position: fixed; top: 14px; right: 18px; z-index: 20; opacity: .45; transition: opacity .15s; }
+html.reading .read-toggle:hover { opacity: 1; }
+html.reading .essence { max-width: var(--read-w); margin-top: 4px; padding: 64px var(--read-pad) 56px; }
+html.reading .read-title { display: block; font-size: 2rem; font-weight: 600; line-height: 1.4; letter-spacing: -.01em; color: var(--ink); margin: 0 0 30px; }
+html.reading .read-title span { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: .04em; color: var(--ink-faint); margin-bottom: 10px; }
+html.reading .essence .story, html.reading .essence .i-detail, html.reading .essence .recap p { font-size: var(--read-fs); }
+html.reading .essence .icard .i-essence { font-size: calc(var(--read-fs) + 1px); }
+html.reading .essence .i-analogy, html.reading .essence .i-impl, html.reading .essence .i-lead { font-size: calc(var(--read-fs) - 1.5px); }
+html.reading .essence .i-more .i-detail { font-size: calc(var(--read-fs) - 1px); }
+html.reading .essence .i-detail table { font-size: calc(var(--read-fs) - 2px); }
+html.reading .essence .icard h3 { font-size: calc(var(--read-fs) * 1.42); }
+html.reading .essence .frame-q { font-size: calc(var(--read-fs) * 1.45); }
+html.reading .fig img { width: min(100%, 1040px); }
+html.reading .fig.has-demo { margin-left: calc(var(--read-pad) * -0.4); margin-right: calc(var(--read-pad) * -0.4); }
 .read-width { display: none; }
-body.reading .read-width { display: block; position: fixed; top: 14px; right: 112px; z-index: 20; opacity: .45; transition: opacity .15s;
+html.reading .read-width { display: block; position: fixed; top: 14px; right: 112px; z-index: 20; opacity: .45; transition: opacity .15s;
                            font: inherit; font-size: 13px; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--text-secondary); cursor: pointer; }
-body.reading .read-width:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
-body.reading .unit-pager { max-width: var(--read-w); margin-left: auto; margin-right: auto; }
+html.reading .read-width:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
+html.reading .unit-pager { max-width: var(--read-w); margin-left: auto; margin-right: auto; }
 .fig img { cursor: zoom-in; }
 .fig-veil { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 3vh 3vw; background: rgba(13, 23, 34, .82); cursor: zoom-out; }
 .fig-veil img { max-width: 94vw; max-height: 92vh; width: min(94vw, 1500px); border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
-@media (max-width: 720px) { body.reading .essence { padding: 30px 20px 26px; } body.reading .read-title { font-size: 1.45rem; } body.reading .fig.has-demo { margin: 30px -12px; } }
+@media (max-width: 720px) { html.reading .essence { padding: 30px 20px 26px; } html.reading .read-title { font-size: 1.45rem; } html.reading .fig.has-demo { margin: 30px -12px; } }
 
 /* ── Turning to the next or previous unit: the page slides the way the reader is going ── */
 @view-transition { navigation: auto; }
