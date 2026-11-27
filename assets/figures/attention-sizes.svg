@@ -23,5 +23,5 @@
   <line x1="382" y1="130" x2="408" y2="130" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="602" y1="150" x2="666" y2="150" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="395" y="226" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">中间结果是输入输出的 64 倍，还要在显存里进出好几趟</text>
-  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

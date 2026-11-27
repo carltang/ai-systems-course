@@ -33,5 +33,5 @@
   <line x1="565" y1="152" x2="499" y2="194" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="565" y1="152" x2="631" y2="194" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="565" y="282" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">这两种合起来是“等计算”</text>
-  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

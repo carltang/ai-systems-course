@@ -39,5 +39,5 @@
   <text x="671.1999999999999" y="179.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">显存</text>
   <line x1="592.4" y1="174" x2="604.4" y2="174" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">没配好时不会报错，只是悄悄退回上面那条路</text>
-  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

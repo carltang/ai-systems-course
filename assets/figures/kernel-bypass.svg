@@ -42,5 +42,5 @@
   <line x1="373.19999999999993" y1="228" x2="386.79999999999995" y2="228" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="494.79999999999995" y1="228" x2="630.0" y2="228" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="380" y="282" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">没有系统调用、没有拷贝、没有中断：延迟从几十微秒降到几微秒</text>
-  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

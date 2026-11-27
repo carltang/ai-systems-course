@@ -32,5 +32,5 @@
   <text x="622.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">TCP socket</text>
   <text x="622.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">只有预期的百分之几</text>
   <text x="24" y="246" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">代理线程抢不到 CPU 时通信也会变慢，而 GPU 和网络看起来都没有问题</text>
-  <text x="746" y="253" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="253" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

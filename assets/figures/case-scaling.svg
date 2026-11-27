@@ -16,5 +16,5 @@
   <text x="736" y="132" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">最右一小条：通信本身，只有 1%–2%。“NUMA 慢进程”是一个位置放错的进程拖累了全体</text>
   <text x="24" y="170" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">“把通信拿掉”只花了几分钟，就把问题一分为二：丢的大部分和通信无关</text>
   <text x="24" y="192" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">比例是讲解里的数字；这是一个编出来的综合案例，不是实测</text>
-  <text x="746" y="205" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="205" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

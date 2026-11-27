@@ -24,5 +24,5 @@
   <text x="380" y="214" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每个 batch 都要穿过插槽之间的互联</text>
   <text x="24" y="244" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">放对的原则：一个进程用哪张卡，就让它的 CPU 核和内存都在那张卡所在的一侧</text>
   <text x="24" y="264" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">多张卡同时放错时，插槽之间的互联会成为瓶颈</text>
-  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

@@ -25,5 +25,5 @@
   <text x="204" y="201" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">数据中心内一次网络往返</text>
   <rect x="220" y="182" width="404.2" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
   <text x="634.2" y="201" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">几十到几百微秒</text>
-  <text x="746" y="259" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="259" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>

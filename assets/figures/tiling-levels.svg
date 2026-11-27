@@ -22,5 +22,5 @@
   <text x="736" y="158" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">近、小、快</text>
   <line x1="110" y1="154" x2="660" y2="154" stroke="#d9d4c8" stroke-width="1.2" marker-end="url(#tip)"/>
   <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">读高性能矩阵乘法的代码：先认出每一层循环对应的是哪一级存储</text>
-  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang · CC BY-NC-SA 4.0</text>
+  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
 </svg>
