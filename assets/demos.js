@@ -14,7 +14,7 @@
     // The four kinds of waiting keep one colour each across the whole course.
     var C = {
         data: '#F2B544', compute: '#6E9BFF', launch: '#B49BFF', peers: '#3DD6A0', alert: '#FF7A7A',
-        ink: '#E9EEF5', soft: '#A4B3C4', dim: '#6B7D91', faint: '#2A3B50', grid: '#1C2B3D', panel: '#0D1722', well: '#121F2E'
+        ink: '#E9EEF5', soft: '#A4B3C4', dim: '#8193A8', faint: '#2A3B50', grid: '#1C2B3D', panel: '#0D1722', well: '#121F2E'
     };
     var MONO = '"IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace';
     var SANS = '"IBM Plex Sans", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif';
@@ -79,8 +79,10 @@
         this.minHeight = spec.minHeight || 230;
         this.values = {};
         this.cells = {};
-        var img = figure.querySelector('img');
+        var img = figure.querySelector('img'), cap = figure.querySelector('figcaption');
         if (img) img.classList.add('demo-fallback');
+        if (cap && spec.caption) { cap.setAttribute('data-drawing-caption', cap.textContent); cap.textContent = spec.caption; }
+        this.maxHeight = spec.maxHeight || 560;
         figure.classList.add('has-demo');
         figure.insertBefore(this.root, figure.firstChild);
         this.resize();
@@ -89,7 +91,7 @@
     }
     Panel.prototype.resize = function () {
         var w = this.stage.clientWidth || 600;
-        var h = this.fixedH || Math.max(this.minHeight, Math.round(w * this.ratio));
+        var h = this.fixedH || Math.min(this.maxHeight, Math.max(this.minHeight, Math.round(w * this.ratio)));
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -123,6 +125,10 @@
             input.style.setProperty('--fill', ((v - min) / (max - min) * 100) + '%');
         }
         input.addEventListener('input', function () { update(); onInput && onInput(); self.draw && self.draw(); });
+        // room for the widest value up front, so the label never re-wraps while the slider moves
+        var widest = 0;
+        [min, max, (min + max) / 2, min + (max - min) * 0.9].forEach(function (v) { out.textContent = show(v); widest = Math.max(widest, out.offsetWidth); });
+        out.style.minWidth = Math.ceil(widest + 4) + 'px';
         update();
         return input;
     };
@@ -380,7 +386,7 @@
     /* ── 2.4 · Roofline ────────────────────────────────────────────────────────────────────
      * Lesson: 1000 GB/s and 20 TFLOPS, knee at 20 FLOP/B; naive matmul 0.25 FLOP/B, tiling ×T. */
     registry.roofline = function (figure) {
-        var p = new Panel(figure, { title: 'Roofline：你的 kernel 撞的是哪面墙', note: '分块边长 T 决定算术强度；带宽和峰值决定屋顶', ratio: 0.5, minHeight: 300 });
+        var p = new Panel(figure, { title: 'Roofline：你的 kernel 撞的是哪面墙', note: '分块边长 T 决定算术强度；带宽和峰值决定屋顶', ratio: 0.5, minHeight: 300, caption: '默认值是讲解里的数字：带宽 1000 GB/s，峰值 20 TFLOPS，拐点在 20 FLOP/B' });
         p.slider('T', '分块边长 T', 1, 64, 1, 1, function (v) { return v === 1 ? '1（不分块）' : String(v); });
         p.slider('bw', '显存带宽', 200, 4000, 100, 1000, function (v) { return fmt(v) + ' GB/s'; });
         p.slider('peak', '峰值算力', 5, 100, 1, 20, function (v) { return fmt(v) + ' TFLOPS'; });
@@ -452,6 +458,7 @@
         var N, have, step, phase, t, playing = true, moving;
         p.slider('n', '卡数 N', 2, 8, 1, 4, function (v) { return v + ' 张'; }, reset);
         var play = p.button('暂停', function (b) { playing = !playing; b.textContent = playing ? '暂停' : '播放'; p.kick && p.kick(); });
+        if (still) { play.style.display = 'none'; playing = false; }                 // with less motion the reader steps through by hand
         p.button('下一步', function () { playing = false; play.textContent = '播放'; advance(); }, 'ghost');
         p.button('重来', function () { reset(); }, 'ghost');
         p.readout('stage', '阶段', 'peers');
@@ -492,7 +499,7 @@
             var ctx = p.ctx, w = p.w, h = p.h;
             p.clear();
             var cw = Math.max(9, Math.min(20, (Math.min(w, h) * 0.45) / N)), nodeW = cw * N + 18, nodeH = cw + 36;
-            var cx = w * 0.5, cy = h * 0.5 + 14, R = Math.min(w * 0.36, h * 0.36, w / 2 - nodeW / 2 - 8, (h - 40) / 2 - nodeH / 2 - 4);
+            var cx = w * 0.5, cy = h * 0.5 + 18, R = Math.min(w * 0.36, h * 0.36, w / 2 - nodeW / 2 - 8, (h - 64) / 2 - nodeH / 2 - 4);
             function pos(g) { var a = -Math.PI / 2 + g * 2 * Math.PI / N; return [cx + R * Math.cos(a), cy + R * Math.sin(a)]; }
             // the ring
             ctx.strokeStyle = C.faint; ctx.lineWidth = 1.5;
@@ -543,7 +550,7 @@
      * Each warp computes for a while, then waits on memory. One warp issues at a time.
      * Cycle counts are illustrative; the lesson says only that a memory access takes hundreds. */
     registry['latency-hiding'] = function (figure) {
-        var p = new Panel(figure, { title: '用别的 warp 把等待填满', note: '周期数是示意值：一次访存要等几百个周期', ratio: 0.5, minHeight: 320 });
+        var p = new Panel(figure, { title: '用别的 warp 把等待填满', note: '周期数是示意值：一次访存要等几百个周期', ratio: 0.5, minHeight: 320, caption: '默认是四个 warp 轮流占用运算单元；多加几个，看空转怎样被填满' });
         var BUCKET = 8, SPEED = 900, sim, hist, sm;
         p.slider('W', '驻留的 warp 数', 1, 16, 1, 4, function (v) { return v + ' 个'; }, reset);
         p.slider('L', '一次访存要等', 100, 800, 20, 400, function (v) { return v + ' 周期'; }, reset);
@@ -632,10 +639,10 @@
     /* ── 5.4 · Pipeline bubbles ────────────────────────────────────────────────────────────
      * p stages, m micro-batches, all forwards then all backwards. Lesson: bubble = (p−1)/(m+p−1). */
     registry['pipeline-bubbles'] = function (figure) {
-        var p = new Panel(figure, { title: '流水线并行的气泡', note: '前向和反向画成一样长（示意）', ratio: 0.42, minHeight: 280 });
+        var p = new Panel(figure, { title: '流水线并行的气泡', note: '前向和反向画成一样长（示意）', ratio: 0.42, minHeight: 280, caption: '行是段，列是时间；默认是讲解里 4 段的例子' });
         var head = 0;
         p.slider('p', '段数 p', 2, 8, 1, 4, function (v) { return v + ' 段'; }, function () { head = 0; p.kick && p.kick(); });
-        p.slider('m', '微批次数 m', 1, 16, 1, 4, function (v) { return v + ' 个'; }, function () { head = 0; p.kick && p.kick(); });
+        p.slider('m', '微批次数 m', 1, 32, 1, 4, function (v) { return v + ' 个'; }, function () { head = 0; p.kick && p.kick(); });
         p.readout('bubble', '气泡占比（数格子）', 'alert');
         p.readout('formula', '(p − 1) ÷ (m + p − 1)', 'ink');
         p.readout('slots', '一步的总时长（格）', 'ink');
@@ -696,7 +703,7 @@
         p.draw = function () {
             var ctx = p.ctx, w = p.w, h = p.h;
             p.clear();
-            var narrow = w < 560, half = narrow ? w : w / 2, pad = narrow ? 14 : 18, gs = Math.min(half - pad * 2 - 60, 300), cell = gs / B;
+            var narrow = w < 560, half = narrow ? w : w / 2, pad = narrow ? 14 : 18, gs = Math.min(half - pad * 2 - 60, narrow ? 200 : 300), cell = gs / B;
             var blockH = 76 + gs + 44;
             p.fit(narrow ? blockH * 2 + 10 : blockH);
             ctx = p.ctx; h = p.h; w = p.w;
@@ -837,10 +844,10 @@
             ctx.stroke(); ctx.restore();
             ctx.setLineDash([2, 4]); ctx.strokeStyle = C.dim; ctx.beginPath(); ctx.moveTo(X(knee), T + 26); ctx.lineTo(X(knee), B); ctx.stroke(); ctx.setLineDash([]);
             // things from the lessons, on the same axis
-            [[4e3, '几 KB 的偏置'], [25e6, 'DDP 的 25 MB 桶']].forEach(function (mk) {
-                var mm = model(mk[0]), yy = Y(mm.lat + mm.xfer);
+            [[4e3, narrow ? 'KB 级偏置' : '几 KB 的偏置'], [25e6, narrow ? '25 MB 桶' : 'DDP 的 25 MB 桶']].forEach(function (mk) {
+                var mm = model(mk[0]), yy = Y(mm.lat + mm.xfer), right = X(mk[0]) > R - 110;
                 ctx.beginPath(); ctx.arc(X(mk[0]), yy, 3.5, 0, Math.PI * 2); ctx.fillStyle = C.soft; ctx.fill();
-                text(ctx, mk[1], X(mk[0]) + 7, yy - 8, { size: 11, color: C.soft });
+                text(ctx, mk[1], X(mk[0]) + (right ? -7 : 7), yy - 8, { size: 11, align: right ? 'right' : 'left', color: C.soft });
             });
             var M = model(shown), t = M.lat + M.xfer, px = X(shown), py = Y(t), col = M.lat > M.xfer ? C.launch : C.peers;
             ctx.setLineDash([2, 3]); ctx.strokeStyle = alpha(col, 0.7);
@@ -959,7 +966,7 @@
      * The lesson's bytes per parameter: 16 (2 + 2 + 12), then 4 + 12/N, 2 + 14/N, 16/N;
      * communication 1×, 1×, 1×, 1.5×. */
     registry['zero-levels'] = function (figure) {
-        var p = new Panel(figure, { title: 'ZeRO：每张卡只管 1/N', note: '混合精度 + Adam，每个参数 16 字节；卡上显存按 80 GB 算', ratio: 0.46, minHeight: 300 });
+        var p = new Panel(figure, { title: 'ZeRO：每张卡只管 1/N', note: '混合精度 + Adam，每个参数 16 字节；卡上显存按 80 GB 算', ratio: 0.46, minHeight: 300, caption: '数据并行每个参数 16 字节；三级各自把哪一部分切成了 1/N' });
         p.toggle('lv', [[0, '数据并行'], [1, '第一级'], [2, '第二级'], [3, '第三级']], 0);
         p.slider('n', '卡数 N', 1, 64, 1, 8, function (v) { return v + ' 张'; });
         p.slider('P', '模型参数', 1, 70, 1, 7, function (v) { return v + 'B（' + v * 10 + ' 亿）'; });
@@ -1053,7 +1060,7 @@
                 if (a && k >= 40 && !still && (k - 40) / reqCells >= shownReq - 1 && (k - 40) / reqCells < shownReq) { ctx.save(); ctx.shadowColor = C.data; ctx.shadowBlur = 10; ctx.fill(); ctx.restore(); }
             }
             var ly = top + rows * cell + 24;
-            legend(ctx, [[C.compute, '模型权重 14 GB'], ['#2A3B50', '运行时与余量'], [C.data, '一个个请求的 KV cache']], L, ly, narrow ? 110 : 150);
+            legend(ctx, [[C.compute, narrow ? '权重 14 GB' : '模型权重 14 GB'], ['#2A3B50', narrow ? '运行时' : '运行时与余量'], [C.data, narrow ? '各请求的缓存' : '一个个请求的 KV cache']], L, ly, narrow ? 100 : 150);
             var msg = s.cap === 0 ? '一个请求的缓存就超过了 60 GB：一个都放不下' : '同时放下 ' + s.cap + ' 个请求；再来的只能排队，算力却远没用满';
             text(ctx, msg, L, ly + 24, { size: 12, color: s.cap === 0 ? C.alert : C.soft });
             p.set('tok', fmt(s.perTok / Math.pow(2, 20), 2) + ' MB');
@@ -1801,6 +1808,401 @@
             p.set('extra', p.values.group ? '每个数 +0.125 位' : '几乎为 0');
         };
         p.draw();
+    };
+
+    /* ── 1.4 · Causal mask ─────────────────────────────────────────────────────────────────
+     * Scores above the diagonal are set to −∞ before softmax, so position t takes nothing from
+     * later positions. Training computes every row at once; generation one row per step. */
+    registry['causal-mask'] = function (figure) {
+        var p = new Panel(figure, { title: '因果掩码：每个位置只看它前面', note: '分数是随手取的；被遮住的格子在 softmax 之后权重为 0', ratio: 0.55, minHeight: 340 });
+        var WORDS = ['今天', '天气', '很', '好', '我们', '去', '公园', '走走', '吧', '。'], clock = 0;
+        p.slider('n', '序列长度 N', 3, 10, 1, 6, function (v) { return v + ' 个词'; }, function () { clock = 0; p.kick && p.kick(); }, 'compute');
+        p.toggle('mode', [['train', '训练：所有行一次算完'], ['gen', '生成：一次一行']], 'train', function () { clock = 0; p.kick && p.kick(); });
+        p.readout('masked', '被遮住的格子 N(N−1)/2', 'alert');
+        p.readout('preds', '一次前向得到的预测', 'peers');
+        p.readout('steps', '要串行走几步', 'ink');
+        var S = [], seed = 17;
+        for (var i = 0; i < 10; i++) { S.push([]); for (var j = 0; j < 10; j++) { seed = (seed * 16807) % 2147483647; S[i].push((seed / 2147483647) * 3 - 1.5); } }
+        function weights(row) {
+            var m = -Infinity, k, out = [], sum = 0;
+            for (k = 0; k <= row; k++) m = Math.max(m, S[row][k]);
+            for (k = 0; k <= row; k++) { out[k] = Math.exp(S[row][k] - m); sum += out[k]; }
+            for (k = 0; k <= row; k++) out[k] /= sum;
+            return out;
+        }
+        function tick(dt) { clock += dt; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 600, N = p.values.n, gen = p.values.mode === 'gen', pad = 14;
+            var lab = narrow ? 40 : 52, mat = narrow ? Math.min(w - pad * 2 - lab, 300) : Math.min(300, w * 0.42), cell = mat / N;
+            var top = 44, barsTop = narrow ? top + mat + 50 : top, barsH = narrow ? 150 : mat;
+            p.fit(narrow ? barsTop + barsH + 30 : top + mat + 40);
+            var ctx = p.ctx, h = p.h;
+            p.clear();
+            var period = gen ? 0.9 : 1.3, cur = still ? N - 1 : Math.floor(clock / period) % (gen ? N + 2 : N), done = gen ? Math.min(cur, N - 1) : N - 1;
+            var showRow = gen ? Math.min(cur, N - 1) : cur;
+            var mx = pad + lab, my = top;
+            text(ctx, '分数矩阵（行：在算的位置，列：被看的位置）', pad, 22, { size: 11.5, color: C.soft });
+            for (var r = 0; r < N; r++) {
+                text(ctx, WORDS[r], mx - 6, my + r * cell + cell / 2 + 4, { size: Math.min(12, cell * 0.42), align: 'right', color: r === showRow ? C.ink : C.dim });
+                if (!narrow || cell > 26) text(ctx, WORDS[r], mx + r * cell + cell / 2, my - 6, { size: Math.min(11, cell * 0.38), align: 'center', color: C.dim });
+                var W = weights(r), live = r <= done;
+                for (var c = 0; c < N; c++) {
+                    var x = mx + c * cell, y = my + r * cell;
+                    round(ctx, x + 1, y + 1, cell - 2, cell - 2, Math.min(5, cell / 6));
+                    if (c > r) { ctx.fillStyle = alpha(C.alert, 0.13); ctx.fill(); if (cell > 26) text(ctx, '−∞', x + cell / 2, y + cell / 2 + 4, { size: 10, mono: true, align: 'center', color: alpha(C.alert, 0.6) }); continue; }
+                    ctx.fillStyle = live ? alpha(C.compute, 0.15 + 0.85 * W[c]) : alpha(C.faint, 0.5); ctx.fill();
+                    if (r === showRow && live) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
+                }
+            }
+            if (!gen && !still) { ctx.strokeStyle = alpha(C.peers, 0.35 + 0.3 * Math.sin(clock * 4)); ctx.lineWidth = 2; round(ctx, mx - 2, my - 2, mat + 4, mat + 4, 8); ctx.stroke(); }
+            // the highlighted row as weights
+            var bx = narrow ? pad + lab : mx + mat + 46, bw = narrow ? w - bx - pad : w - bx - pad, bh = barsH, W2 = weights(showRow), bar = bw / N;
+            text(ctx, '“' + WORDS[showRow] + '”这一行 softmax 之后的权重', bx, barsTop - 14, { size: 11.5, color: C.soft });
+            for (c = 0; c < N; c++) {
+                var v = c <= showRow ? W2[c] : 0, hh = (bh - 46) * v, xx = bx + c * bar;
+                round(ctx, xx + 3, barsTop + bh - 34 - hh, bar - 6, Math.max(2, hh), 4);
+                ctx.fillStyle = c <= showRow ? C.compute : alpha(C.alert, 0.4); ctx.fill();
+                text(ctx, c <= showRow ? v.toFixed(2) : '0', xx + bar / 2, barsTop + bh - 40 - hh, { size: 10, mono: true, align: 'center', color: c <= showRow ? C.ink : C.alert });
+                text(ctx, WORDS[c], xx + bar / 2, barsTop + bh - 16, { size: Math.min(11, bar * 0.4), align: 'center', color: c <= showRow ? C.soft : C.dim });
+            }
+            var nextWord = showRow + 1 < WORDS.length ? WORDS[showRow + 1] : '…';
+            text(ctx, '用它预测下一个词：“' + nextWord + '”', bx, barsTop + bh + 2, { size: 11.5, color: C.peers });
+            p.set('masked', String(N * (N - 1) / 2));
+            p.set('preds', gen ? '1 个' : N + ' 个（N 个损失）', gen ? 'ink' : 'peers');
+            p.set('steps', gen ? N + ' 步，后一步等前一步' : '1 步', gen ? 'alert' : 'peers');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 4.1 · KV cache ────────────────────────────────────────────────────────────────────
+     * Without a cache, step t recomputes all t positions: 1 + 2 + … + L ≈ L²/2 positions in all
+     * (about 500,000 for 1000 tokens). With it, only the new position: L in all. The price is
+     * 2 × layers × hidden × bytes per token: 0.5 MB for 32 layers, 4096, 16 bit; 8000 tokens ≈ 4 GB. */
+    registry['kv-cache'] = function (figure) {
+        var p = new Panel(figure, { title: 'KV cache：算过的不再算', note: '每一列是一个位置；亮的是这一步要算的', ratio: 0.48, minHeight: 300 });
+        var COLS = 12, clock = 0;
+        p.toggle('cache', [[false, '不用缓存'], [true, '用 KV cache']], true, function () { clock = 0; p.kick && p.kick(); });
+        p.slider('L', '一共生成多少个 token', 10, 8000, 10, 1000, function (v) { return fmt(v); }, null, 'data');
+        p.readout('work', '一共要算多少个“位置”', 'ink');
+        p.readout('mem', '缓存占显存（32 层 4096 维）', 'data');
+        p.readout('now', '这一步算几个位置', 'compute');
+        function tick(dt) { clock += dt; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 560, pad = 14, cache = p.values.cache, lab = narrow ? 34 : 50;
+            var cw = (w - pad * 2 - lab) / COLS, ch = Math.min(28, cw * 0.8), top = 40;
+            p.fit(top + 4 * (ch + 8) + 60);
+            var ctx = p.ctx, h = p.h;
+            p.clear();
+            var t = still ? COLS : Math.floor(clock / 0.7) % (COLS + 3) + 1, step = Math.min(t, COLS);
+            text(ctx, '第 ' + step + ' 步：生成第 ' + step + ' 个 token', pad, 22, { size: 12.5, weight: 600, color: C.ink });
+            var rows = ['Q', 'K', 'V'], col = [C.launch, C.data, C.peers];
+            rows.forEach(function (name, r) {
+                var y = top + r * (ch + 8);
+                text(ctx, name, pad + lab - 12, y + ch / 2 + 4, { size: 12, mono: true, weight: 600, align: 'right', color: col[r] });
+                for (var c = 0; c < COLS; c++) {
+                    var x = pad + lab + c * cw, fresh = cache ? c === step - 1 : c < step, kept = cache && r > 0 && c < step - 1, needed = r === 0 ? c === step - 1 : c < step;
+                    round(ctx, x + 2, y, cw - 4, ch, 5);
+                    if (c >= step) { ctx.fillStyle = alpha(C.faint, 0.4); ctx.fill(); continue; }
+                    if (fresh) {
+                        ctx.save(); if (!still && c === step - 1) { ctx.shadowColor = col[r]; ctx.shadowBlur = 14; }
+                        ctx.fillStyle = r === 0 && c !== step - 1 ? alpha(C.alert, 0.5) : alpha(col[r], needed ? 0.95 : 0.45); ctx.fill(); ctx.restore();
+                        if (!cache && c < step - 1) { ctx.strokeStyle = C.alert; ctx.lineWidth = 1.2; ctx.stroke(); }
+                    } else if (kept) { ctx.fillStyle = alpha(col[r], 0.25); ctx.fill(); ctx.strokeStyle = alpha(col[r], 0.7); ctx.lineWidth = 1; ctx.stroke(); }
+                    else { ctx.fillStyle = alpha(C.faint, 0.6); ctx.fill(); }
+                }
+            });
+            // the new position's query looks at every key so far
+            var qy = top + ch / 2, qx = pad + lab + (step - 1) * cw + cw / 2;
+            for (var c = 0; c < step; c++) {
+                var kx = pad + lab + c * cw + cw / 2, ky = top + (ch + 8) + ch / 2;
+                ctx.strokeStyle = alpha(C.launch, 0.35); ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(qx, qy + ch / 2); ctx.quadraticCurveTo((qx + kx) / 2, qy + ch, kx, ky - ch / 2); ctx.stroke();
+            }
+            var ay = top + 3 * (ch + 8) + 6;
+            text(ctx, cache ? (narrow ? '带框：缓存里的 K、V；只算最新一列' : '淡色带框：缓存里的 K、V，直接拿来用；只有最新一列是现算的') : (narrow ? '红框：前面的位置又重算了一遍' : '红框：前面的位置又被整个重算了一遍'), pad, ay + 10, { size: 11.5, color: cache ? C.peers : C.alert });
+            var soFar = cache ? step : step * (step + 1) / 2;
+            text(ctx, '到这一步一共算了 ' + soFar + ' 个位置', pad, ay + 32, { size: 12, mono: true, color: C.soft });
+            var L = p.values.L, posNo = L * (L + 1) / 2;
+            p.set('work', cache ? fmt(L) + ' 个' : fmt(posNo) + ' 个', cache ? 'peers' : 'alert');
+            var bytes = 2 * 32 * 4096 * 2 * L;
+            p.set('mem', bytes >= Math.pow(2, 30) ? fmt(bytes / Math.pow(2, 30), 1) + ' GB' : fmt(bytes / Math.pow(2, 20)) + ' MB');
+            p.set('now', cache ? '1 个' : step + ' 个');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 4.1 · Matrix times matrix, or matrix times vector ─────────────────────────────────
+     * One pass over a 7B model's weights serves as many positions as there are rows. The card is
+     * 9.1's: 1 TB/s and 300 TFLOPS. One row in 16 bits: 14 GB read for 1.4×10¹⁰ FLOPs, 14 ms,
+     * about 70 tokens a second; a multiply-add per weight, under one per byte. */
+    registry['matmul-vs-matvec'] = function (figure) {
+        var p = new Panel(figure, { title: '同一个权重矩阵：用一次，还是用很多次', note: '7B 模型；卡按 9.1 的例子：显存带宽 1 TB/s，峰值 300 TFLOPS；只算权重的读写', ratio: 0.5, minHeight: 320 });
+        function rowsOf(v) { return Math.round(Math.pow(2, v)); }
+        p.slider('r', '读一遍权重，同时算多少行（位置）', 0, 12, 1, 0, function (v) { var r = rowsOf(v); return r === 1 ? '1（生成一个词）' : fmt(r); }, null, 'compute');
+        p.toggle('bits', [[2, '16 位权重'], [1, '8 位'], [0.5, '4 位']], 2);
+        p.readout('reuse', '每读 1 字节做几次乘加', 'ink');
+        p.readout('time', '读一遍、算一遍要多久', 'ink');
+        p.readout('tps', '每秒能出多少个 token', 'peers');
+        p.readout('bound', '在等什么', 'data');
+        var P = 7e9, BW = 1e12, PEAK = 300e12, clock = 0;
+        function tick(dt) { clock += dt; }
+        function model() {
+            var rows = rowsOf(p.values.r), bytes = P * p.values.bits, flops = 2 * P * rows, tRead = bytes / BW, tMath = flops / PEAK, t = Math.max(tRead, tMath);
+            return { rows: rows, tRead: tRead, tMath: tMath, t: t, tps: rows / t, reuse: rows / p.values.bits };
+        }
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, h = p.h, narrow = w < 560, M = model(), pad = 16;
+            p.clear();
+            // weights as a grid whose brightness is how many times each weight is used per read
+            var gx = narrow ? pad + 70 : w * 0.36, gs = Math.min(h - 130, narrow ? w - gx - pad : 200), n = 12, cs = gs / n, gy = 30;
+            var heat = Math.min(1, Math.log2(M.rows + 1) / 12);
+            for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) {
+                var flick = still ? 0 : 0.12 * Math.sin(clock * 6 + i * 0.9 + j * 1.7);
+                round(ctx, gx + j * cs + 1, gy + i * cs + 1, cs - 2, cs - 2, 3);
+                ctx.fillStyle = alpha(C.compute, Math.max(0.08, 0.15 + 0.8 * heat + flick * heat)); ctx.fill();
+            }
+            text(ctx, '权重矩阵', gx + gs / 2, gy + gs + 18, { size: 11.5, align: 'center', color: C.soft });
+            // the rows that share one read of the weights
+            var shown = Math.min(M.rows, 24), rx = narrow ? pad : gx - 90, rw = 60;
+            for (var r = 0; r < shown; r++) {
+                var ry = gy + gs / 2 - shown * 3 + r * 6, phase = still ? 1 : (clock * 0.8 + r * 0.04) % 1;
+                ctx.fillStyle = alpha(C.data, 0.85); ctx.fillRect(rx, ry, rw, 3.5);
+                if (!still) { ctx.fillStyle = alpha(C.data, 0.9); ctx.fillRect(rx + rw + (gx - rx - rw) * phase - 3, ry, 6, 3.5); }
+            }
+            text(ctx, M.rows > 24 ? '× ' + fmt(M.rows) + ' 行' : M.rows + ' 行输入', rx, gy + gs / 2 + shown * 3 + 18, { size: 11.5, color: C.data });
+            if (!narrow) {                                                      // and as many rows of output on the other side
+                var ox = gx + gs + 30;
+                for (r = 0; r < shown; r++) {
+                    var oy = gy + gs / 2 - shown * 3 + r * 6, ph = still ? 1 : (clock * 0.8 + r * 0.04 + 0.5) % 1;
+                    ctx.fillStyle = alpha(C.peers, 0.85); ctx.fillRect(ox, oy, rw * Math.min(1, ph * 1.6), 3.5);
+                }
+                text(ctx, M.rows > 24 ? '× ' + fmt(M.rows) + ' 行输出' : M.rows + ' 行输出', ox, gy + gs / 2 + shown * 3 + 18, { size: 11.5, color: C.peers });
+            }
+            // time for one pass: reading against arithmetic, on one scale
+            var by = gy + gs + 40, bl = narrow ? 70 : 96, bwid = w - pad - bl - 90, longest = Math.max(M.tRead, M.tMath);
+            [['读权重', M.tRead, C.data], ['做运算', M.tMath, C.compute]].forEach(function (b, k) {
+                var y = by + k * 26, len = Math.max(2, b[1] / longest * bwid), mine = b[1] === longest;
+                text(ctx, b[0], bl - 10, y + 12, { size: 12, align: 'right', color: mine ? C.ink : C.dim });
+                round(ctx, bl, y + 2, len, 12, 4); ctx.fillStyle = alpha(b[2], mine ? 0.95 : 0.4); ctx.fill();
+                text(ctx, fmtTime(b[1]), bl + len + 8, y + 12, { size: 11, mono: true, color: mine ? C.ink : C.dim });
+            });
+            p.set('reuse', M.reuse < 10 ? fmt(M.reuse, 2) : fmt(M.reuse), M.reuse < 1 ? 'alert' : 'ink');
+            p.set('time', fmtTime(M.t));
+            p.set('tps', fmt(M.tps));
+            p.set('bound', M.tRead >= M.tMath ? '显存（读权重）' : '算力', M.tRead >= M.tMath ? 'data' : 'compute');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 9.1 · Prefill and decode ──────────────────────────────────────────────────────────
+     * Lesson: a 7B model, 14 GB of 16-bit weights, 1 TB/s, 300 TFLOPS at half use. Decode reads
+     * the weights once per token: 14 ms. Prefill of 2000 tokens: 2 × 7×10⁹ × 2000 FLOPs, about
+     * 0.2 s. The replay runs at the real speed. */
+    registry['prefill-decode'] = function (figure) {
+        var p = new Panel(figure, { title: '一个请求的两段：prefill 和 decode', note: '7B 模型、16 位权重，显存带宽 1 TB/s，峰值 300 TFLOPS、prefill 用到五成；按真实速度回放', ratio: 0.42, minHeight: 290 });
+        p.slider('N', '提示词长度', 100, 8000, 100, 2000, function (v) { return fmt(v) + ' token'; }, restart, 'compute');
+        p.slider('G', '要生成多少个 token', 10, 300, 10, 60, function (v) { return v + ' 个'; }, restart, 'data');
+        p.readout('ttft', '首 token 延迟（不算排队）', 'compute');
+        p.readout('tpot', '之后每个 token 的间隔', 'data');
+        p.readout('total', '整个请求', 'ink');
+        p.readout('cu', '算力用到（prefill / decode）', 'ink');
+        var P = 7e9, BYTES = 14e9, BW = 1e12, PEAK = 300e12, USE = 0.5, clock = 0;
+        function restart() { clock = 0; p.kick && p.kick(); }
+        function model() {
+            var N = p.values.N, G = p.values.G, read = BYTES / BW, pre = Math.max(2 * P * N / (PEAK * USE), read), dec = read;
+            return { pre: pre, dec: dec, total: pre + G * dec, G: G, cuPre: 2 * P * N / pre / PEAK, cuDec: 2 * P / dec / PEAK, bwPre: BYTES / pre / BW };
+        }
+        function tick(dt) { var M = model(); clock += dt; if (clock > M.total + 1.2) clock = 0; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 560, M = model(), pad = 16, now = still ? M.total : clock;
+            p.fit(46 + 30 + (narrow ? 62 : 44) + 16 + 2 * 26 + 14);
+            var ctx = p.ctx, h = p.h;
+            p.clear();
+            var L = pad, R = w - pad, ty = 46, th = 30, X = function (t) { return L + t / M.total * (R - L); };
+            text(ctx, '时间 →', R, ty - 12, { size: 11, align: 'right', color: C.dim });
+            round(ctx, X(0), ty, Math.max(3, X(M.pre) - X(0) - 2), th, 6);
+            ctx.fillStyle = alpha(C.compute, now >= M.pre ? 0.9 : now > 0 ? 0.55 : 0.2); ctx.fill();
+            if (X(M.pre) - X(0) > 70) text(ctx, 'prefill', X(M.pre / 2), ty + th / 2 + 4, { size: 12, align: 'center', weight: 600, color: C.panel });
+            for (var k = 0; k < M.G; k++) {
+                var t0 = M.pre + k * M.dec, x0 = X(t0), x1 = X(t0 + M.dec);
+                ctx.fillStyle = alpha(C.data, now >= t0 + M.dec ? 0.9 : 0.15);
+                ctx.fillRect(x0 + 0.5, ty, Math.max(1, x1 - x0 - 1), th);
+            }
+            if (!still && now <= M.total) { ctx.fillStyle = C.ink; ctx.fillRect(X(now) - 1, ty - 6, 2, th + 12); }
+            text(ctx, '首 token', X(M.pre), ty + th + 16, { size: 11, align: 'center', color: C.compute });
+            var made = Math.max(0, Math.min(M.G, Math.floor((now - M.pre) / M.dec) + (now >= M.pre ? 1 : 0)));
+            text(ctx, '已生成 ' + made + ' / ' + M.G + ' 个 token（每秒约 ' + fmt(1 / M.dec) + ' 个）', narrow ? L : R, ty + th + (narrow ? 34 : 16), { size: 11.5, mono: true, align: narrow ? 'left' : 'right', color: C.soft });
+            // two gauges for the phase in progress
+            var inPre = now < M.pre, gy = ty + th + (narrow ? 62 : 44), gw = narrow ? w - pad * 2 - 110 : Math.min(360, w * 0.5);
+            text(ctx, inPre ? '现在：prefill（大矩阵乘大矩阵）' : '现在：decode（矩阵乘向量）', L, gy, { size: 12.5, weight: 600, color: inPre ? C.compute : C.data });
+            [['算力', inPre ? M.cuPre : M.cuDec, C.compute], ['显存带宽', inPre ? M.bwPre : 1, C.data]].forEach(function (g, i) {
+                var y = gy + 16 + i * 26;
+                text(ctx, g[0], L, y + 11, { size: 11.5, color: C.soft });
+                round(ctx, L + 70, y + 2, gw, 10, 5); ctx.fillStyle = C.faint; ctx.fill();
+                round(ctx, L + 70, y + 2, Math.max(4, gw * g[1]), 10, 5); ctx.fillStyle = g[2]; ctx.fill();
+                text(ctx, fmt(g[1] * 100, g[1] < 0.1 ? 1 : 0) + '%', L + 78 + gw, y + 11, { size: 11, mono: true, color: C.ink });
+            });
+            p.set('ttft', fmtTime(M.pre), 'compute');
+            p.set('tpot', fmtTime(M.dec));
+            p.set('total', fmtTime(M.total));
+            p.set('cu', fmt(M.cuPre * 100) + '% / ' + fmt(M.cuDec * 100, 1) + '%');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 1.3 · Learning-rate schedule ──────────────────────────────────────────────────────
+     * Linear warm-up to the set value, then a cosine down to near zero (or to a floor). */
+    registry['lr-schedule'] = function (figure) {
+        var p = new Panel(figure, { title: '学习率：先预热，再按余弦衰减', note: '拖动看曲线怎么变；小球按步数走一遍', ratio: 0.45, minHeight: 290 });
+        p.slider('W', '预热多少步', 0, 10000, 100, 2000, function (v) { return fmt(v) + ' 步'; }, null, 'launch');
+        p.slider('T', '总步数', 10000, 200000, 5000, 100000, function (v) { return fmt(v) + ' 步'; }, null, 'compute');
+        p.slider('lr', '设定值（峰值）', -4, -2.5, 0.05, Math.log10(6e-4), function (v) { return Math.pow(10, v).toExponential(1); }, null, 'data');
+        p.toggle('floor', [[0, '降到接近零'], [0.1, '降到峰值的 10%']], 0);
+        p.readout('step', '当前步', 'ink');
+        p.readout('now', '当前学习率', 'data');
+        p.readout('half', '走到一半时', 'ink');
+        var clock = 0;
+        function lrAt(s) {
+            var W = p.values.W, T = p.values.T, peak = Math.pow(10, p.values.lr), lo = peak * p.values.floor;
+            if (s < W) return peak * (s + 1) / W;
+            var f = Math.min(1, (s - W) / Math.max(1, T - W));
+            return lo + 0.5 * (peak - lo) * (1 + Math.cos(Math.PI * f));
+        }
+        function tick(dt) { clock = (clock + dt / 6) % 1.15; }
+        p.draw = function () {
+            var ctx = p.ctx, w = p.w, h = p.h, narrow = w < 560, T = p.values.T, W = Math.min(p.values.W, T), peak = Math.pow(10, p.values.lr);
+            p.clear();
+            var L = narrow ? 58 : 70, R = w - 18, top = 28, B = h - 38, X = function (s) { return L + s / T * (R - L); }, Y = function (v) { return B - v / (peak * 1.1) * (B - top); };
+            ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+            [0, 0.25, 0.5, 0.75, 1].forEach(function (f) { ctx.beginPath(); ctx.moveTo(X(T * f), top); ctx.lineTo(X(T * f), B); ctx.stroke(); text(ctx, fmt(T * f / 1000) + 'k', X(T * f), B + 16, { size: 10.5, mono: true, align: 'center', color: C.dim }); });
+            [0, 0.5, 1].forEach(function (f) { ctx.beginPath(); ctx.moveTo(L, Y(peak * f)); ctx.lineTo(R, Y(peak * f)); ctx.stroke(); text(ctx, (peak * f).toExponential(1).replace('0.0e+0', '0'), L - 6, Y(peak * f) + 4, { size: 10.5, mono: true, align: 'right', color: C.dim }); });
+            ctx.fillStyle = alpha(C.launch, 0.1); ctx.fillRect(X(0), top, X(W) - X(0), B - top);
+            if (X(W) - X(0) > 40) text(ctx, '预热', (X(0) + X(W)) / 2, top + 14, { size: 11.5, align: 'center', color: C.launch });
+            text(ctx, '余弦衰减', (X(W) + R) / 2, top + 14, { size: 11.5, align: 'center', color: C.data });
+            ctx.save(); if (!still) { ctx.shadowColor = alpha(C.data, 0.6); ctx.shadowBlur = 10; }
+            ctx.strokeStyle = C.data; ctx.lineWidth = 2.4; ctx.beginPath();
+            for (var i = 0; i <= 240; i++) { var s = T * i / 240, y = Y(lrAt(s)); if (i) ctx.lineTo(X(s), y); else ctx.moveTo(X(s), y); }
+            ctx.stroke(); ctx.restore();
+            text(ctx, '步数', R, B + 30, { size: 10.5, align: 'right', color: C.dim });
+            var step = still ? T * 0.3 : Math.min(T, clock * T), v = lrAt(step);
+            ctx.save(); if (!still) { ctx.shadowColor = C.ink; ctx.shadowBlur = 14; }
+            ctx.beginPath(); ctx.arc(X(step), Y(v), 6.5, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill(); ctx.restore();
+            p.set('step', fmt(step));
+            p.set('now', v.toExponential(2));
+            p.set('half', lrAt(T / 2).toExponential(2));
+        };
+        p.loop(tick);
+    };
+
+    /* ── 4.5 · Tiling at three levels ──────────────────────────────────────────────────────
+     * The lesson's example sizes: a block owns a 128×128 piece of the output (shared memory), a
+     * warp 64×32 (registers), one Tensor Core instruction 16×8. An M×N tile in 16 bits does
+     * M·N/(M+N) FLOPs per byte it brings in (the same rule as the roofline demo). */
+    registry['tiling-levels'] = function (figure) {
+        var p = new Panel(figure, { title: '分块分三层：block、warp、Tensor Core', note: '块的大小取讲解表里的例子；运算按 16 位、一次乘加算 2 次运算', ratio: 0.46, minHeight: 300 });
+        var LV = [['显存 → 共享内存', '一个 block', 128, 128, C.data], ['共享内存 → 寄存器', '一个 warp', 64, 32, C.launch], ['寄存器 → Tensor Core', '一条指令', 16, 8, C.compute]];
+        p.readout('a', '128×128（block）每搬 1 字节', 'data');
+        p.readout('b', '64×32（warp）每搬 1 字节', 'launch');
+        p.readout('c', '16×8（指令）每搬 1 字节', 'compute');
+        var clock = 0;
+        function tick(dt) { clock += dt; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 600, pad = 14, gap = narrow ? 26 : 34, side = narrow ? Math.min((w - pad * 2 - gap) / 2, 190) : (w - pad * 2 - gap * 2) / 3, top = 34;
+            var big = narrow ? Math.min(w - pad * 2, 240) : side;                 // on a phone the first level gets the full width
+            p.fit(narrow ? top + big + 60 + side + 54 : top + side + 50);
+            var ctx = p.ctx;
+            p.clear();
+            var k = still ? 0 : Math.floor(clock / 1.1), boxes = [], panels = [];
+            // level 1: the output split into 8×8 blocks; levels 2 and 3 zoom into the lit tile
+            var splits = [[8, 8], [128 / 64, 128 / 32], [64 / 16, 32 / 8]];
+            for (var l = 0; l < 3; l++) {
+                var sd = narrow && l === 0 ? big : side, pw = l === 2 ? sd / 2 : sd;
+                var slotX = narrow ? (l === 0 ? (w - big) / 2 : (w - 2 * side - gap) / 2 + (l - 1) * (side + gap)) : pad + l * (side + gap);
+                var ox = slotX + (sd - pw) / 2, oy = narrow ? (l === 0 ? top : top + big + 60) : top;
+                var rows = splits[l][0], cols = splits[l][1], cw = pw / cols, chh = sd / rows;      // the warp tile is 64 tall, 32 wide
+                var lit = (k + l * 3) % (rows * cols), tone = LV[l][4];
+                text(ctx, narrow && l > 0 ? LV[l][0].split(' → ')[1] : LV[l][0], ox - (sd - pw) / 2, oy - 10, { size: 11.5, weight: 600, color: tone });
+                for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+                    var on = r * cols + c === lit;
+                    round(ctx, ox + c * cw + 1.5, oy + r * chh + 1.5, cw - 3, chh - 3, 4);
+                    ctx.fillStyle = on ? tone : alpha(tone, 0.14); ctx.fill();
+                    if (on) boxes[l] = [ox + c * cw, oy + r * chh, cw, chh];
+                }
+                text(ctx, LV[l][1] + ' 管 ' + LV[l][2] + '×' + LV[l][3], ox - (sd - pw) / 2, oy + sd + 18, { size: 11.5, color: C.soft });
+                if (l === 0) text(ctx, '（整块输出 1024×1024）', ox, oy + sd + 34, { size: 10.5, color: C.dim });
+                panels[l] = [ox, oy, pw];
+            }
+            // lines from a lit tile to the panel that zooms into it
+            for (l = 0; l < 2; l++) {
+                var b = boxes[l], nx = panels[l + 1][0], ny = panels[l + 1][1], npw = panels[l + 1][2];
+                if (!b) continue;
+                ctx.strokeStyle = alpha(LV[l][4], 0.45); ctx.lineWidth = 1;
+                ctx.beginPath();
+                if (narrow && l === 0) { ctx.moveTo(b[0], b[1] + b[3]); ctx.lineTo(nx, ny); ctx.moveTo(b[0] + b[2], b[1] + b[3]); ctx.lineTo(nx + npw, ny); }
+                else { ctx.moveTo(b[0] + b[2], b[1]); ctx.lineTo(nx, ny); ctx.moveTo(b[0] + b[2], b[1] + b[3]); ctx.lineTo(nx, ny + side); }
+                ctx.stroke();
+            }
+            function per(M, N) { return M * N / (M + N); }
+            p.set('a', fmt(per(128, 128)) + ' 次运算');
+            p.set('b', fmt(per(64, 32), 1) + ' 次运算');
+            p.set('c', fmt(per(16, 8), 1) + ' 次运算');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 7.4 · Failures grow with scale ────────────────────────────────────────────────────
+     * Lesson: one server fails about once in 5 years (≈ 44,000 hours). The job stops when any one
+     * does, so its mean time between failures is that divided by the number of servers:
+     * 1000 servers → 44 hours, seven or eight stops in two weeks. The replay draws random failures. */
+    registry['failure-scale'] = function (figure) {
+        var p = new Panel(figure, { title: '规模越大，故障越是常态', note: '点是服务器；回放整段训练，红点是一次让作业中断的故障（随机抽的）', ratio: 0.5, minHeight: 320 });
+        p.slider('n', '服务器台数', 0, 4, 0.05, 3, function (v) { return fmt(Math.round(Math.pow(10, v))) + ' 台'; }, restart, 'compute');
+        p.slider('y', '一台平均多久出一次故障', 1, 10, 0.5, 5, function (v) { return v + ' 年'; }, restart, 'alert');
+        p.slider('d', '训练要跑多久', 1, 60, 1, 14, function (v) { return v + ' 天'; }, restart, 'peers');
+        p.readout('mtbf', '作业平均多久中断一次', 'alert');
+        p.readout('exp', '训练期间预计中断', 'ink');
+        p.readout('seen', '这次回放里遇到', 'ink');
+        var clock = 0, events = null;
+        function restart() { clock = 0; events = null; p.kick && p.kick(); }
+        function machines() { return Math.round(Math.pow(10, p.values.n)); }
+        function plan() {
+            var n = machines(), hours = p.values.d * 24, rate = n / (p.values.y * 8760), t = 0, r = 12345, ev = [];
+            while (ev.length < 400) {
+                r = (r * 1103515245 + 12345) % 2147483648; t += -Math.log(1 - r / 2147483648) / rate;
+                if (t > hours) break;
+                r = (r * 1103515245 + 12345) % 2147483648; ev.push({ t: t, who: Math.floor(r / 2147483648 * n) });
+            }
+            return ev;
+        }
+        function tick(dt) { clock += dt / 7; if (clock > 1.2) clock = 0; }
+        p.draw = function () {
+            if (!events) events = plan();
+            var ctx = p.ctx, w = p.w, h = p.h, narrow = w < 560, pad = 16, n = machines(), hours = p.values.d * 24, now = still ? hours : Math.min(1, clock) * hours;
+            p.clear();
+            var dots = Math.min(n, narrow ? 600 : 1000), per = n / dots, top = 26, gridH = h - 110, cols = Math.ceil(Math.sqrt(dots * (w - pad * 2) / gridH)), sz = Math.min(22, (w - pad * 2) / cols), rowsN = Math.ceil(dots / cols);
+            var gx = (w - cols * sz) / 2, gy = top + (gridH - rowsN * sz) / 2;
+            text(ctx, per > 1 ? '每个点代表 ' + fmt(per) + ' 台' : '每个点是一台服务器', pad, 16, { size: 11.5, color: C.soft });
+            var hot = {};
+            events.forEach(function (e) { if (e.t <= now && now - e.t < hours * 0.04) hot[Math.floor(e.who / per)] = 1 - (now - e.t) / (hours * 0.04); });
+            for (var i = 0; i < dots; i++) {
+                var x = gx + (i % cols) * sz + sz / 2, y = gy + Math.floor(i / cols) * sz + sz / 2, f = hot[i];
+                ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, sz * 0.32) * (f ? 1 + f : 1), 0, Math.PI * 2);
+                ctx.fillStyle = f ? alpha(C.alert, 0.4 + 0.6 * f) : alpha(C.peers, 0.55); ctx.fill();
+            }
+            // the run as a timeline with its stops
+            var ty = h - 60, tx0 = pad, tx1 = w - pad, X = function (t) { return tx0 + t / hours * (tx1 - tx0); };
+            round(ctx, tx0, ty, tx1 - tx0, 10, 5); ctx.fillStyle = C.faint; ctx.fill();
+            round(ctx, tx0, ty, Math.max(4, X(now) - tx0), 10, 5); ctx.fillStyle = alpha(C.peers, 0.7); ctx.fill();
+            var seen = 0;
+            events.forEach(function (e) { if (e.t <= now) { seen++; ctx.fillStyle = C.alert; ctx.fillRect(X(e.t) - 1, ty - 5, 2, 20); } });
+            text(ctx, '第 0 天', tx0, ty + 28, { size: 10.5, color: C.dim });
+            text(ctx, '第 ' + p.values.d + ' 天', tx1, ty + 28, { size: 10.5, align: 'right', color: C.dim });
+            var mtbf = p.values.y * 8760 / n, expect = hours / mtbf;
+            p.set('mtbf', mtbf >= 48 ? fmt(mtbf / 24, 1) + ' 天' : fmt(mtbf, mtbf < 10 ? 1 : 0) + ' 小时', mtbf < 24 ? 'alert' : 'ink');
+            p.set('exp', expect < 0.1 ? '几乎不会' : fmt(expect, expect < 10 ? 1 : 0) + ' 次');
+            p.set('seen', (events.length >= 400 ? '400+' : seen) + ' 次');
+        };
+        p.loop(tick);
     };
 
     function upgrade(root) {

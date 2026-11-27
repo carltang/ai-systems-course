@@ -42,7 +42,7 @@
             ['comment', /#[^\n]*/y],
             ['string', /"(?:\\.|[^"\\])*"|'[^']*'/y],
             ['var', /\$\{?\w+\}?|\b[A-Z][A-Z0-9_]*(?==)/y],
-            ['flag', /(?:^|(?<=\s))--?[\w-]+/y],
+            ['flag', /--?[A-Za-z][\w-]*/y],
             ['number', /\b\d+(?:\.\d+)?\b/y],
             ['word', /[A-Za-z_][\w.-]*/y]
         ],
@@ -64,7 +64,7 @@
                 var re = rules[r][1];
                 re.lastIndex = i;
                 var m = re.exec(src);
-                if (m && m.index === i && m[0].length) hit = [rules[r][0], m[0]];
+                if (m && m.index === i && m[0].length && !(rules[r][0] === 'flag' && i > 0 && !/\s/.test(src[i - 1]))) hit = [rules[r][0], m[0]];   // a flag starts after a space
             }
             if (!hit) { plain += src[i]; lineStart = src[i] === '\n' || (lineStart && /\s/.test(src[i])); i++; continue; }
             flush();
