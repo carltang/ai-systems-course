@@ -293,6 +293,14 @@ body.reading .unit-pager { max-width: var(--read-w); margin-left: auto; margin-r
 :root[data-theme=dark] .fig-veil { background: rgba(0, 0, 0, .86); }
 :root[data-theme=dark] .demo { background: #0B1219; box-shadow: inset 0 0 0 1px #1A2531; }
 :root[data-theme=dark] .demo-title::before { box-shadow: 0 0 6px #3DD6A0; }
+/* the app's own pills and buttons around a lesson, quieted for the night */
+:root[data-theme=dark] .ls-doing, :root[data-theme=dark] .verify-pill, :root[data-theme=dark] .origin.o-ai { background: rgba(215, 165, 72, .16); color: #D7A548; }
+:root[data-theme=dark] .ls-done { background: rgba(93, 199, 160, .14); color: #5DC7A0; }
+:root[data-theme=dark] .ls-missing { background: rgba(255, 122, 122, .14); color: #F0A0A0; }
+:root[data-theme=dark] .distill-status { background: rgba(215, 165, 72, .10); }
+:root[data-theme=dark] .ai-btn { background: var(--accent-light); color: var(--accent); border-color: var(--border); box-shadow: none; }
+:root[data-theme=dark] .btn-primary { color: #0E0F11; }
+:root[data-theme=dark] select, :root[data-theme=dark] input:not([type=range]), :root[data-theme=dark] textarea { background-color: var(--bg-secondary); color: var(--text); border-color: var(--border); }
 :root.theme-changing, :root.theme-changing body, :root.theme-changing .essence, :root.theme-changing .essence *, :root.theme-changing .unit-nav * {
     transition: background-color .35s ease, color .35s ease, border-color .35s ease, filter .35s ease !important; }
 @media (prefers-reduced-motion: reduce) { :root.theme-changing * { transition: none !important; } }
