@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=7286539c">
+<link rel="stylesheet" href="../assets/site.css?v=4eaded23">
 </head>
 <body>
 <main class="main">
@@ -37,16 +37,16 @@
 <p class="i-analogy"><b>打个比方</b>像用很多段直尺去拼一条曲线：尺子越多，拼得越像。</p>
 <p class="i-impl">所以非线性激活是神经网络表达能力的来源；“神经网络能拟合任意函数”说的就是：分段足够多，就能逼近任何连续函数。</p>
 <div class="i-builds">后面会用到 <a href="1-1.html#c-1-1-depth">深度的威力：每加一层，就把空间再“对折”一次</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL 第 3 章 浅层网络</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》第 3 章 浅层网络</a></div>
 </li>
 <li class="i-lead">加神经元可以增加分段。但同样多的神经元，排成很多层比排成一层更有效。</li>
 <li class="icard" id="c-1-1-depth"><h3><span class="i-num">2</span>深度的威力：每加一层，就把空间再“对折”一次</h3>
 <p class="i-essence">深层网络的前一层把输入空间“折叠”起来，后一层在折叠后的空间里画的线，会被复制到所有折在一起的位置上。因此线性区域的数量可以随层数成倍增长，而加宽一层只能线性地增加。</p>
-<div class="i-detail"><p><strong class="h">两层串起来会怎样。</strong> 设第一层把输入 x 变成一个分段线性的中间量，比如一个“锯齿”：x 从左到右时，中间量上去、下来、再上去。于是输入的三个不同的区间，被映射到了中间量的同一段取值范围上。可以说第一层把输入轴“折”了三折，叠在了一起。</p><p>第二层再在这个中间量上画一个分段线性函数，比如有 4 段。因为三个输入区间共用同一段中间量，第二层画的这 4 段，在三个区间里各出现一次（有的是镜像）。最后得到的函数有 3 × 4 = 12 段。而两层加起来用的神经元并不多。</p><p><strong class="h">对比。</strong> 同样的神经元如果全放在一层里，段数只是“神经元个数加一”，是相加的关系。分成两层，段数是相乘的关系。层数越多，乘的次数越多：<mark>线性区域的数量可以随深度指数增长，而随宽度只是线性增长</mark>。UDL 第 4 章用图演示了这个折叠的过程。</p><p><strong class="h">但这些段不是任意的。</strong> 那 12 段不是 12 个可以独立调整的线段：后面一层画的图案在每个“折”里是重复的。所以深层网络擅长表示有重复结构、有层次的函数。现实中的数据（图像由部件组成，部件由边缘组成；句子由短语组成，短语由词组成）恰好有这种层次结构，这是深度网络在实践中有效的一个解释。</p><p><strong class="h">深度的代价。</strong> 层数多了，训练变难：信号和梯度要穿过很多层，容易消失或爆炸（1.2 的初始化、1.4 的残差连接）。计算上，深度意味着这些层必须一层接一层地算，不能并行。所以 GPU 的并行性用在每一层的内部（一层里的很多神经元、一个 batch 里的很多样本同时算），而不是层与层之间。7.3 的流水线并行按层切开模型时遇到的“气泡”，根源就是层与层之间这种先后依赖。</p></div>
+<div class="i-detail"><p><strong class="h">两层串起来会怎样。</strong> 设第一层把输入 x 变成一个分段线性的中间量，比如一个“锯齿”：x 从左到右时，中间量上去、下来、再上去。于是输入的三个不同的区间，被映射到了中间量的同一段取值范围上。可以说第一层把输入轴“折”了三折，叠在了一起。</p><p>第二层再在这个中间量上画一个分段线性函数，比如有 4 段。因为三个输入区间共用同一段中间量，第二层画的这 4 段，在三个区间里各出现一次（有的是镜像）。最后得到的函数有 3 × 4 = 12 段。而两层加起来用的神经元并不多。</p><figure class="fig"><img src="../assets/figures/depth-fold.svg" alt="第一层把输入轴折成三段叠在一起，第二层画的 4 段在每一折里各出现一次：3 × 4 = 12 段" loading="lazy"><figcaption>第一层把输入轴折成三段叠在一起，第二层画的 4 段在每一折里各出现一次：3 × 4 = 12 段</figcaption></figure><p><strong class="h">对比。</strong> 同样的神经元如果全放在一层里，段数只是“神经元个数加一”，是相加的关系。分成两层，段数是相乘的关系。层数越多，乘的次数越多：<mark>线性区域的数量可以随深度指数增长，而随宽度只是线性增长</mark>。UDL（Simon Prince 的《Understanding Deep Learning》，作者在网上免费提供全书）第 4 章的图 4.1 和图 4.3 画的就是这个折叠的过程。</p><p><strong class="h">但这些段不是任意的。</strong> 那 12 段不是 12 个可以独立调整的线段：后面一层画的图案在每个“折”里是重复的。所以深层网络擅长表示有重复结构、有层次的函数。现实中的数据（图像由部件组成，部件由边缘组成；句子由短语组成，短语由词组成）恰好有这种层次结构，这是深度网络在实践中有效的一个解释。</p><p><strong class="h">深度的代价。</strong> 层数多了，训练变难：信号和梯度要穿过很多层，容易消失或爆炸（1.2 的初始化、1.4 的残差连接）。计算上，深度意味着这些层必须一层接一层地算，不能并行。所以 GPU 的并行性用在每一层的内部（一层里的很多神经元、一个 batch 里的很多样本同时算），而不是层与层之间。7.3 的流水线并行按层切开模型时遇到的“气泡”，根源就是层与层之间这种先后依赖。</p></div>
 <p class="i-analogy"><b>打个比方</b>像把一张纸反复对折后剪一刀：展开时得到的是许多对称的剪口。折的次数越多，一刀剪出的花样越多。</p>
 <p class="i-impl">所以同样多的参数，深而窄的网络往往比浅而宽的网络表达能力更强；这也是“深度学习”里“深”的意义。</p>
 <div class="i-builds">承接 <a href="1-1.html#c-1-1-piecewise">ReLU 网络把输入空间切成许多块，每块里是一个线性函数</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL 第 4 章 折叠输入空间</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》第 4.1 节 图 4.1 两个网络串起来</a><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》第 4.2 节 图 4.3 深层网络折叠输入空间</a></div>
 </li>
 <li class="i-lead">网络能表示复杂的函数。接下来的问题是：怎样知道每个参数该往哪个方向调，才能让损失变小？</li>
 <li class="icard" id="c-1-1-chain-rule"><h3><span class="i-num">3</span>反向传播 = 链式法则 + 记账</h3>
@@ -55,7 +55,7 @@
 <p class="i-analogy"><b>打个比方</b>像倒查一笔账：从最终结果往回问，每一步对结果贡献了多少，再把这个答案交给上一步继续往回查。</p>
 <p class="i-impl">所以训练必须保存前向的中间结果（activations），这是训练比推理占显存多得多的主要原因；后面的 activation checkpointing 和 Flash Attention 的重算，都是在用“再算一遍”换显存。</p>
 <div class="i-builds">后面会用到 <a href="1-1.html#c-1-1-accumulate">一个值被用了几次，梯度就要加几次</a><a href="1-2.html#c-1-2-init">初始化决定信号能不能穿过几十层</a><a href="1-5.html#c-1-4-6n">训练每个 token，大约要 6N 次浮点运算</a><a href="2-2.html#c-p2-2-record">前向时，每个算子顺手记下一个“反向节点”，连成一张图</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL 第 7 章 反向传播</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》第 7 章 反向传播</a></div>
 </li>
 <li class="i-lead">链式法则讲的是一条链。实际的网络里，一个值常常被用在不止一处。</li>
 <li class="icard" id="c-1-1-accumulate"><h3><span class="i-num">4</span>一个值被用了几次，梯度就要加几次</h3>
@@ -77,11 +77,11 @@
 </main>
 <footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
 Zongyao Tang 与 Claude 合著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=7286539c"></script>
-<script src="../assets/demos.js?v=7286539c"></script>
-<script src="../assets/code.js?v=7286539c"></script>
-<script src="../assets/motion.js?v=7286539c"></script>
-<script src="../assets/theme.js?v=7286539c"></script>
+<script src="../assets/reading.js?v=4eaded23"></script>
+<script src="../assets/demos.js?v=4eaded23"></script>
+<script src="../assets/code.js?v=4eaded23"></script>
+<script src="../assets/motion.js?v=4eaded23"></script>
+<script src="../assets/theme.js?v=4eaded23"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

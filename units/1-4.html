@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=7286539c">
+<link rel="stylesheet" href="../assets/site.css?v=4eaded23">
 </head>
 <body>
 <main class="main">
@@ -37,7 +37,7 @@
 <p class="i-analogy"><b>打个比方</b>像在图书馆查资料：拿你的问题（Q）去比对每本书的标签（K），越相关的书，从里面摘抄的内容（V）就用得越多。</p>
 <p class="i-impl">所以每个位置都能直接从任何位置取信息，不用像 RNN 那样一步步往后传；代价是要算一个 N×N 的分数矩阵，序列一长，计算量和显存都按平方增长。这正是 4.4 的 Flash Attention 要解决的问题。</p>
 <div class="i-builds">后面会用到 <a href="1-4.html#c-1-3-causal">因果掩码：训练时整段并行，生成时一词一词</a><a href="1-4.html#c-1-3-multihead">多头注意力：同时用几种不同的方式去“看”</a><a href="4-1.html#c-3-1-kv-cache">KV cache：算过的不再算</a><a href="4-2.html#c-p4-2-handwritten">编译器之外：你每天在用的手写融合 kernel</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL §12.2 点积自注意力</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》§12.2 点积自注意力</a></div>
 </li>
 <li class="i-lead">用注意力做语言模型时，有一条必须遵守的限制。</li>
 <li class="icard" id="c-1-3-causal"><h3><span class="i-num">2</span>因果掩码：训练时整段并行，生成时一词一词</h3>
@@ -47,7 +47,7 @@
 <p class="i-impl">所以训练能把一整段文本一次算完，高度并行；生成却必须一个 token 接一个 token 地来。推理（9.1）的瓶颈因此和训练完全不同。</p>
 <div class="i-builds">承接 <a href="1-4.html#c-1-3-attention">注意力是一次“软查表”</a></div>
 <div class="i-builds">后面会用到 <a href="4-1.html#c-3-1-decode-matvec">生成一个词时，矩阵乘法退化成了矩阵乘向量</a><a href="9-3.html#c-p9-3-interference">prefill 和 decode 混在一起，会互相拖累</a><a href="10-3.html#c-p10-3-generate">数据不是读出来的，是和环境交互“跑”出来的</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL §12.7.2 掩码自注意力</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》§12.7.2 掩码自注意力</a></div>
 </li>
 <li class="i-lead">一层注意力加一层 MLP 是一个 Transformer 层。要把几十上百个这样的层叠起来还能训练，需要另外两样东西。</li>
 <li class="icard" id="c-1-3-residual"><h3><span class="i-num">3</span>残差连接：给信号和梯度修一条直通车道</h3>
@@ -56,7 +56,7 @@
 <p class="i-analogy"><b>打个比方</b>像大楼里每层都有直达电梯：哪层的楼梯堵了，人照样能上下。</p>
 <p class="i-impl">所以 Transformer 能堆到几十上百层；每一层只需要学一点“修正”，而不是从头重新表示一切。</p>
 <div class="i-builds">承接 <a href="1-2.html#c-1-2-init">初始化决定信号能不能穿过几十层</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL §11.2 残差连接</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》§11.2 残差连接</a></div>
 </li>
 <li class="i-lead">最后一个部件：一个位置同时需要关注好几种不同的关系。</li>
 <li class="icard" id="c-1-3-multihead"><h3><span class="i-num">4</span>多头注意力：同时用几种不同的方式去“看”</h3>
@@ -65,7 +65,7 @@
 <p class="i-analogy"><b>打个比方</b>像几位编辑同时读同一篇稿子：有人盯语法，有人看指代关系，有人看语气。</p>
 <p class="i-impl">所以多头几乎不增加计算量（每个头的维度变小了），却能同时捕捉多种关系；实现上，多头就是多了一个可以并行的维度，正适合 GPU。</p>
 <div class="i-builds">承接 <a href="1-4.html#c-1-3-attention">注意力是一次“软查表”</a></div>
-<div class="i-anchors"><span class="i-anchors-label">出处</span><span class="src">UDL §12.3.3 多头注意力</span></div>
+<div class="i-anchors"><span class="i-anchors-label">出处</span><a class="src" href="https://udlbook.github.io/udlbook/" target="_blank" rel="noopener" title="作者免费提供的全书">UDL《Understanding Deep Learning》§12.3.3 多头注意力</a></div>
 </li>
 </ol>
 <div class="recap"><h3>串起来</h3><p><strong class="h">注意力</strong>是一次软查表：用 Q 和所有的 K 算相关度，按相关度对 V 加权求和，代价是 N×N 的分数矩阵。<strong>因果掩码</strong>让训练可以整段并行，生成却只能逐词进行。<strong>残差连接</strong>和归一化让信号与梯度能穿过很深的网络。<strong>多头</strong>是并行的几组注意力。</p></div>
@@ -78,11 +78,11 @@
 </main>
 <footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
 Zongyao Tang 与 Claude 合著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=7286539c"></script>
-<script src="../assets/demos.js?v=7286539c"></script>
-<script src="../assets/code.js?v=7286539c"></script>
-<script src="../assets/motion.js?v=7286539c"></script>
-<script src="../assets/theme.js?v=7286539c"></script>
+<script src="../assets/reading.js?v=4eaded23"></script>
+<script src="../assets/demos.js?v=4eaded23"></script>
+<script src="../assets/code.js?v=4eaded23"></script>
+<script src="../assets/motion.js?v=4eaded23"></script>
+<script src="../assets/theme.js?v=4eaded23"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

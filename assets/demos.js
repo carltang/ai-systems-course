@@ -2205,6 +2205,86 @@
         p.loop(tick);
     };
 
+    /* ── 1.1 · Depth folds the input ────────────────────────────────────────────────────────
+     * Lesson: the first layer turns x into a sawtooth (up, down, up), so three intervals of x land
+     * on the same range of the middle value: the axis is folded three times. The second layer
+     * draws 4 pieces on the middle value; they appear in each fold (mirrored in some): 3 × 4 = 12
+     * pieces. The same neurons in one layer give "neurons + 1" pieces. More layers multiply again. */
+    registry['depth-fold'] = function (figure) {
+        var p = new Panel(figure, { title: '深度的威力：先把输入轴折起来，再画一刀', note: '每一段折线约用一个神经元；颜色表示最后一层画的是哪一段', ratio: 0.62, minHeight: 420 });
+        var PAL = [C.compute, C.peers, C.launch, C.data, '#FF9F7A', '#7FD3FF'], clock = 0;
+        p.slider('k', '每一层把输入折成几段', 1, 5, 1, 3, function (v) { return v + ' 段'; }, function () { clock = 0; p.kick && p.kick(); }, 'compute');
+        p.slider('s', '最后一层画几段', 1, 6, 1, 4, function (v) { return v + ' 段'; }, null, 'data');
+        p.toggle('depth', [[2, '两层'], [3, '三层：再折一次']], 2, function () { clock = 0; p.kick && p.kick(); });
+        p.readout('pieces', '整个网络的线性段数', 'peers');
+        p.readout('neurons', '用到的神经元', 'ink');
+        p.readout('flat', '同样多的神经元放进一层', 'alert');
+        function zig(x, k) { var i = Math.min(k - 1, Math.floor(x * k)), u = x * k - i; return i % 2 ? 1 - u : u; }
+        function inner(x) { var k = p.values.k, h = zig(x, k); return p.values.depth === 3 ? zig(h, k) : h; }
+        function vals(s) { var v = []; for (var j = 0; j <= s; j++) v.push(j % 2 ? 0.82 - 0.1 * ((j * 37) % 5) / 4 : 0.18 + 0.1 * ((j * 53) % 5) / 4); return v; }
+        function g(h, V, s) { var j = Math.min(s - 1, Math.floor(h * s)), u = h * s - j; return V[j] + (V[j + 1] - V[j]) * u; }
+        function tick(dt) { clock = (clock + dt) % 5.2; }
+        function foldT() {                                   // 0 = laid flat, 1 = folded: fold, hold, unfold, rest
+            if (still) return 1;
+            var c = clock, e = function (t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+            if (c < 0.6) return 0; if (c < 2.0) return e((c - 0.6) / 1.4); if (c < 3.8) return 1; if (c < 4.9) return e(1 - (c - 3.8) / 1.1); return 0;
+        }
+        p.draw = function () {
+            var w = p.w, narrow = w < 600, pad = 14, k = p.values.k, s = p.values.s, depth = p.values.depth, F = depth === 3 ? k * k : k, V = vals(s);
+            var stripTop = 34, stripH = 112, plotTop = stripTop + stripH + 34, plotH = narrow ? 104 : 150, gapY = 40;
+            p.fit(narrow ? plotTop + 3 * (plotH + gapY) - 10 : plotTop + plotH + 34);
+            var ctx = p.ctx, h = p.h;
+            p.clear();
+            // ── the strip: the input axis, folded onto the middle value's range
+            var L = pad + (narrow ? 4 : 40), W = w - L - pad - (narrow ? 4 : 40), t = foldT(), gap = Math.min(16, (stripH - 26) / Math.max(1, F - 1));
+            text(ctx, depth === 3 ? '前两层把输入轴折成 ' + F + ' 段，叠在一起' : '第一层把输入轴折成 ' + F + ' 段，叠在一起', pad, 22, { size: 12.5, weight: 600, color: C.ink });
+            for (var i = 0; i < F; i++) {
+                var x0 = i / F, x1 = (i + 1) / F, H0 = inner(x0 + 1e-9), H1 = inner(x1 - 1e-9);
+                H0 = Math.round(H0); H1 = Math.round(H1);
+                for (var j = 0; j < s; j++) {
+                    var a = j / s, b = (j + 1) / s;                                   // this piece of the last layer, inside fold i
+                    var xa = x0 + (a - H0) / (H1 - H0) / F, xb = x0 + (b - H0) / (H1 - H0) / F;
+                    var P = function (x, H) { return [L + ((1 - t) * x + t * H) * W, stripTop + 16 + t * i * gap]; };
+                    var pa = P(xa, a), pb = P(xb, b);
+                    ctx.strokeStyle = PAL[j % PAL.length]; ctx.lineWidth = 5; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+                }
+            }
+            if (t > 0.6) {                                   // the second layer's boundaries cut through every fold at once
+                ctx.save(); ctx.globalAlpha = (t - 0.6) / 0.4; ctx.setLineDash([3, 4]); ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+                for (j = 1; j < s; j++) { var cx = L + j / s * W; ctx.beginPath(); ctx.moveTo(cx, stripTop + 6); ctx.lineTo(cx, stripTop + 26 + (F - 1) * gap); ctx.stroke(); }
+                ctx.restore();
+                text(ctx, '最后一层画的分界线，一刀穿过所有折在一起的层', w - pad, stripTop + stripH + 2, { size: 11.5, align: 'right', color: alpha(C.ink, (t - 0.6) / 0.4) });
+            } else text(ctx, '展开时：输入从左到右', w - pad, stripTop + stripH + 2, { size: 11.5, align: 'right', color: C.dim });
+            // ── three plots: the fold, the last layer, the whole network
+            var pw = narrow ? w - pad * 2 : (w - pad * 2 - 2 * 26) / 3;
+            function frame(n, title) {
+                var px = narrow ? pad : pad + n * (pw + 26), py = narrow ? plotTop + n * (plotH + gapY) : plotTop;
+                text(ctx, title, px, py - 10, { size: 11.5, weight: 600, color: C.soft });
+                round(ctx, px, py, pw, plotH, 8); ctx.fillStyle = alpha(C.ink, 0.03); ctx.fill(); ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.stroke();
+                return function (u, v) { return [px + 8 + u * (pw - 16), py + plotH - 8 - v * (plotH - 16)]; };
+            }
+            function seg(M, u0, v0, u1, v1, col, width) { var a = M(u0, v0), b = M(u1, v1); ctx.strokeStyle = col; ctx.lineWidth = width || 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+            var M1 = frame(0, depth === 3 ? '前两层：x → 折叠后的中间量' : '第一层：x → 中间量（锯齿）');
+            for (i = 0; i < F; i++) { var A = Math.round(inner(i / F + 1e-9)), B = Math.round(inner((i + 1) / F - 1e-9)); seg(M1, i / F, A, (i + 1) / F, B, B > A ? C.compute : C.launch); }
+            var M2 = frame(1, '最后一层：中间量 → 输出（' + s + ' 段）');
+            for (j = 0; j < s; j++) seg(M2, j / s, V[j], (j + 1) / s, V[j + 1], PAL[j % PAL.length], 2.6);
+            var M3 = frame(2, '整个网络：x → 输出（' + F * s + ' 段）');
+            for (i = 0; i < F; i++) {
+                var H0b = Math.round(inner(i / F + 1e-9)), H1b = Math.round(inner((i + 1) / F - 1e-9));
+                for (j = 0; j < s; j++) {
+                    var xa2 = i / F + (j / s - H0b) / (H1b - H0b) / F, xb2 = i / F + ((j + 1) / s - H0b) / (H1b - H0b) / F;
+                    seg(M3, xa2, V[j], xb2, V[j + 1], PAL[j % PAL.length], 2.2);
+                }
+            }
+            var neurons = depth === 3 ? 2 * k + s : k + s;
+            p.set('pieces', (depth === 3 ? k + ' × ' + k + ' × ' + s : k + ' × ' + s) + ' = ' + F * s);
+            p.set('neurons', '约 ' + neurons + ' 个');
+            p.set('flat', '最多 ' + (neurons + 1) + ' 段');
+        };
+        p.loop(tick);
+    };
+
     function upgrade(root) {
         (root || document).querySelectorAll('figure.fig').forEach(function (figure) {
             if (figure.classList.contains('has-demo')) return;
