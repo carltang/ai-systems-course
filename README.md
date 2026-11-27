@@ -6,4 +6,4 @@
 
 页面由课程的源文件生成，不要直接改这里的 HTML；来历和需要留心的地方见 `about.html`。
 
-Zongyao Tang 与 Claude（Anthropic 的 AI 助手）合著。© 2026 Zongyao Tang，以 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 许可分享：须署名、不得商用、改编后以同样的许可分享。
+Zongyao Tang 与 Claude 合著。© 2026 Zongyao Tang，以 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 许可分享：须署名、不得商用、改编后以同样的许可分享。
