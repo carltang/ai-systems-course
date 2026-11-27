@@ -97,6 +97,7 @@
         this.w = w; this.h = h;
         this.ctx = this.canvas.getContext('2d');
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        for (var k in this.cells) shrink(this.cells[k].value);
     };
     Panel.prototype.fit = function (h) {
         h = Math.round(h);
@@ -167,9 +168,16 @@
     Panel.prototype.set = function (key, value, tone) {
         var c = this.cells[key];
         if (!c) return;
-        if (c.value.textContent !== value) c.value.textContent = value;
+        if (c.value.textContent !== value) { c.value.textContent = value; shrink(c.value); }
         if (tone) c.cell.style.setProperty('--tone', C[tone] || tone);
     };
+    // A reading stays on one line, so the panel never changes height under the reader's hand;
+    // a long one is set a little smaller instead.
+    function shrink(node) {
+        node.style.fontSize = '';
+        var size = parseFloat(getComputedStyle(node).fontSize);
+        while (node.scrollWidth > node.clientWidth + 1 && size > 11) { size -= 0.5; node.style.fontSize = size + 'px'; }
+    }
     // A demo animates only while it is on screen, and not at all when the reader asked for less motion.
     Panel.prototype.loop = function (tick) {
         var self = this, visible = false, last = 0, frame = 0;
@@ -583,8 +591,8 @@
         if (still) { for (var s = 0; s < 3000; s++) tick(0.01); }
         p.draw = function () {
             var ctx = p.ctx, w = p.w, h = p.h, W = sim.warps.length;
-            var narrow = w < 560, L = narrow ? 58 : 74, R = w - 14, top = 18, rh = W <= 8 ? 22 : 15, cols = 260, cw = (R - L) / cols;
-            var sy = top + W * rh + 14, sh = 26, legendRows = narrow ? 2 : 1;
+            var narrow = w < 560, L = narrow ? 58 : 74, R = w - 14, AREA = 200, rh = Math.min(30, AREA / W), top = 18 + (AREA - W * rh) / 2, cols = 260, cw = (R - L) / cols;
+            var sy = 18 + AREA + 14, sh = 26, legendRows = narrow ? 2 : 1;
             p.fit(sy + sh + 26 + legendRows * 20);
             ctx = p.ctx; h = p.h;
             p.clear();
@@ -635,8 +643,8 @@
         p.draw = function () {
             var ctx = p.ctx, w = p.w, h = p.h, P = p.values.p, M = p.values.m, total = 2 * (M + P - 1), F = M + P - 1;
             p.clear();
-            var narrow = w < 560, L = narrow ? 50 : 66, R = w - 14, top = 16, cw = (R - L) / total, rh = P > 6 ? 24 : 30;
-            p.fit(top + P * rh + (narrow ? 64 : 46));
+            var narrow = w < 560, L = narrow ? 50 : 66, R = w - 14, AREA = 200, rh = Math.min(34, AREA / P), top = 16 + (AREA - P * rh) / 2, cw = (R - L) / total;
+            p.fit(16 + AREA + (narrow ? 64 : 46));
             ctx = p.ctx; h = p.h;
             p.clear();
             var shown = still ? total : head, idle = 0;
@@ -989,14 +997,14 @@
                 }
                 text(ctx, '卡 ' + (c + 1), x + cw / 2, B + 16, { size: 11, align: 'center', color: C.dim });
             }
-            if (N > drawn) text(ctx, '… 共 ' + N + ' 张', L + gap + drawn * (cw + gap), B - 8, { size: 12, color: C.soft });
+            if (N > drawn) text(ctx, '… 共 ' + N + ' 张', R - 2, B - 8, { size: 12, align: 'right', color: C.soft });
             var lx = narrow ? L : R - 270;
             legend(ctx, parts.map(function (pt) { return [pt[2], pt[0] + ' ' + pt[1] + ' 字节']; }), lx, T - 8, narrow ? 84 : 90);
             var bpp = [16, 4 + 12 / N, 2 + 14 / N, 16 / N][lv], card = bpp * P / 1e9;
             p.set('bpp', fmt(bpp, bpp < 10 ? 2 : 0));
             p.set('card', fmt(card, card < 10 ? 1 : 0) + ' GB');
             p.set('comm', lv === 3 ? '1.5 倍' : '1 倍', lv === 3 ? 'data' : 'peers');
-            p.set('fit', card <= 80 ? (card <= 60 ? '放得下，还剩 ' + fmt(80 - card) + ' GB 给激活值' : '勉强，激活值没地方放') : '放不下', card <= 60 ? 'peers' : card <= 80 ? 'data' : 'alert');
+            p.set('fit', card <= 80 ? (card <= 60 ? '放得下，余 ' + fmt(80 - card) + ' GB' : '勉强放下') : '放不下', card <= 60 ? 'peers' : card <= 80 ? 'data' : 'alert');
         };
         p.loop(tick);
     };
@@ -1159,8 +1167,8 @@
         p.draw = function () {
             var ctx = p.ctx, w = p.w, narrow = w < 560, stride = p.values.stride, segs = Math.ceil(32 * stride / 32);
             var L = 18, R = w - 18, perRow = Math.min(segs, narrow ? 4 : 8), gap = narrow ? 8 : 12, segW = (R - L - gap * (perRow - 1)) / perRow, segH = narrow ? 30 : 34;
-            var rows = Math.ceil(segs / perRow), memTop = 150;
-            p.fit(memTop + rows * (segH + gap) + 30);
+            var rows = Math.ceil(segs / perRow), memTop = 150, maxRows = narrow ? 8 : 4;
+            p.fit(memTop + maxRows * (segH + gap) + 30);
             ctx = p.ctx; var h = p.h;
             p.clear();
             var tw = (R - L) / 32;
@@ -1260,7 +1268,7 @@
             var ctx = p.ctx, w = p.w, narrow = w < 560, S = solve(), N = p.values.n, col = p.values.how === 'col';
             var pad = 14, L = narrow ? 46 : 64, cw = narrow ? Math.min(36, (w - L - pad) / 8) : Math.min(48, (w - L - pad - 40 - 4 * 52) / 8);
             var ow = narrow ? Math.min(52, (w - L - pad) / 4) : 52, rowH = narrow ? 64 : 40, top = 86;
-            var cardsH = N * rowH + (N - 1) * 8, sumY = top + cardsH + (narrow ? 44 : 34), rowGap = narrow ? 46 : 34;
+            var cardsH = 4 * rowH + 3 * 8, sumY = top + cardsH + (narrow ? 44 : 34), rowGap = narrow ? 46 : 34;
             p.fit(sumY + 2 * rowGap + 30);
             ctx = p.ctx; var h = p.h;
             p.clear();
@@ -1590,10 +1598,12 @@
             var s = Math.abs(v) >= 1e5 || Math.abs(v) < 1e-4 ? v.toExponential(6) : v.toPrecision(10);
             return s.replace(/(\.\d*?)0+($|e)/, '$1$2').replace(/\.($|e)/, '$1');
         }
-        var kids = p.controls.children;
+        var swap = el('div', 'demo-swap'), kids = p.controls.children, presets = kids[1], upSlider = kids[2];
+        swap.appendChild(presets); swap.appendChild(upSlider); p.controls.appendChild(swap);
         p.draw = function () {
             var ctx = p.ctx, w = p.w, narrow = w < 560, upd = p.values.mode === 'update', pad = 14;
-            kids[1].style.display = upd ? 'none' : ''; kids[2].style.display = upd ? '' : 'none';
+            presets.classList.toggle('off', upd); upSlider.classList.toggle('off', !upd);
+            presets.setAttribute('aria-hidden', upd ? 'true' : 'false'); upSlider.setAttribute('aria-hidden', upd ? 'false' : 'true');
             var v = upd ? 1 + Math.pow(10, p.values.u) : PRESETS[p.values.x][0], E = encode(v);
             var labelW = narrow ? 44 : 56, cw = Math.min(18, (w - pad * 2 - labelW) / 32), rowH = narrow ? 62 : 58, top = 40;
             p.fit(top + 3 * rowH + 26);
