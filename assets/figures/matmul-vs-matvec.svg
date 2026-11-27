@@ -33,5 +33,5 @@
   <text x="396" y="206" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">权重照样完整读一遍，每个只用一次</text>
   <text x="396" y="228" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">在等显存（带宽受限）</text>
   <line x1="380" y1="24" x2="380" y2="240" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="3 4"/>
-  <text x="746" y="253" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="253" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

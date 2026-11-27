@@ -27,5 +27,5 @@
   <text x="272.0" y="81.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">轮询</text>
   <text x="24" y="228" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">注册内存和建连接是慢操作，放在启动时；之后每次收发都不进内核、不拷贝、不用中断</text>
   <text x="24" y="248" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">两把钥匙：lkey 自己用，rkey 交给对方，对方凭它才能直接读写这块内存</text>
-  <text x="746" y="259" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="259" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

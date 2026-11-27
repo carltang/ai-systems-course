@@ -28,5 +28,5 @@
   <line x1="620" y1="52" x2="620" y2="176" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="3 4"/>
   <text x="166" y="116" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">下单：每次只要几微秒</text>
   <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">在“下单”之后立刻停表，量到的只是下单的时间；计时前后要先同步</text>
-  <text x="746" y="217" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="217" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

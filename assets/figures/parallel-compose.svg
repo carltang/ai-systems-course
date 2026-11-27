@@ -47,5 +47,5 @@
   <rect x="24" y="255" width="12" height="12" rx="3" fill="#e0b860"/>
   <text x="44" y="266" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">段与段之间</text>
   <text x="170" y="266" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">流水线并行：每步一次，量很小</text>
-  <text x="746" y="281" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="281" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

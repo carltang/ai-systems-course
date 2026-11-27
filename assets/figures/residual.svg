@@ -20,5 +20,5 @@
   <path d="M150 121 L150 46 L668 46 L668 94" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="409" y="36" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">直通车道：输入原样到达相加处，梯度也原样传回</text>
   <text x="380" y="174" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一个 Transformer 层里有两个这样的块：一个包着注意力，一个包着 MLP</text>
-  <text x="746" y="181" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="181" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

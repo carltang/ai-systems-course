@@ -36,5 +36,5 @@
   <text x="686.0" y="182" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">等计算</text>
   <rect x="390" y="206" width="348" height="6" rx="3" fill="#a892dc"/>
   <text x="564.0" y="230" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">等发令：CPU 上的 Python 来不及把下一个任务派给 GPU</text>
-  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="241" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

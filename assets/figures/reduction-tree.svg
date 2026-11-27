@@ -51,5 +51,5 @@
   <text x="357.0" y="269.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">+</text>
   <text x="736" y="269" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">第 3 轮：1 次加法</text>
   <text x="24" y="304" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">加法总数还是 n − 1 次，只是排成了一棵树：n 个数只要 log₂n 轮</text>
-  <text x="746" y="313" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="313" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

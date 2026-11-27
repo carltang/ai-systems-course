@@ -16,5 +16,5 @@
   <rect x="110" y="168" width="26" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
   <text x="148" y="187" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">4.4 小时</text>
   <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">条长是示意（每行实际相差 100 倍或 10 倍）。数字只说明量级：所有机器同时正常，作业才正常</text>
-  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

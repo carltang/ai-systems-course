@@ -31,5 +31,5 @@
   <text x="149" y="178" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">产出：第一个新 token，和整段的 KV cache</text>
   <text x="508" y="178" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每一步都把权重和这个请求的缓存读一遍</text>
   <text x="24" y="214" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">同一个模型、同一个请求，前后两段撞在硬件的两个不同上限上</text>
-  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

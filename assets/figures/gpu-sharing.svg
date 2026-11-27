@@ -37,5 +37,5 @@
   <text x="624" y="192" font-size="13" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">切成固定规格的实例</text>
   <text x="624" y="212" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">硬件级的显存隔离，故障隔离强</text>
   <text x="24" y="250" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">蓝色和黄色是两个 Pod。多卡训练要独占整卡，不参与共享；要小心的是自己的卡被悄悄配成了共享</text>
-  <text x="746" y="259" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="259" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

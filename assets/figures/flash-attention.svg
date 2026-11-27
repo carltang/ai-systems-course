@@ -35,5 +35,5 @@
   <path d="M85 82 C 85 130, 120 174, 168 174" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <path d="M655 82 C 655 124, 440 104, 344 150" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="272" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">一块 Q 看完全部 K、V 之后，才把这块的输出写回显存：N×N 的矩阵从头到尾没有出现过</text>
-  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="291" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

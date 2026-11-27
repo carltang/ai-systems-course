@@ -36,5 +36,5 @@
   <line x1="284" y1="108" x2="284" y2="164" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
   <line x1="476" y1="108" x2="476" y2="164" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
   <text x="488" y="140" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">局部导数要用到前向时留下的值</text>
-  <text x="746" y="223" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

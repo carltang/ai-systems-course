@@ -23,5 +23,5 @@
   <text x="658.0" y="139.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">算第 4 块</text>
   <text x="150" y="184" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">蓝色：运算单元在算    黄色：数据从显存搬进来（异步，发出后不等）</text>
   <text x="24" y="208" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一轮的时间从“搬 + 算”变成两者中较长的那个；代价是多一块缓冲区</text>
-  <text x="746" y="217" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="217" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>
