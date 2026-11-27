@@ -4,26 +4,26 @@
   <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
   <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一步训练，从左到右依次经过</text>
   <rect x="24" y="70" width="104" height="64" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
-  <text x="76.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">读数据</text>
-  <text x="76.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">存储</text>
+  <text x="76.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">1 读取与预处理</text>
+  <text x="76.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">存储 → CPU</text>
   <rect x="146" y="70" width="104" height="64" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
-  <text x="198.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">预处理</text>
-  <text x="198.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">CPU</text>
+  <text x="198.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">2 拼 batch</text>
+  <text x="198.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">锁页内存</text>
   <line x1="130" y1="102" x2="144" y2="102" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <rect x="268" y="70" width="104" height="64" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
-  <text x="320.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">拷上 GPU</text>
+  <text x="320.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">3 拷上 GPU</text>
   <text x="320.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">PCIe</text>
   <line x1="252" y1="102" x2="266" y2="102" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <rect x="390" y="70" width="104" height="64" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
-  <text x="442.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">前向 · 反向</text>
+  <text x="442.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">4 前向 · 反向</text>
   <text x="442.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">GPU</text>
   <line x1="374" y1="102" x2="388" y2="102" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <rect x="512" y="70" width="104" height="64" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
-  <text x="564.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">同步梯度</text>
+  <text x="564.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">5 梯度同步</text>
   <text x="564.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">NVLink / 网络</text>
   <line x1="496" y1="102" x2="510" y2="102" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <rect x="634" y="70" width="104" height="64" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
-  <text x="686.0" y="98.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">更新参数</text>
+  <text x="686.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">6 优化器</text>
   <text x="686.0" y="119.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">GPU</text>
   <line x1="618" y1="102" x2="632" y2="102" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <rect x="24" y="158" width="348" height="6" rx="3" fill="#e0b860"/>

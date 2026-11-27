@@ -91,6 +91,11 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .essence-head { margin: 38px 0 0; padding-top: 22px; border-top: 1px solid var(--rule); }
 .essence-head h2 { font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--ink-faint); }
 .essence .icards { gap: 0; }
+.essence .icards > *, .essence .story, .essence .recap { min-width: 0; }      /* a grid item may not grow past the column for a long line */
+.essence pre { max-width: 100%; overflow-x: auto; }
+.essence .i-anchors > *, .essence .i-builds a { min-width: 0; overflow-wrap: anywhere; }
+.essence .i-builds { overflow-wrap: anywhere; }
+.essence :not(pre) > code { overflow-wrap: anywhere; }
 .essence .icard { background: none; border: none; border-top: 1px solid var(--rule); border-radius: 0; padding: 48px 0 40px; }
 .essence .icards > .icard:first-child { border-top: none; padding-top: 30px; }
 .essence .icard:target { box-shadow: -3px 0 0 var(--term); padding-left: 18px; margin-left: -21px; }
@@ -115,6 +120,19 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .essence .i-detail code, .essence .story code, .essence .recap code { font-family: var(--k-mono); font-size: .86em; padding: 1px 6px; border-radius: 5px; background: #EEF2F7; color: #2B3646; }
 .essence .i-detail pre { margin: 1.3em 0; padding: 16px 18px; border-radius: 12px; background: #0F1924; border: none; font-family: var(--k-mono); font-size: 13px; line-height: 1.75; color: #D5DEE9; overflow-x: auto; }
 .essence .i-detail pre code { background: none; color: inherit; padding: 0; }
+/* Code: Victor Mono, whose italic is handwritten, so keywords and comments read like notes in the margin */
+.essence pre { font-family: "Victor Mono", var(--k-mono); font-weight: 500; font-size: 13.5px; line-height: 1.8; tab-size: 4; font-variant-ligatures: none;
+               box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 18px 40px -30px rgba(13, 23, 34, .7); }
+.essence pre .tk-kw { color: #C3AEFF; font-style: italic; font-weight: 500; }
+.essence pre .tk-comment { color: #7F92A8; font-style: italic; font-weight: 400; }
+.essence pre .tk-call { color: #8FB3FF; }
+.essence pre .tk-attr { color: #D5DEE9; }
+.essence pre .tk-string { color: #F2C66D; }
+.essence pre .tk-number { color: #FFB27A; }
+.essence pre .tk-deco, .essence pre .tk-flag { color: #C3AEFF; }
+.essence pre .tk-var { color: #6FE0B7; }
+.essence pre .tk-key { color: #8FB3FF; }
+.essence pre .tk-cmd { color: #6FE0B7; font-weight: 600; }
 .essence .i-detail table, .essence .recap table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1.5em 0; font-size: 14.5px; line-height: 1.7; }
 .essence .i-detail th { text-align: left; font-size: 12.5px; font-weight: 600; color: var(--ink-faint); padding: 8px 18px 8px 0; border-bottom: 1.5px solid var(--ink); white-space: nowrap; }
 .essence .i-detail td { padding: 10px 18px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
