@@ -78,5 +78,5 @@
   <text x="608" y="286" font-size="11.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">微批 4</text>
   <text x="430" y="96" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">灰色的空闲就是气泡</text>
   <text x="24" y="322" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">只画了前向。微批次越多，头尾的气泡占比越小</text>
-  <text x="746" y="325" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="325" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

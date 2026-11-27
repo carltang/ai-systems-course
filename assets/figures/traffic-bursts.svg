@@ -16,5 +16,5 @@
   <text x="344" y="192" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">同步梯度</text>
   <text x="716" y="192" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">每一步训练重复一次</text>
   <text x="24" y="214" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">所有卡同时开始发，一开始就是满速：平均利用率很低，瞬时却常常是满的</text>
-  <text x="746" y="217" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="217" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

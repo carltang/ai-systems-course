@@ -33,5 +33,5 @@
   <line x1="116" y1="224" x2="188" y2="224" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="572" y1="224" x2="644" y2="224" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="270" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">读 3n、写 n，共 4n 次：访问量减半，时间也大约减半</text>
-  <text x="746" y="281" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="281" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

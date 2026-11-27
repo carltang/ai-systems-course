@@ -28,5 +28,5 @@
   <text x="692.0" y="107.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">token/秒</text>
   <text x="24" y="158" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">五次改动，每次都先量再改；顺序由测量决定</text>
   <text x="24" y="180" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一上来就开混合精度的话吞吐几乎不变：当时 GPU 六成的时间在等数据</text>
-  <text x="746" y="205" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="205" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

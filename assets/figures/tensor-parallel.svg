@@ -39,5 +39,5 @@
   <text x="694.0" y="152.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">相加</text>
   <text x="385" y="142" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">这一段各算各的，不需要通信</text>
   <text x="24" y="250" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">每层都要做，又在计算的关键路径上，很难藏住：所以张量并行留在一台机器内，走 NVLink</text>
-  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

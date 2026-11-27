@@ -45,5 +45,5 @@
   <rect x="252" y="264" width="368" height="22" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1"/>
   <text x="435.61" y="280" font-size="11.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">请求 6</text>
   <text x="24" y="310" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">灰色是空着的位置。绿色的请求在静态批处理里只能排队等下一批</text>
-  <text x="746" y="315" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="315" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

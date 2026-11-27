@@ -31,5 +31,5 @@
   <text x="450" y="94" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">存下最近的刻度</text>
   <text x="24" y="176" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">误差最多半格。格子的宽度是范围除以格数：要么多用几位（格更多），要么想办法缩小范围</text>
   <text x="24" y="198" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">8 位是 256 格，4 位只有 16 格</text>
-  <text x="746" y="211" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="211" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>

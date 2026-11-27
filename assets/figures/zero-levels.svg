@@ -36,5 +36,5 @@
   <rect x="190" y="262" width="11" height="20" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
   <text x="211.0" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">16/N 字节</text>
   <text x="736" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信约 1.5 倍</text>
-  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">© Zongyao Tang with Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="291" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
 </svg>
