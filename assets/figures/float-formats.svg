@@ -22,5 +22,5 @@
   <rect x="275.5" y="170" width="134.5" height="32" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="343.75" y="191" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">有效数字 7 位</text>
   <text x="24" y="236" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">bf16 保留了 fp32 的全部指数位，所以范围不变，只是每个数没那么精确；最左一格是符号位</text>
-  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

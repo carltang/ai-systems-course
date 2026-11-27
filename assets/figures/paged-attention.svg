@@ -45,5 +45,5 @@
   <text x="628" y="186" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">灰色：空闲的块</text>
   <text x="24" y="232" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">用到多少分配多少：不必按最大长度预留，也不必为了变长而整块拷贝</text>
   <text x="24" y="254" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">两个请求的前缀相同时，页表可以指向同一批块，这部分只存一份</text>
-  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="271" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

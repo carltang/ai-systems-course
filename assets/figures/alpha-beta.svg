@@ -17,5 +17,5 @@
   <text x="542.6358629876985" y="138.65594104221412" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">大消息：数据量 ÷ 带宽</text>
   <text x="382.893567114722" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">分界点：延迟 × 带宽</text>
   <text x="24" y="296" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">例子里的数字：固定延迟 10 微秒，带宽 50 GB/s</text>
-  <text x="746" y="301" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="301" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

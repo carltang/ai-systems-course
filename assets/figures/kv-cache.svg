@@ -32,5 +32,5 @@
   <text x="527.0" y="111.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">追加</text>
   <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每一步真正新算的只有最后这一个位置；前面位置的 Q 和其他中间结果都不需要</text>
   <text x="24" y="228" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">代价：每一层、每个并发请求都要存一份，上下文越长越大</text>
-  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang & Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="241" font-size="9.5" fill="#b9b3a6" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>
