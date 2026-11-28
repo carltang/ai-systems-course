@@ -1663,7 +1663,12 @@
         p.slider('c', '存一次要多久', 1, 3, 0.02, Math.log10(60), function (v) { var s = cOf(v); return s < 90 ? fmt(s) + ' 秒' : fmt(s / 60, 1) + ' 分钟'; }, null, 'launch');
         p.slider('M', '平均多久出一次故障', 1, 100, 1, 4, function (v) { return v + ' 小时'; }, null, 'alert');
         var Tin = p.slider('T', '你选的间隔', 0, 2.78, 0.01, Math.log10(22), function (v) { var m = Math.pow(10, v); return m < 90 ? fmt(m) + ' 分钟' : fmt(m / 60, 1) + ' 小时'; }, null, 'peers');
-        p.button('用最优间隔', function () { Tin.value = Math.log10(Math.sqrt(2 * cOf(p.values.c) / 60 * p.values.M * 60)); Tin.dispatchEvent(new Event('input')); }, 'ghost');
+        var best = p.button('用最优间隔', function () { Tin.value = Math.log10(Math.sqrt(2 * cOf(p.values.c) / 60 * p.values.M * 60)); Tin.dispatchEvent(new Event('input')); }, 'ghost');
+        best.textContent = '已是最优间隔'; best.style.minWidth = Math.ceil(best.offsetWidth) + 'px'; best.textContent = '用最优间隔';
+        function bestLabel(opt) {                                                     // a click that would change nothing says so
+            var at = Math.abs(Math.pow(10, p.values.T) / opt - 1) < 0.03;
+            best.textContent = at ? '已是最优间隔' : '用最优间隔'; best.disabled = at; best.classList.toggle('on', at);
+        }
         p.readout('opt', '最优间隔 √(2cM)', 'peers');
         p.readout('waste', '你选的间隔：浪费', 'ink');
         p.readout('best', '最优时浪费 √(2c/M)', 'peers');
@@ -1732,6 +1737,7 @@
             });
             legend(ctx, [[alpha(C.peers, 0.8), '有用的训练'], [C.launch, '存档'], [alpha(C.alert, 0.55), '故障白算的'], [C.alert, '故障']], L, stripY + 44, narrow ? 78 : 110);
             p.set('opt', Topt < 90 ? fmt(Topt) + ' 分钟' : fmt(Topt / 60, 1) + ' 小时');
+            bestLabel(Topt);
             p.set('waste', fmt(wT * 100, 1) + '%', wT > wOpt * 1.15 ? 'alert' : 'peers');
             p.set('best', fmt(Math.sqrt(2 * cMin / Mmin) * 100, 1) + '%');
             p.set('sim', fmt(long.waste * 100, 1) + '%');
@@ -2409,10 +2415,11 @@
         var p = new Panel(figure, { title: '初始化：每层乘一个倍数，层数把它变成指数', note: 'ReLU 网络，一层有 n 个输入：倍数 = n × 权重的方差 × ½', ratio: 0.42, minHeight: 250 });
         var input = p.slider('c', '每个权重的方差', 1, 3, 0.05, 3, function (v) { return v.toFixed(2) + ' / n' + (Math.abs(v - 2) < 1e-6 ? '（He）' : ''); }, null, 'data');
         p.slider('L', '层数', 1, 100, 1, 50, function (v) { return v + ' 层'; }, null, 'compute');
-        function pick(v) { input.value = v; input.dispatchEvent(new Event('input')); }
-        p.button('倍数 1.5', function () { pick(3); }, 'ghost');
-        p.button('倍数 0.7', function () { pick(1.4); }, 'ghost');
-        p.button('He 初始化', function () { pick(2); }, 'ghost');
+        // the lesson's three cases as a toggle: the lit one shows which case the slider is on (none, in between)
+        var PRESET = [3, 1.4, 2];
+        p.toggle('preset', [[3, '倍数 1.5'], [1.4, '倍数 0.7'], [2, 'He 初始化']], 3, function () { input.value = p.values.preset; input.dispatchEvent(new Event('input')); });
+        var presets = p.controls.lastChild.querySelectorAll('button');
+        function lit() { PRESET.forEach(function (v, i) { var on = Math.abs(p.values.c - v) < 1e-6; presets[i].classList.toggle('on', on); presets[i].setAttribute('aria-checked', on ? 'true' : 'false'); }); }
         p.readout('m', '每层的倍数', 'ink');
         p.readout('end', '穿过这些层之后，信号变成', 'ink');
         p.readout('verdict', '结果', 'peers');
@@ -2456,6 +2463,7 @@
             ctx.beginPath(); ctx.arc(X(k), Y(k * slope), 5.5, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill();
             ctx.setLineDash([2, 3]); ctx.strokeStyle = alpha(col, 0.6); ctx.beginPath(); ctx.moveTo(X(Ln), Y(Ln * slope)); ctx.lineTo(X(Ln), B); ctx.stroke(); ctx.setLineDash([]);
             var end = Math.pow(m, Ln);
+            lit();
             p.set('m', m.toFixed(2), flat ? 'peers' : m > 1 ? 'alert' : 'launch');
             p.set('end', size(end));
             p.set('verdict', end > 1e4 ? '爆炸：数值溢出' : end < 1e-4 ? '消失：几乎成了零' : '稳定地穿过', end > 1e4 ? 'alert' : end < 1e-4 ? 'launch' : 'peers');

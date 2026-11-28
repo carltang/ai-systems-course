@@ -202,6 +202,8 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .demo-button { background: var(--d-ink); color: #0D1722; font-weight: 600; }
 .demo-button.ghost { background: none; color: var(--d-soft); box-shadow: inset 0 0 0 1px #2A3B50; font-weight: 500; }
 .demo-button:hover, .demo-toggle button:hover { filter: brightness(1.15); }
+.demo-button.ghost.on { background: #22344A; color: var(--d-ink); box-shadow: none; }       /* a button whose click would change nothing says so */
+.demo-button:disabled { cursor: default; filter: none; }
 .demo-swap { display: grid; flex: 1 1 420px; min-width: 0; align-items: center; }   /* two controls in one slot: the slot keeps the taller one's height */
 .demo-swap > * { grid-area: 1 / 1; min-width: 0; }
 .demo-swap > .demo-toggle { justify-self: start; }
