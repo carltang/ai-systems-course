@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>About · AI Systems: From Deep Learning Principles to GPUs and Distributed Training</title>
+<meta name="description" content="A course that explains the principles: what one training step actually goes through inside the machine, where it is slow when it is slow, and how to trace a symptom layer by layer to its cause. It starts from neural networks and PyTorch, and goes through GPUs and CUDA, operators and kernels, high-speed interconnects and NCCL, to distributed training; the three parts on clusters, inference and reinforcement learning are optional.">
+<meta name="author" content="Zongyao Tang & Claude">
+<meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='en')location.replace('../about.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/about.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/about.html">
+<style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
+<script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
+<link rel="manifest" href="../manifest-en.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+</head>
+<body>
+<main class="main">
+<div class="item-page"><div class="unit-nav"><a class="learn-meta" href="index.html">← Contents</a><a class="lang-switch" href="../about.html" hreflang="zh-CN" lang="zh-CN" data-lang="zh" title="用中文读这一页">中文</a></div>
+<section class="essence about">
+<h1 class="unit-title"><span>About</span>How this course came about</h1>
+<div class="i-detail">
+<p><strong class="h">What it is.</strong> Lecture notes for people with an engineering background who want a systematic understanding of AI training systems: principles first, connections between them, and simple examples and analogies wherever possible. The hands-on exercises are all optional.</p>
+<p><strong class="h">How it was written.</strong> The explanations and all the drawings were written and revised round by round with the help of AI (Anthropic's Claude), to standards set by one learner. The content draws on published books, papers and official documentation, retold in our own words; the "Sources" under each principle list what it rests on. Books and papers are given only by name and chapter: please read a copy you have obtained legitimately.</p>
+<p><strong class="h">Where to keep your wits about you.</strong></p>
+<ul>
+<li>The source walkthroughs (PyTorch, NCCL) were written from papers and documentation, without being checked line by line against a specific version. When reading source code, go by the version you have.</li>
+<li>The order-of-magnitude figures throughout (latency, bandwidth, speed-ups) are orders of magnitude, not measurements from a particular machine.</li>
+<li>The four troubleshooting cases of part 11 are composite cases written to tie the methods together; their numbers are consistent, but they are not records of real measurements.</li>
+<li>The YAML in part 8 is illustrative, and the fields depend on your cluster's version; the parts on combining large models with reinforcement learning reflect practice around 2025, which is changing fast.</li>
+</ul>
+<p>If you find a mistake, it is quite likely a real one.</p>
+<p><strong class="h">Names and trademarks.</strong> NVIDIA, CUDA, NCCL, PyTorch, Kubernetes, Claude, Anthropic and other names belong to their respective owners. This course is not a product of these companies, nor endorsed by them.</p>
+<p><strong class="h">Authors.</strong> Zongyao Tang and Claude. The explanations retell published books, papers and official documentation in our own words, and the drawings and interactive demos were made afresh. The division of work: Zongyao Tang set the course's goals, standards and trade-offs; Claude wrote the explanations, drawings and demos to those requirements, which he then reviewed round by round, asking for changes, before they were finalised.</p>
+<p><strong class="h">The English edition.</strong> Translated by AI (Anthropic's Claude) from the Chinese edition, passage by passage; where the two differ, the Chinese is the reference. Its content, drawings and interactive demos match the Chinese one for one. The EN / 中文 button at the top of every page switches language, stays at the same place, and remembers your choice.</p>
+<p><strong class="h">Copyright and licence.</strong> Under current law an AI cannot hold copyright, so the copyright notice names only Zongyao Tang. All the explanations and drawings are shared under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> (Attribution–NonCommercial–ShareAlike): you are welcome to read, share, quote and adapt them, but please credit the authors and the source, do not use them for commercial purposes, and share adapted works under the same licence.</p>
+<p><strong class="h">Reading offline.</strong> In your phone's browser choose "Add to Home Screen", and pages you have read will open without a network.</p>
+<p id="versions"><strong class="h">Versions.</strong> This is version 1.12 (2026-11-28). The first publication was 1.0, and each update since has raised the minor number by one (1.9 was followed by 1.10).</p><ul class="releases"><li><strong>1.12</strong> (2026-11-28) The English edition: all 45 units, 83 drawings and 36 interactive demos in English, with a switch at the top of every page that keeps your place and remembers your choice; every demo control shows its state (the initialisation cases as a toggle, the checkpoint interval says when it is already the best); version numbers in the footer and on this page.</li><li><strong>1.11</strong> (2026-11-28) The backpropagation demo&#x27;s play button shows whether it is playing, and a Restart button.</li><li><strong>1.10</strong> (2026-11-28) Ten more interactive demos where a lesson describes a mechanism in a long paragraph: backpropagation, initialisation, attention, tensor views, asynchronous execution, reduction, online softmax, routing by hash, collectives and gang scheduling.</li><li><strong>1.9</strong> (2026-11-28) Unit 1.1 gains a live demo of depth as folding, and UDL is named in full with a link to the author&#x27;s free edition; full-screen reading stays in reading layout after a page turn; the Chinese byline now says the course was compiled from published sources.</li><li><strong>1.8</strong> (2026-11-27) Night mode; page turns slide the way you go; folds open and close smoothly.</li><li><strong>1.7</strong> (2026-11-27) Seven more interactive demos; all 25 checked on phones, iPads, laptops and large screens.</li><li><strong>1.6</strong> (2026-11-27) Twelve more interactive demos; coloured code; the training pipeline numbered as the lesson&#x27;s six steps; no sideways scrolling on phones; demos keep one height whatever you choose.</li><li><strong>1.5</strong> (2026-11-27) The stylesheet and scripts carry a version in their addresses, so browsers fetch the new ones.</li><li><strong>1.4</strong> (2026-11-27) Six drawings become hands-on interactive demos; a cooler, sans-serif reading page.</li><li><strong>1.3</strong> (2026-11-27) Fixed the escaping of the ampersand in the drawings&#x27; credit.</li><li><strong>1.2</strong> (2026-11-27) The Chinese byline reworded as a joint work.</li><li><strong>1.1</strong> (2026-11-27) Claude named wherever the author is named.</li><li><strong>1.0</strong> (2026-11-27) First publication: 45 units and 81 drawings; the author, the CC BY-NC-SA 4.0 licence and a credit on every drawing.</li></ul>
+</div></section></div>
+</main>
+<footer class="foot"><a href="index.html">Contents</a> · <a href="about.html">About this course</a> · <a href="about.html#versions">Version 1.12</a><br>
+Zongyao Tang & Claude · © 2026 Zongyao Tang<br>Shared under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a>: you may share and adapt it, with attribution, not for commercial use, and adaptations under the same licence</footer>
+<script src="../assets/reading.js?v=44d46eb3"></script>
+<script src="../assets/demos-en.js?v=44d46eb3"></script>
+<script src="../assets/demos.js?v=44d46eb3"></script>
+<script src="../assets/code.js?v=44d46eb3"></script>
+<script src="../assets/motion.js?v=44d46eb3"></script>
+<script src="../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

@@ -7,6 +7,8 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; font-family: var(--font); font-size: 15px; line-height: 1.6; color: var(--text); background: var(--k-page); -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); }
 .main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 8px; }
+.translated { margin: 6px 0 14px; font-size: 13px; line-height: 1.55; color: var(--k-ink-faint); }
+.translated a { color: inherit; }
 .foot { text-align: center; font-size: 13px; line-height: 2; color: var(--k-ink-faint); padding: 26px 16px 40px; }
 .foot a { color: var(--k-ink-faint); }
 .item-page { margin: 0 auto; }
@@ -14,6 +16,9 @@ a { color: var(--accent); }
 .learn-meta { font-size: 13px; color: var(--k-ink-faint); text-decoration: none; margin-right: auto; }
 .unit-steps { display: flex; gap: 6px; }
 .unit-steps a { font-size: 13px; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--text-secondary); text-decoration: none; }
+.lang-switch { font-size: 13px; line-height: 1.5; padding: 3px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--text-secondary); text-decoration: none; white-space: nowrap; }
+.lang-switch:hover { border-color: var(--accent); color: var(--accent); }
+.unit-nav .lang-switch + .read-toggle { margin-left: 0; }
 .unit-title { font-size: 1.7rem; font-weight: 600; line-height: 1.4; color: var(--k-ink); margin: 0 0 28px; }
 .unit-title span { display: block; font-size: 12.5px; font-weight: 500; letter-spacing: .04em; color: var(--k-ink-faint); margin-bottom: 10px; }
 html.reading .unit-title { font-size: 1.9rem; }

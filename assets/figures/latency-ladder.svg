@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 268" width="760" height="268" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="存储层次的延迟">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 284" width="760" height="284" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="存储层次的延迟">
   <title>存储层次的延迟</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="268" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="284" rx="14" fill="#fbf9f4"/>
   <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">取一次数据要等多久（横轴每一格是 10 倍）</text>
   <line x1="220" y1="52" x2="220" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
   <line x1="306" y1="52" x2="306" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
@@ -25,5 +25,5 @@
   <text x="204" y="201" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">数据中心内一次网络往返</text>
   <rect x="220" y="182" width="404.2" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
   <text x="634.2" y="201" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">几十到几百微秒</text>
-  <text x="746" y="259" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="276" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

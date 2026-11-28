@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="哈希选路遇上少量大流">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="哈希选路遇上少量大流">
   <title>哈希选路遇上少量大流</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">8 条大流按哈希分到 8 条等价链路上（一种典型的结果）</text>
   <rect x="40" y="122" width="64" height="34" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
   <text x="72.0" y="144.0" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">链路 1</text>
@@ -44,5 +44,5 @@
   <text x="688.0" y="108.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em"></text>
   <text x="688" y="176" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">正好</text>
   <text x="24" y="210" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">流少的时候随机分不匀；而且流的模式每一步都重复，撞上的链路会一直拥塞</text>
-  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

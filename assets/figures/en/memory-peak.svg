@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 254" width="760" height="254" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="How memory use rises and falls in one training step">
+  <title>How memory use rises and falls in one training step</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="254" rx="14" fill="#fbf9f4"/>
+  <g transform="translate(0 17.5)"><line x1="70" y1="176" x2="716" y2="176" stroke="#d9d4c8" stroke-width="1.2"/></g>
+  <line x1="70" y1="176" x2="70" y2="46" stroke="#d9d4c8" stroke-width="1.2"/>
+  <g transform="translate(0 17.5)"><polyline points="70,150 330,64 600,150 716,150" fill="none" stroke="#8aa2e6" stroke-width="2.4" stroke-linejoin="round"/></g>
+  <line x1="330" y1="64" x2="330" y2="176" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="3 4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">memory in use</text>
+  <g transform="translate(0 17.5)"><text x="200" y="200" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">forward: intermediate results kept all the way</text></g>
+  <g transform="translate(0 17.5)"><text x="470" y="200" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">backward: one freed per node passed</text></g>
+  <text x="340" y="58" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="340" dy="0">The peak is the moment the forward pass ends and the backward</tspan><tspan x="340" dy="17.5">pass begins</tspan></text>
+  <text x="746" y="246" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

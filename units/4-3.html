@@ -7,6 +7,8 @@
 <meta name="description" content="用 Triton 写出性能接近手写 CUDA 的 kernel，体会“按块编程”。">
 <meta name="author" content="Zongyao Tang & Claude">
 <meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='zh')location.replace('../en/units/4-3.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/units/4-3.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/units/4-3.html">
 <style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
 <script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
 <link rel="manifest" href="../manifest.webmanifest">
@@ -14,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=f3253d60">
+<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
 </head>
 <body>
 <main class="main">
@@ -24,7 +26,7 @@
 <span class="unit-steps">
 <a href="4-2.html" title="4.2 算子融合" data-step="prev">‹ 4.2</a>
 <a href="4-4.html" title="4.4 Flash Attention" data-step="next">4.4 ›</a>
-</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+</span><a class="lang-switch" href="../en/units/4-3.html" hreflang="en" lang="en" data-lang="en" title="Read this page in English">EN</a><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
 <section class="essence" id="essence">
 <h1 class="unit-title"><span>第 4 部分 · 算子与 kernel</span>4.3 Triton 入门</h1>
 <div class="frame"><div class="frame-q"><span>这一单元回答</span>能不能不写线程级的 CUDA，也拿到接近手写的性能？</div><div class="frame-c">承接 4.1–4.2：同样的算子，换一种更高层的写法。</div></div>
@@ -66,7 +68,7 @@ def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
 <li class="i-lead">既然 Triton 省事，性能又好，是不是就不用学 CUDA 了？</li>
 <li class="icard" id="c-3-4-when-cuda"><h3><span class="i-num">3</span>先用 Triton，证明不够再写 CUDA</h3>
 <p class="i-essence">Triton 覆盖了大多数融合算子和不少矩阵乘法场景，性能常常接近手写 CUDA；但需要精细控制 warp 级操作、特殊数据布局或最新硬件特性时，仍然要回到 CUDA 或 CUTLASS。</p>
-<div class="i-detail"><p><strong class="h">Triton 擅长的。</strong></p><ul><li>融合的逐元素运算和归约（4.2）：这是它最主要的用途，也是 torch.compile 用它来做的事。</li><li>规整的、可以按块处理的稠密运算：矩阵乘法及其变体、注意力、归一化。</li><li>需要快速试验的新算子：代码短，改起来快，和 PyTorch 在同一个 Python 文件里。</li></ul><p>在这些场景里，Triton 写出来的 kernel 通常能达到手写 CUDA 的八九成甚至持平，代码量却只有几分之一。</p><p><strong class="h">它不擅长的。</strong></p><ul><li>需要精细控制每个 warp、每个线程行为的算法。3.5 讲的一些并行模式（比如需要线程之间按特定方式配合的扫描）用“块”的抽象很难表达。</li><li>不规整的数据：稀疏矩阵、图、长短不一的序列。</li><li>需要特殊的内存布局，或者要用上最新硬件的某个专有特性，而编译器还不支持。</li><li>追求最后百分之十几的性能：库的作者（cuBLAS、cuDNN）仍然用更底层的手段。</li></ul><p><strong class="h">一个实际的决策顺序</strong>（你的那份文档里把它列为要记住的顺序，这里补上理由）：</p><ul><li><strong>先用库。</strong> 矩阵乘法、卷积、标准的注意力，库里的实现几乎不可能被你超过。</li><li><strong>再用编译器。</strong> 自己拼的一串运算，先看 torch.compile 能不能融合好。零代码成本。</li><li><strong>然后才是 Triton。</strong> 编译器融合不了、或者融合得不好的模式，用 Triton 手写一个。</li><li><strong>最后是 CUDA。</strong> 只有当 profiler 证明这个 kernel 是瓶颈、Roofline 显示它离硬件上限还远、而 Triton 又表达不了你要的优化时。</li></ul><p><mark>每往下一级，开发和维护的成本都高一个量级，所以要有证据才往下走</mark>。</p><p><strong class="h">那为什么第 3 部分花那么多篇幅讲 CUDA。</strong> 因为你的目标是读懂和排查，而不只是写。Triton 生成的代码、库里的 kernel、profiler 报告的指标，说的都是 warp、共享内存、访存合并这套语言。不懂底下这一层，就看不懂上面这一层为什么快、为什么慢。</p></div>
+<div class="i-detail"><p><strong class="h">Triton 擅长的。</strong></p><ul><li>融合的逐元素运算和归约（4.2）：这是它最主要的用途，也是 torch.compile 用它来做的事。</li><li>规整的、可以按块处理的稠密运算：矩阵乘法及其变体、注意力、归一化。</li><li>需要快速试验的新算子：代码短，改起来快，和 PyTorch 在同一个 Python 文件里。</li></ul><p>在这些场景里，Triton 写出来的 kernel 通常能达到手写 CUDA 的八九成甚至持平，代码量却只有几分之一。</p><p><strong class="h">它不擅长的。</strong></p><ul><li>需要精细控制每个 warp、每个线程行为的算法。3.5 讲的一些并行模式（比如需要线程之间按特定方式配合的扫描）用“块”的抽象很难表达。</li><li>不规整的数据：稀疏矩阵、图、长短不一的序列。</li><li>需要特殊的内存布局，或者要用上最新硬件的某个专有特性，而编译器还不支持。</li><li>追求最后百分之十几的性能：库的作者（cuBLAS、cuDNN）仍然用更底层的手段。</li></ul><p><strong class="h">一个实际的决策顺序</strong>（这是常被推荐的顺序，这里补上理由）：</p><ul><li><strong>先用库。</strong> 矩阵乘法、卷积、标准的注意力，库里的实现几乎不可能被你超过。</li><li><strong>再用编译器。</strong> 自己拼的一串运算，先看 torch.compile 能不能融合好。零代码成本。</li><li><strong>然后才是 Triton。</strong> 编译器融合不了、或者融合得不好的模式，用 Triton 手写一个。</li><li><strong>最后是 CUDA。</strong> 只有当 profiler 证明这个 kernel 是瓶颈、Roofline 显示它离硬件上限还远、而 Triton 又表达不了你要的优化时。</li></ul><p><mark>每往下一级，开发和维护的成本都高一个量级，所以要有证据才往下走</mark>。</p><p><strong class="h">那为什么第 3 部分花那么多篇幅讲 CUDA。</strong> 因为你的目标是读懂和排查，而不只是写。Triton 生成的代码、库里的 kernel、profiler 报告的指标，说的都是 warp、共享内存、访存合并这套语言。不懂底下这一层，就看不懂上面这一层为什么快、为什么慢。</p></div>
 <p class="i-analogy"><b>打个比方</b>像装修：大部分活用成品家具就够了，只有特殊尺寸的角落才值得找木匠定做。</p>
 <p class="i-impl">所以先用 Triton 快速做出够快的版本；只有 profiler 证明它是瓶颈、而且离硬件极限还远时，才值得手写 CUDA。</p>
 <div class="i-builds">承接 <a href="3-1.html#c-2-1-measure">先测量，再优化：瓶颈常常不在你以为的地方</a></div>
@@ -80,13 +82,14 @@ def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
 <a class="next" href="4-4.html"><small>下一单元</small>4.4 Flash Attention</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=f3253d60"></script>
-<script src="../assets/demos.js?v=f3253d60"></script>
-<script src="../assets/code.js?v=f3253d60"></script>
-<script src="../assets/motion.js?v=f3253d60"></script>
-<script src="../assets/theme.js?v=f3253d60"></script>
+<script src="../assets/reading.js?v=44d46eb3"></script>
+<script src="../assets/demos.js?v=44d46eb3"></script>
+<script src="../assets/code.js?v=44d46eb3"></script>
+<script src="../assets/motion.js?v=44d46eb3"></script>
+<script src="../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

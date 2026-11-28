@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 276" width="760" height="276" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="The backward graph recorded during the forward pass">
+  <title>The backward graph recorded during the forward pass</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="276" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">The forward pass (top) records backward nodes (bottom) as it computes</text>
+  <rect x="60" y="52" width="80" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="100.0" y="77.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">a</text>
+  <rect x="60" y="104" width="80" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="100.0" y="129.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">b</text>
+  <rect x="300" y="78" width="120" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="360.0" y="103.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">c = a * b</text>
+  <rect x="580" y="78" width="120" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="640.0" y="103.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">d = c + a</text>
+  <line x1="142" y1="72" x2="298" y2="92" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="142" y1="124" x2="298" y2="104" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="422" y1="98" x2="578" y2="98" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="40" y="186" width="150" height="46" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="115.0" y="205.0" font-size="11.9" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">accumulate into a.grad</text>
+  <text x="115.0" y="226.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">leaf node</text>
+  <rect x="300" y="186" width="130" height="46" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="365.0" y="205.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">MulBackward0</text>
+  <text x="365.0" y="226.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">saved a and b</text>
+  <rect x="570" y="186" width="140" height="46" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="640.0" y="205.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">AddBackward0</text>
+  <text x="640.0" y="226.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">saves nothing</text>
+  <line x1="568" y1="209" x2="432" y2="209" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="500.0" y="202.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">next stop</text>
+  <line x1="298" y1="209" x2="192" y2="209" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="245.0" y="202.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">next stop</text>
+  <line x1="640" y1="120" x2="640" y2="184" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
+  <text x="670.0" y="156.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">grad_fn</text>
+  <line x1="365" y1="120" x2="365" y2="184" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
+  <text x="395.0" y="156.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">grad_fn</text>
+  <text x="380" y="252" font-size="12.5" fill="#9aa0aa" font-weight="400" text-anchor="middle" letter-spacing="0">(b also has an accumulation node, omitted here; the addition node also has an edge straight to a)</text>
+  <text x="746" y="268" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

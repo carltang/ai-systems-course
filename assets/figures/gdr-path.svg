@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPUDirect RDMA 省掉的两次中转">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPUDirect RDMA 省掉的两次中转">
   <title>GPUDirect RDMA 省掉的两次中转</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">没有 GPUDirect RDMA：两端各多一次拷贝，各多占一趟 PCIe</text>
   <rect x="24.0" y="50" width="88.0" height="40" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="68.0" y="75.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">显存</text>
@@ -39,5 +39,5 @@
   <text x="671.1999999999999" y="179.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">显存</text>
   <line x1="592.4" y1="174" x2="604.4" y2="174" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">没配好时不会报错，只是悄悄退回上面那条路</text>
-  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

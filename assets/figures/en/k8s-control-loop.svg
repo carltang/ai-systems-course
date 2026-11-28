@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 368" width="760" height="368" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Declarative control in Kubernetes">
+  <title>Declarative control in Kubernetes</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="368" rx="14" fill="#fbf9f4"/>
+  <rect x="300" y="126" width="160" height="84" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="380.0" y="154.9" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">API server</text>
+  <text x="380.0" y="174.2" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="380.0" dy="0">spec and status of every</tspan><tspan x="380.0" dy="16.5">object</tspan></text>
+  <rect x="24" y="136" width="150" height="64" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="99.0" y="164.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">You</text>
+  <text x="99.0" y="185.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">kubectl apply</text>
+  <line x1="176" y1="168" x2="298" y2="168" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="237.0" y="161.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">desired state</text>
+  <rect x="300" y="24" width="160" height="58" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="380.0" y="49.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Job controller</text>
+  <text x="380.0" y="70.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">creates missing Pods</text>
+  <rect x="576" y="60" width="160" height="58" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="656.0" y="85.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Scheduler</text>
+  <text x="656.0" y="106.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">picks a node for a Pod</text>
+  <rect x="576" y="218" width="160" height="58" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="656.0" y="234.5" font-size="12.9" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">kubelet</text>
+  <text x="656.0" y="252.3" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="656.0" dy="0">starts containers on the</tspan><tspan x="656.0" dy="15.2">node</tspan></text>
+  <rect x="300" y="250" width="160" height="58" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="380.0" y="266.5" font-size="12.9" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Other controllers</text>
+  <text x="380.0" y="284.3" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="380.0" dy="0">each manages one kind of</tspan><tspan x="380.0" dy="15.2">object</tspan></text>
+  <line x1="360" y1="84" x2="360" y2="124" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="400" y1="124" x2="400" y2="84" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="462" y1="150" x2="574" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="574" y1="112" x2="462" y2="162" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="462" y1="178" x2="574" y2="232" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="574" y1="246" x2="462" y2="192" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="360" y1="212" x2="360" y2="248" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="400" y1="248" x2="400" y2="212" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="596" y="168" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">sees its work → acts → writes back</text>
+  <text x="24" y="334" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Nobody is directing: each participant watches only the objects it cares about</text>
+  <text x="746" y="360" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

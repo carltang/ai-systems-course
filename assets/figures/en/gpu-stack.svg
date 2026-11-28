@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 316" width="760" height="316" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="The full set of components on a GPU node">
+  <title>The full set of components on a GPU node</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="316" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">What must be there, bottom to top, for GPUs to be usable in containers (the GPU Operator installs it all)</text>
+  <rect x="24" y="50" width="170" height="34" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="109.0" y="72.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Monitoring exporter</text>
+  <text x="210" y="72" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">exports utilisation, memory, temperature, Xid errors as metrics</text>
+  <rect x="24" y="92" width="170" height="34" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="109.0" y="114.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Feature discovery</text>
+  <text x="210" y="114" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">probes model, memory, driver version, and labels the node</text>
+  <rect x="24" y="134" width="170" height="34" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="109.0" y="156.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">device plugin</text>
+  <text x="210" y="156" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">reports GPUs as a resource that can be requested</text>
+  <rect x="24" y="176" width="170" height="34" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="109.0" y="198.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Container toolkit</text>
+  <text x="210" y="198" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">at container start, mounts device files and the driver&#x27;s user-space libraries</text>
+  <rect x="24" y="218" width="170" height="34" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="109.0" y="240.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Driver</text>
+  <text x="210" y="240" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">in the node&#x27;s operating system kernel, decides which CUDA versions are supported</text>
+  <text x="24" y="276" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">The driver is on the node, the CUDA libraries are in the image: their versions have to match</text>
+  <text x="746" y="308" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

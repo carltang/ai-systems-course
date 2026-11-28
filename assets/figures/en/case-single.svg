@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 230" width="760" height="230" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Case one: the bottleneck moves, one after another">
+  <title>Case one: the bottleneck moves, one after another</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="230" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Case one: the four kinds of bottleneck the same training task met in turn</text>
+  <rect x="24" y="60" width="96" height="60" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="72.0" y="86.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">40k</text>
+  <text x="72.0" y="107.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">tokens/s</text>
+  <rect x="142" y="60" width="110" height="60" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="197.0" y="86.0" font-size="12.3" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">waiting for data</text>
+  <text x="197.0" y="107.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">data loading (2.4)</text>
+  <line x1="122" y1="90" x2="140" y2="90" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="268" y="60" width="110" height="60" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="323.0" y="86.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">sync point</text>
+  <text x="323.0" y="107.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">3.6</text>
+  <line x1="248" y1="90" x2="266" y2="90" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="394" y="60" width="110" height="60" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="449.0" y="86.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">overhead</text>
+  <text x="449.0" y="107.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">2.3, 2.5</text>
+  <line x1="374" y1="90" x2="392" y2="90" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="520" y="60" width="110" height="60" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="575.0" y="77.5" font-size="12.9" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">compute</text>
+  <text x="575.0" y="95.3" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="575.0" dy="0">mixed precision</tspan><tspan x="575.0" dy="15.2">(2.6)</tspan></text>
+  <line x1="500" y1="90" x2="518" y2="90" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="632" y1="90" x2="648" y2="90" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="648" y="60" width="88" height="60" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="692.0" y="86.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">200k</text>
+  <text x="692.0" y="107.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">tokens/s</text>
+  <text x="24" y="158" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">Five changes, each measured before changing; the order is decided by measurement</text>
+  <text x="24" y="180" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">Switching on mixed precision first would have barely changed throughput: the GPU then spent sixty percent of its time</tspan><tspan x="24" dy="17.5">waiting for data</tspan></text>
+  <text x="746" y="222" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

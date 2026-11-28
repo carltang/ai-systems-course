@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="在线 softmax：分块读入，最大值变了就换基准">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 296" width="760" height="296" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="在线 softmax：分块读入，最大值变了就换基准">
   <title>在线 softmax：分块读入，最大值变了就换基准</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="296" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一行 12 个分数，分成 3 块依次读入；每块只更新三个数：最大值 m、指数和 l、未归一化的输出 O</text>
   <rect x="30" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/>
   <rect x="52" y="130.0" width="28" height="20.0" rx="3" fill="#e0b860" opacity="0.55"/>
@@ -39,5 +39,5 @@
   <text x="620" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">l 先乘 exp(3.1 − 4.0)，再加这一块</text>
   <line x1="492" y1="100" x2="506" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="262" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">最大值变大时，已经加好的 l 和 O 统一乘一个系数换到新基准，不用回头看前面的分数；最后除以 l，结果和一次算完相同</text>
-  <text x="746" y="271" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="288" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

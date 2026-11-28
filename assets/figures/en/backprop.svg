@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="The forward pass keeps intermediate results; the backward pass works back by the chain rule">
+  <title>The forward pass keeps intermediate results; the backward pass works back by the chain rule</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Forward: compute left to right, keeping each layer&#x27;s output</text>
+  <rect x="40" y="50" width="104" height="56" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="92.0" y="74.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">x</text>
+  <text x="92.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">input</text>
+  <rect x="232" y="50" width="104" height="56" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="284.0" y="74.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">a</text>
+  <text x="284.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">layer 1 output</text>
+  <rect x="424" y="50" width="104" height="56" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="476.0" y="74.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">b</text>
+  <text x="476.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">layer 2 output</text>
+  <rect x="616" y="50" width="104" height="56" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="668.0" y="74.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">L</text>
+  <text x="668.0" y="95.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">loss</text>
+  <line x1="146" y1="78" x2="230" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="338" y1="78" x2="422" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="530" y1="78" x2="614" y2="78" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="24" y="150" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Backward: right to left, once per layer</text>
+  <rect x="232" y="166" width="104" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="284.0" y="193.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">∂L/∂a</text>
+  <rect x="424" y="166" width="104" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="476.0" y="193.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">∂L/∂b</text>
+  <rect x="616" y="166" width="104" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="668.0" y="193.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">1</text>
+  <rect x="40" y="166" width="104" height="44" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="92.0" y="193.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">∂L/∂x</text>
+  <line x1="230" y1="188" x2="146" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="188.0" y="181.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">× derivative</text>
+  <line x1="422" y1="188" x2="338" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380.0" y="181.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">× derivative</text>
+  <line x1="614" y1="188" x2="530" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="572.0" y="181.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">× derivative</text>
+  <line x1="284" y1="108" x2="284" y2="164" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
+  <line x1="476" y1="108" x2="476" y2="164" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#tip)"/>
+  <text x="488" y="140" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">uses values kept by the forward pass</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

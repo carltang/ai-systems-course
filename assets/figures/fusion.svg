@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" width="760" height="290" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="算子融合：中间结果不落地">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 306" width="760" height="306" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="算子融合：中间结果不落地">
   <title>算子融合：中间结果不落地</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="290" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="306" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">分开执行：三个 kernel，中间结果写回显存再读出来</text>
   <rect x="24" y="52" width="70" height="40" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
   <text x="59.0" y="77.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">x, w</text>
@@ -33,5 +33,5 @@
   <line x1="116" y1="224" x2="188" y2="224" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="572" y1="224" x2="644" y2="224" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="270" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">读 3n、写 n，共 4n 次：访问量减半，时间也大约减半</text>
-  <text x="746" y="281" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="298" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

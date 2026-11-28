@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3.2 The first CUDA kernel · AI Systems: From Deep Learning Principles to GPUs and Distributed Training</title>
+<meta name="description" content="Understand threads, thread blocks and grids, and be able to write and launch a simple CUDA kernel correctly on your own.">
+<meta name="author" content="Zongyao Tang & Claude">
+<meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='en')location.replace('../../units/3-2.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/units/3-2.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/units/3-2.html">
+<style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
+<script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
+<link rel="manifest" href="../../manifest-en.webmanifest">
+<link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../assets/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="../../assets/site.css?v=44d46eb3">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← Contents</a>
+<span class="unit-steps">
+<a href="3-1.html" title="3.1 The GPU environment and a first performance analysis" data-step="prev">‹ 3.1</a>
+<a href="3-3.html" title="3.3 Compute and memory architecture" data-step="next">3.3 ›</a>
+</span><a class="lang-switch" href="../../units/3-2.html" hreflang="zh-CN" lang="zh-CN" data-lang="zh" title="用中文读这一页">中文</a><button type="button" class="read-toggle" id="read-toggle">Full-screen reading</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>Part 3 · The GPU and the CUDA execution model</span>3.2 The first CUDA kernel</h1>
+<p class="translated">Translated by AI (Anthropic's Claude) from the Chinese edition. <a href="../../units/3-2.html" hreflang="zh-CN" data-lang="zh">The Chinese original</a> is the reference.</p>
+<div class="frame"><div class="frame-q"><span>This unit answers</span>How do thousands of threads each find their own share of the work?</div><div class="frame-c">Follows 3.1: the GPU&#x27;s strength is doing a great deal of identical work at once; this unit is about handing that work out to threads.</div></div>
+<div class="story"><p>The previous unit said the GPU is good at "doing a great deal of identical work at once". This unit answers: how exactly is the work handed out? The thread: write the code for one thread only → each thread finds its data by its number → the data first has to be moved from the CPU to the GPU → threads are grouped into blocks, and blocks do not depend on each other.</p></div>
+<ol class="thread"><li><a href="#c-2-2-spmd">Write the code for one thread, and run a million copies of it</a></li><li><a href="#c-2-2-index">A thread&#x27;s address: blockIdx × blockDim + threadIdx</a></li><li><a href="#c-2-2-two-memories">The CPU and the GPU each have their own memory, with a narrow road between</a></li><li><a href="#c-2-2-independent-blocks">Blocks never wait for each other, so the same program runs on large and small GPUs alike</a></li></ol>
+<div class="essence-head"><h2>Explanation</h2></div><ol class="icards">
+<li class="icard" id="c-2-2-spmd"><h3><span class="i-num">1</span>Write the code for one thread, and run a million copies of it</h3>
+<p class="i-essence">A CUDA kernel describes &quot;what one thread does&quot;. When launching the kernel you say how many threads to start; all threads run the same code, each on different data. This is called SPMD (single program, multiple data). Parallelism is not written; it is &quot;launched&quot;.</p>
+<div class="i-detail"><p>To add the elements of two arrays on the CPU, you write a loop:</p><pre>for (int i = 0; i &lt; n; i++) c[i] = a[i] + b[i];</pre><p>In CUDA the loop disappears. You write only the body of the loop, that is, "how element i is computed":</p><pre>__global__ void add(float* a, float* b, float* c, int n) {
+    int i = /* which thread am I */;
+    if (i &lt; n) c[i] = a[i] + b[i];
+}</pre><p>Then at launch you say "start n threads to run it". The n threads run this same code at once, each with a different <code>i</code>.</p><p>This is SPMD (single program, multiple data): one program, many pieces of data. It corresponds directly to the previous unit's conclusion: the GPU is good at large amounts of identical work, and a kernel is the description of "the identical work".</p><p>So the first step in moving CPU code to the GPU is always to find the loop whose "iterations do not depend on each other": <mark>the loop variable becomes the thread number, and the loop body becomes the kernel</mark>. If the iterations depend on each other (step i needs the result of step i−1, say), you cannot do this directly; that is the subject of 3.5.</p></div>
+<p class="i-analogy"><b>An analogy</b>Like handing a million workers the same job sheet: everyone follows the same sheet and uses their own staff number to collect different materials.</p>
+<p class="i-impl">So the way to write a kernel is: first be clear &quot;how one element is computed&quot;, then &quot;which thread handles which element&quot;. A loop in CPU code often becomes threads.</p>
+<div class="i-builds">Used later in <a href="3-2.html#c-2-2-index">A thread&#x27;s address: blockIdx × blockDim + threadIdx</a><a href="3-5.html#c-2-5-tournament">A reduction is a knockout tournament: n numbers, a result in log n rounds</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><span class="src">PMPP §2.5</span></div>
+</li>
+<li class="i-lead">Every thread runs the same code, so how does it know which element it should handle? By its number.</li>
+<li class="icard" id="c-2-2-index"><h3><span class="i-num">2</span>A thread&#x27;s address: blockIdx × blockDim + threadIdx</h3>
+<p class="i-essence">Threads are organised in two levels: a grid is made of thread blocks, and a block is made of threads. A thread&#x27;s global number = block number × threads per block + number within the block, and it uses this to find the data it is responsible for. To round up, more threads are usually started than there is data, and the extra ones must be stopped with if (i &lt; n).</p>
+<div class="i-detail"><p>Threads are not one flat list but two levels: some threads make a block, some blocks make the grid. Each thread can read three built-in variables: <code>blockIdx</code> (which block I am in), <code>blockDim</code> (how many threads each block has) and <code>threadIdx</code> (my place within the block).</p><p>The global number is: <code>i = blockIdx.x * blockDim.x + threadIdx.x</code>. With 256 threads per block, for example, thread 10 in block 3 has global number 3 × 256 + 10 = 778, and is responsible for <code>c[778]</code>.</p><p>Why check the bounds? Because <mark>threads can only be started a whole block at a time</mark>. With 1000 elements and 256 threads per block, you start ⌈1000/256⌉ = 4 blocks, 1024 threads in all. The 24 threads numbered 1000 to 1023 have no data; if they are not stopped, they read and write memory past the end of the arrays that does not belong to you.</p><p>The two-dimensional case (images, matrices) is exactly the same, just computed once for each of the x and y directions: the column number from the three x variables, the row number from the three y variables.</p></div>
+<details class="i-more"><summary>Example: processing a 1920×1080 image, how large should the grid be?</summary><div class="i-detail"><p>Suppose each block has 16×16 = 256 threads and each thread handles one pixel.</p><ul><li>x direction (width 1920): 1920 ÷ 16 = 120, exactly 120 blocks.</li><li>y direction (height 1080): 1080 ÷ 16 = 67.5, rounded up to 68 blocks.</li></ul><p>So the grid is 120×68, 8160 blocks in all, about 2.09 million threads. The threads cover 1920×1088, 8 rows more than the image (15360 threads), and these threads must be stopped by the bounds check.</p><p>In the kernel each thread finds its pixel like this:</p><pre>int col = blockIdx.x * blockDim.x + threadIdx.x;
+int row = blockIdx.y * blockDim.y + threadIdx.y;
+if (col &lt; width &amp;&amp; row &lt; height) {
+    int i = row * width + col;       // the image is stored by rows: row `row`, column `col`
+    out[i] = /* compute the result from in[i] */;
+}</pre><p>A common way to round up: <code>(n + blockSize - 1) / blockSize</code>, which gives ⌈n / blockSize⌉ with integer division.</p></div></details>
+<p class="i-analogy"><b>An analogy</b>Like working out an estate-wide flat number as &quot;building number × flats per building + flat number&quot;; the last building is not full, and you must not knock on the empty flats&#x27; doors.</p>
+<p class="i-impl">So the first line of almost every kernel computes an index and the second checks bounds; for two-dimensional data such as images and matrices, the column and row are computed separately in the x and y directions.</p>
+<div class="i-builds">Builds on <a href="3-2.html#c-2-2-spmd">Write the code for one thread, and run a million copies of it</a></div>
+<div class="i-builds">Used later in <a href="6-2.html#c-p6-2-channels">Channels: one operation cut into several parallel streams, each taking one of the GPU&#x27;s compute units</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><span class="src">PMPP §2.5</span><span class="src">PMPP chapter 3</span></div>
+</li>
+<li class="i-lead">A thread has found its position, but where is the data it is to process? At first it is in memory on the CPU side, which the GPU cannot reach.</li>
+<li class="icard" id="c-2-2-two-memories"><h3><span class="i-num">3</span>The CPU and the GPU each have their own memory, with a narrow road between</h3>
+<p class="i-essence">Host memory and GPU memory are separate, and data has to be copied across PCIe. GPU memory bandwidth is of the order of a thousand GB per second; PCIe only tens of GB per second, a few dozen times less.</p>
+<div class="i-detail"><p>The memory the CPU uses (host memory) and the memory the GPU uses (GPU memory) are two separate stores, connected by the PCIe bus. Kernels on the GPU can only read and write GPU memory, so data must be copied over first, and results copied back when needed.</p><p>The trouble is that this channel is narrow. The GPU reads and writes its own memory at hundreds to over a thousand GB per second; PCIe transfers at roughly ten to a few dozen GB per second. Copying 1 GB of data takes tens of milliseconds, while one element-wise operation on 1 GB of data takes the GPU a few milliseconds. In other words, the time to move the data once is enough to compute ten times.</p><p>That gives a practical rule: <mark>once data is on the GPU, do not let it out lightly</mark>. Do a long chain of operations on the GPU in one go, and copy back only the results you need at the end.</p><p>The most common trap in a training loop is calling <code>loss.item()</code> or <code>.cpu()</code> at every step. They not only trigger a copy but also make the CPU stop and wait for the GPU to finish every earlier task (because the GPU is asynchronous; see 3.1). Printing once in a while is fine; doing it every step slows things down noticeably.</p></div>
+<p class="i-analogy"><b>An analogy</b>Inside the factory (the GPU) things move fast, but the raw-materials warehouse (CPU memory) is outside town, with only a small road between.</p>
+<p class="i-impl">So keep data on the GPU as much as possible and do many steps of computation there in a row; copying back and forth between CPU and GPU often takes longer than the computation itself. In PyTorch, .cpu() and .item() both trigger a copy and a synchronisation.</p>
+<div class="i-builds">Builds on <a href="3-1.html#c-2-1-async">Python is only placing orders: the GPU executes asynchronously</a><a href="0-3.html#c-p0-3-pinned">The operating system moves data around in memory; it must be &quot;pinned&quot; before it goes to a device</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><span class="src">PMPP chapter 2</span><span class="src">Best Practices §9.1 Data transfer between host and device</span></div>
+</li>
+<li class="i-lead">Back to the two levels of threads: why divide them into blocks rather than one big plane? Because a block is a boundary: inside it threads can cooperate, across it they have nothing to do with each other.</li>
+<li class="icard" id="c-2-2-independent-blocks"><h3><span class="i-num">4</span>Blocks never wait for each other, so the same program runs on large and small GPUs alike</h3>
+<p class="i-essence">Threads in the same block can synchronise with __syncthreads() and share shared memory; different blocks have no guarantee of execution order and are independent of each other. The hardware can schedule them in any order, with any degree of parallelism.</p>
+<div class="i-detail"><p>Threads in the same block have two privileges: they share a small piece of very fast storage (shared memory), and they can wait for each other with <code>__syncthreads()</code>, meaning "once everyone has reached this point, go on together". This lets them cooperate on one job, for instance moving a block of data into shared memory together and then each using it (the tiling of 3.3).</p><p>Between different blocks there is no guarantee at all: which runs first, which later, or whether they run at the same time is up to the hardware, and the program may not assume anything.</p><p>What this restriction buys is scalability. Because blocks do not depend on each other, the hardware is free to arrange them: on a small GPU 8 blocks run at once and the rest queue; on a large GPU 100 run at once. <mark>Without changing a single character of the program, performance grows with the hardware automatically</mark>. This is called transparent scalability.</p><p>The other way round, it constrains how you design algorithms: work that needs threads to cooperate closely must be placed within one block; cooperation across blocks can only be achieved by "launching one kernel to finish, then launching the next".</p></div>
+<p class="i-analogy"><b>An analogy</b>Like an exam held in several rooms: within a room an invigilator gives everyone the same instructions; the rooms have nothing to do with each other; with many rooms everyone sits the exam at once, with few they sit it in turns.</p>
+<p class="i-impl">So the same kernel runs faster automatically on a large GPU with more SMs (transparent scalability); it also means you cannot write logic that depends on &quot;another block finishing first&quot;.</p>
+<div class="i-builds">Used later in <a href="3-3.html#c-2-3-warp">Warps: 32 threads following the same command</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><span class="src">PMPP §4.3</span></div>
+</li>
+</ol>
+<div class="recap"><h3>Putting it together</h3><p><strong class="h">Because</strong> a kernel describes the work of one thread, <strong>the key</strong> is the conversion from a thread's number to a position in the data; <strong>because</strong> moving data between the two memories is expensive, <strong>keep</strong> the data on the GPU; <strong>because</strong> blocks are independent of each other, <strong>the same</strong> program runs on a GPU of any size.</p></div>
+<div class="selftest"><h3>Test yourself</h3><p class="hint">Without looking back at the explanation, say it in your own words.</p><ol><li>What does a CUDA kernel describe? Where does the parallelism come from?</li><li>How does a thread work out the position of the data it is responsible for? Why is if (i &lt; n) needed?</li><li>Why should data stay on the GPU as much as possible? Why does .item() slow training down?</li><li>What can threads in the same block do, and threads in different blocks? What can they not do?</li></ol></div>
+</section><nav class="unit-pager">
+<a href="3-1.html"><small>Previous unit</small>3.1 The GPU environment and a first performance analysis</a>
+<a class="next" href="3-3.html"><small>Next unit</small>3.3 Compute and memory architecture</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">Contents</a> · <a href="../about.html">About this course</a> · <a href="../about.html#versions">Version 1.12</a><br>
+Zongyao Tang & Claude · © 2026 Zongyao Tang<br>Shared under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a>: you may share and adapt it, with attribution, not for commercial use, and adaptations under the same licence</footer>
+<script src="../../assets/reading.js?v=44d46eb3"></script>
+<script src="../../assets/demos-en.js?v=44d46eb3"></script>
+<script src="../../assets/demos.js?v=44d46eb3"></script>
+<script src="../../assets/code.js?v=44d46eb3"></script>
+<script src="../../assets/motion.js?v=44d46eb3"></script>
+<script src="../../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../../sw.js').catch(function () {});</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 296" width="760" height="296" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="How a cross-machine hop divides the work, and its three grades of road">
+  <title>How a cross-machine hop divides the work, and its three grades of road</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="296" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">A cross-machine hop: the kernel on the GPU cannot send data out of the machine, and relies on a proxy thread on</tspan><tspan x="24" dy="18.2">the host</tspan></text>
+  <g transform="translate(0 18.2)"><rect x="24" y="52" width="128" height="54" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="88.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">kernel</text></g>
+  <g transform="translate(0 18.2)"><text x="88.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">moves data</text></g>
+  <g transform="translate(0 18.2)"><rect x="170" y="52" width="128" height="54" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="234.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">staging buffer</text></g>
+  <g transform="translate(0 18.2)"><text x="234.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">written slot by slot</text></g>
+  <g transform="translate(0 18.2)"><line x1="154" y1="79" x2="168" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><rect x="316" y="52" width="128" height="54" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="380.0" y="75.0" font-size="13.2" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">proxy thread</text></g>
+  <g transform="translate(0 18.2)"><text x="380.0" y="96.0" font-size="11.8" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">CPU, drives the NIC</text></g>
+  <g transform="translate(0 18.2)"><line x1="300" y1="79" x2="314" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><rect x="462" y="52" width="128" height="54" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="526.0" y="75.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">NIC</text></g>
+  <g transform="translate(0 18.2)"><text x="526.0" y="96.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">RDMA</text></g>
+  <g transform="translate(0 18.2)"><line x1="446" y1="79" x2="460" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><rect x="608" y="52" width="128" height="54" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="672.0" y="84.0" font-size="13.2" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">another machine</text></g>
+  <g transform="translate(0 18.2)"><line x1="592" y1="79" x2="606" y2="79" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><text x="24" y="144" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">From best to worst this hop has three grades, and falling to any of them reports no error:</text></g>
+  <g transform="translate(0 18.2)"><rect x="24" y="160" width="228" height="54" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="138.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">IB + GPUDirect RDMA</text></g>
+  <g transform="translate(0 18.2)"><text x="138.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">NIC reads GPU memory</text></g>
+  <g transform="translate(0 18.2)"><rect x="266" y="160" width="228" height="54" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="380.0" y="183.0" font-size="13.2" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">IB, staged through main memory</text></g>
+  <g transform="translate(0 18.2)"><text x="380.0" y="204.0" font-size="11.8" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">an extra copy at each end</text></g>
+  <g transform="translate(0 18.2)"><rect x="508" y="160" width="228" height="54" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/></g>
+  <g transform="translate(0 18.2)"><text x="622.0" y="183.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">TCP socket</text></g>
+  <g transform="translate(0 18.2)"><text x="622.0" y="204.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">only a few percent of expected</text></g>
+  <g transform="translate(0 18.2)"><text x="24" y="246" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">When the proxy thread cannot get CPU time, communication slows too, while the GPU and network look fine</text></g>
+  <text x="746" y="288" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

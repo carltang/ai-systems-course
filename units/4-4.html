@@ -7,6 +7,8 @@
 <meta name="description" content="理解并实现 FlashAttention：分块 + 在线 softmax，减少注意力的显存读写。">
 <meta name="author" content="Zongyao Tang & Claude">
 <meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='zh')location.replace('../en/units/4-4.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/units/4-4.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/units/4-4.html">
 <style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
 <script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
 <link rel="manifest" href="../manifest.webmanifest">
@@ -14,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=f3253d60">
+<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
 </head>
 <body>
 <main class="main">
@@ -24,7 +26,7 @@
 <span class="unit-steps">
 <a href="4-3.html" title="4.3 Triton 入门" data-step="prev">‹ 4.3</a>
 <a href="4-5.html" title="4.5 矩阵乘法的极限与 Tensor Core" data-step="next">4.5 ›</a>
-</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+</span><a class="lang-switch" href="../en/units/4-4.html" hreflang="en" lang="en" data-lang="en" title="Read this page in English">EN</a><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
 <section class="essence" id="essence">
 <h1 class="unit-title"><span>第 4 部分 · 算子与 kernel</span>4.4 Flash Attention</h1>
 <div class="frame"><div class="frame-q"><span>这一单元回答</span>注意力的瓶颈到底在哪？为什么“算得一样多”却能快好几倍？</div><div class="frame-c">承接 1.4 的注意力、3.5 的归约和 3.3 的分块：三者在这里汇合。</div></div>
@@ -90,13 +92,14 @@ print(ref.item(), (o / l).item())         # 两个数应该只在最后几位不
 <a class="next" href="4-5.html"><small>下一单元</small>4.5 矩阵乘法的极限与 Tensor Core</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=f3253d60"></script>
-<script src="../assets/demos.js?v=f3253d60"></script>
-<script src="../assets/code.js?v=f3253d60"></script>
-<script src="../assets/motion.js?v=f3253d60"></script>
-<script src="../assets/theme.js?v=f3253d60"></script>
+<script src="../assets/reading.js?v=44d46eb3"></script>
+<script src="../assets/demos.js?v=44d46eb3"></script>
+<script src="../assets/code.js?v=44d46eb3"></script>
+<script src="../assets/motion.js?v=44d46eb3"></script>
+<script src="../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="16 字节和 ZeRO 的三级">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 316" width="760" height="316" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="16 字节和 ZeRO 的三级">
   <title>16 字节和 ZeRO 的三级</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="300" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="316" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">混合精度加 Adam：每个参数 16 字节</text>
   <rect x="24" y="50" width="85.0" height="52" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="66.5" y="72.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">参数</text>
@@ -36,5 +36,5 @@
   <rect x="190" y="262" width="11" height="20" rx="5" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
   <text x="211.0" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">16/N 字节</text>
   <text x="736" y="277" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">通信约 1.5 倍</text>
-  <text x="746" y="291" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="308" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 284" width="760" height="284" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Latency across the storage hierarchy">
+  <title>Latency across the storage hierarchy</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="284" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">How long one fetch of data takes (each step on the axis is 10×)</text>
+  <line x1="220" y1="52" x2="220" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="306" y1="52" x2="306" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="392" y1="52" x2="392" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="478" y1="52" x2="478" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="564" y1="52" x2="564" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="650" y1="52" x2="650" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="736" y1="52" x2="736" y2="222" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="2 4"/>
+  <text x="220" y="244" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1 ns</text>
+  <text x="478" y="244" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1 µs</text>
+  <text x="736" y="244" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1 ms</text>
+  <text x="204" y="81" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing="0">CPU L1 cache</text>
+  <rect x="220" y="62" width="10" height="28" rx="6" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="240" y="81" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">about 1 ns</text>
+  <text x="204" y="121" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing="0">Main memory</text>
+  <rect x="220" y="102" width="172" height="28" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="402" y="121" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">about 100 ns</text>
+  <text x="204" y="161" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing="0">NVMe SSD</text>
+  <rect x="220" y="142" width="430" height="28" rx="6" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="660" y="161" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">about 100 µs</text>
+  <text x="204" y="201" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing="0">Network round trip</text>
+  <rect x="220" y="182" width="404.2" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="634.2" y="201" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">10s–100s of µs</text>
+  <text x="746" y="276" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

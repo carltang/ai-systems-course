@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" width="760" height="190" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="残差连接和归一化">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 206" width="760" height="206" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="残差连接和归一化">
   <title>残差连接和归一化</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="190" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="206" rx="14" fill="#fbf9f4"/>
   <rect x="24" y="96" width="90" height="50" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
   <text x="69.0" y="117.0" font-size="16" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">x</text>
   <text x="69.0" y="138.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">这一层的输入</text>
@@ -20,5 +20,5 @@
   <path d="M150 121 L150 46 L668 46 L668 94" fill="none" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="409" y="36" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">直通车道：输入原样到达相加处，梯度也原样传回</text>
   <text x="380" y="174" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一个 Transformer 层里有两个这样的块：一个包着注意力，一个包着 MLP</text>
-  <text x="746" y="181" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="198" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

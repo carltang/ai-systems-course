@@ -7,6 +7,8 @@
 <meta name="description" content="了解张量并行、流水线并行、上下文并行怎么组合，看懂一个现代大模型训练框架。">
 <meta name="author" content="Zongyao Tang & Claude">
 <meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='zh')location.replace('../en/units/7-3.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/units/7-3.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/units/7-3.html">
 <style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
 <script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
 <link rel="manifest" href="../manifest.webmanifest">
@@ -14,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=f3253d60">
+<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
 </head>
 <body>
 <main class="main">
@@ -24,7 +26,7 @@
 <span class="unit-steps">
 <a href="7-2.html" title="7.2 ZeRO 与 FSDP" data-step="prev">‹ 7.2</a>
 <a href="7-4.html" title="7.4 检查点、容错与大规模数据读取" data-step="next">7.4 ›</a>
-</span><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
+</span><a class="lang-switch" href="../en/units/7-3.html" hreflang="en" lang="en" data-lang="en" title="Read this page in English">EN</a><button type="button" class="read-toggle" id="read-toggle">全屏阅读</button></div>
 <section class="essence" id="essence">
 <h1 class="unit-title"><span>第 7 部分 · 分布式训练</span>7.3 模型并行与 TorchTitan</h1>
 <div class="frame"><div class="frame-q"><span>这一单元回答</span>更大的模型、更多的卡：几种并行方式怎么组合？</div><div class="frame-c">承接 7.2：FSDP 切的是“存储”，这一单元还要把“计算”也切开。</div></div>
@@ -78,13 +80,14 @@
 <a class="next" href="7-4.html"><small>下一单元</small>7.4 检查点、容错与大规模数据读取</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=f3253d60"></script>
-<script src="../assets/demos.js?v=f3253d60"></script>
-<script src="../assets/code.js?v=f3253d60"></script>
-<script src="../assets/motion.js?v=f3253d60"></script>
-<script src="../assets/theme.js?v=f3253d60"></script>
+<script src="../assets/reading.js?v=44d46eb3"></script>
+<script src="../assets/demos.js?v=44d46eb3"></script>
+<script src="../assets/code.js?v=44d46eb3"></script>
+<script src="../assets/motion.js?v=44d46eb3"></script>
+<script src="../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

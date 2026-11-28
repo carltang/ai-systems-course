@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 284" width="760" height="284" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Attention is a soft table lookup">
+  <title>Attention is a soft table lookup</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="284" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Attention at one position: mix the contents of all positions by how well they match</text>
+  <rect x="24" y="60" width="130" height="50" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="89.0" y="81.0" font-size="15.0" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Q</text>
+  <text x="89.0" y="102.0" font-size="11.8" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">what I am looking for</text>
+  <rect x="24" y="130" width="130" height="50" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="89.0" y="151.0" font-size="14.1" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">K</text>
+  <text x="89.0" y="172.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">what each position has</text>
+  <rect x="24" y="200" width="130" height="50" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="89.0" y="221.0" font-size="14.1" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">V</text>
+  <text x="89.0" y="242.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">each position&#x27;s content</text>
+  <rect x="220" y="92" width="130" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="285.0" y="116.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">dot product</text>
+  <text x="285.0" y="137.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">a set of scores</text>
+  <rect x="410" y="92" width="130" height="56" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="475.0" y="116.0" font-size="12.8" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">softmax</text>
+  <text x="475.0" y="137.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">weights adding up to 1</text>
+  <rect x="600" y="146" width="136" height="56" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="668.0" y="170.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">weighted sum</text>
+  <text x="668.0" y="191.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">this position&#x27;s output</text>
+  <line x1="156" y1="86" x2="218" y2="108" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="156" y1="154" x2="218" y2="132" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="352" y1="120" x2="408" y2="120" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="542" y1="124" x2="598" y2="162" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="156" y1="226" x2="598" y2="188" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="380" y="238" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">All positions do this at once: the scores form an N×N matrix</text>
+  <text x="746" y="276" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

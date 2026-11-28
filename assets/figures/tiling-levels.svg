@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="多层分块">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="多层分块">
   <title>多层分块</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每一级存储都做同一件事：搬一块进来，在里面多用几次</text>
   <rect x="24" y="58" width="158" height="64" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
   <text x="103.0" y="86.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">显存</text>
@@ -22,5 +22,5 @@
   <text x="736" y="158" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">近、小、快</text>
   <line x1="110" y1="154" x2="660" y2="154" stroke="#d9d4c8" stroke-width="1.2" marker-end="url(#tip)"/>
   <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">读高性能矩阵乘法的代码：先认出每一层循环对应的是哪一级存储</text>
-  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

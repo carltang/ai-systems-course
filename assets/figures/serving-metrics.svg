@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" width="760" height="220" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="推理服务的三个指标">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 236" width="760" height="236" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="推理服务的三个指标">
   <title>推理服务的三个指标</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="220" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="236" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一个请求从到达到结束</text>
   <rect x="24" y="60" width="110" height="44" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
   <text x="79.0" y="87.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">排队</text>
@@ -29,5 +29,5 @@
   <text x="409" y="166" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">每 token 延迟</text>
   <text x="409" y="184" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">（TPOT）</text>
   <text x="24" y="206" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">总时间 ≈ 首 token 延迟 + 输出的 token 数 × 每 token 延迟；吞吐是整个系统每秒生成的 token 数</text>
-  <text x="746" y="211" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="228" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

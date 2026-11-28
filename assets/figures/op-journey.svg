@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="一次算子调用穿过的五层">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="一次算子调用穿过的五层">
   <title>一次算子调用穿过的五层</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">c = torch.add(a, b) 从 Python 到 GPU 经过的五层</text>
   <rect x="24" y="54" width="128" height="62" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
   <text x="88.0" y="81.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">Python 绑定</text>
@@ -27,5 +27,5 @@
   <rect x="608" y="138" width="128" height="6" rx="3" fill="#8aa2e6"/>
   <text x="672.0" y="164" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">GPU 稍后才执行</text>
   <text x="24" y="208" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">每个算子都要走一遍：算子又小又多时，这段固定开销就是瓶颈（等发令）</text>
-  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

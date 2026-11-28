@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 266" width="760" height="266" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Job, Pod and container">
+  <title>Job, Pod and container</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="266" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">A Job creates Pods from a template; a Pod is disposable, and a broken one is replaced by a new one</text>
+  <rect x="24" y="56" width="150" height="64" rx="10" fill="#efe9fb" stroke="#a892dc" stroke-width="1.2"/>
+  <text x="99.0" y="74.9" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Job</text>
+  <text x="99.0" y="94.2" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="99.0" dy="0">how many to succeed,</tspan><tspan x="99.0" dy="16.5">how many retries</tspan></text>
+  <rect x="240" y="56" width="200" height="64" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="340.0" y="74.9" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Pod</text>
+  <text x="340.0" y="94.2" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="340.0" dy="0">one or a few containers, on the</tspan><tspan x="340.0" dy="16.5">same node</tspan></text>
+  <rect x="506" y="56" width="230" height="64" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
+  <text x="621.0" y="74.9" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Container</text>
+  <text x="621.0" y="94.2" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="621.0" dy="0">the image holds Python, PyTorch</tspan><tspan x="621.0" dy="16.5">and your code</tspan></text>
+  <line x1="176" y1="88" x2="238" y2="88" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="207.0" y="81.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">creates</text>
+  <line x1="442" y1="88" x2="504" y2="88" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="473.0" y="81.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">wraps</text>
+  <text x="24" y="160" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Pod phases</text>
+  <rect x="120" y="142" width="130" height="44" rx="10" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="185.0" y="160.0" font-size="11.9" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Pending</text>
+  <text x="185.0" y="181.0" font-size="11.0" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">scheduling, image pull</text>
+  <rect x="300" y="142" width="130" height="44" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="365.0" y="160.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Running</text>
+  <text x="365.0" y="181.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">containers running</text>
+  <rect x="480" y="130" width="120" height="32" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="540.0" y="151.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Succeeded</text>
+  <rect x="480" y="168" width="120" height="32" rx="10" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="540.0" y="189.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Failed</text>
+  <line x1="252" y1="164" x2="298" y2="164" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="432" y1="158" x2="478" y2="148" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <line x1="432" y1="170" x2="478" y2="182" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="612" y="150" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">exit code zero</text>
+  <text x="612" y="188" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">exit code non-zero</text>
+  <text x="24" y="232" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">A Failed Pod is never repaired: the Job builds another by its retry rules, with a different name and address</text>
+  <text x="746" y="258" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

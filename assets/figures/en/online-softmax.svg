@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 328" width="760" height="328" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Online softmax: read in blocks, change the baseline when the maximum changes">
+  <title>Online softmax: read in blocks, change the baseline when the maximum changes</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="328" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">A row of 12 scores read in 3 blocks in turn; each block updates only three numbers: the maximum m, the sum of</tspan><tspan x="24" dy="18.2">exponentials l, the unnormalised output O</tspan></text>
+  <g transform="translate(0 18.2)"><rect x="30" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/></g>
+  <g transform="translate(0 18.2)"><rect x="52" y="130.0" width="28" height="20.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="66" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1.0</text></g>
+  <g transform="translate(0 18.2)"><rect x="100" y="106.0" width="28" height="44.0" rx="3" fill="#e0b860" opacity="1"/></g>
+  <g transform="translate(0 18.2)"><text x="114" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">2.2</text></g>
+  <g transform="translate(0 18.2)"><rect x="148" y="140.0" width="28" height="10.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="162" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">0.5</text></g>
+  <g transform="translate(0 18.2)"><rect x="196" y="118.0" width="28" height="32.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="210" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1.6</text></g>
+  <g transform="translate(0 18.2)"><text x="140" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">m = 2.2</text></g>
+  <g transform="translate(0 18.2)"><text x="140" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">l = Σ exp(s − 2.2)</text></g>
+  <g transform="translate(0 18.2)"><rect x="270" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/></g>
+  <g transform="translate(0 18.2)"><rect x="292" y="88.0" width="28" height="62.0" rx="3" fill="#e0b860" opacity="1"/></g>
+  <g transform="translate(0 18.2)"><text x="306" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">3.1</text></g>
+  <g transform="translate(0 18.2)"><rect x="340" y="146.0" width="28" height="4.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="354" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">0.2</text></g>
+  <g transform="translate(0 18.2)"><rect x="388" y="96.0" width="28" height="54.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="402" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">2.7</text></g>
+  <g transform="translate(0 18.2)"><rect x="436" y="128.0" width="28" height="22.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="450" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">1.1</text></g>
+  <g transform="translate(0 18.2)"><text x="380" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">m becomes 3.1</text></g>
+  <g transform="translate(0 18.2)"><text x="380" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">l × exp(2.2 − 3.1), plus this block</text></g>
+  <g transform="translate(0 18.2)"><line x1="252" y1="100" x2="266" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><rect x="510" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/></g>
+  <g transform="translate(0 18.2)"><rect x="532" y="70.0" width="28" height="80.0" rx="3" fill="#e0b860" opacity="1"/></g>
+  <g transform="translate(0 18.2)"><text x="546" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">4.0</text></g>
+  <g transform="translate(0 18.2)"><rect x="580" y="134.0" width="28" height="16.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="594" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">0.8</text></g>
+  <g transform="translate(0 18.2)"><rect x="628" y="110.0" width="28" height="40.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="642" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">2.0</text></g>
+  <g transform="translate(0 18.2)"><rect x="676" y="80.0" width="28" height="70.0" rx="3" fill="#e0b860" opacity="0.55"/></g>
+  <g transform="translate(0 18.2)"><text x="690" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">3.5</text></g>
+  <g transform="translate(0 18.2)"><text x="620" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">m becomes 4.0</text></g>
+  <g transform="translate(0 18.2)"><text x="620" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">l × exp(3.1 − 4.0), plus this block</text></g>
+  <g transform="translate(0 18.2)"><line x1="492" y1="100" x2="506" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/></g>
+  <g transform="translate(0 18.2)"><text x="24" y="262" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">When the maximum grows, the l and O added so far are multiplied by one factor to move to the new baseline, without</tspan><tspan x="24" dy="17.5">looking back at earlier scores; dividing by l at the end gives the same result as computing it all at once</tspan></text></g>
+  <text x="746" y="320" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

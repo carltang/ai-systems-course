@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 276" width="760" height="276" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="用别的 warp 把等待填满">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 292" width="760" height="292" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="用别的 warp 把等待填满">
   <title>用别的 warp 把等待填满</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="276" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="292" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一个 SM 上驻留着很多 warp；谁的数据到了，就执行谁</text>
   <text x="24" y="72" font-size="13" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">warp A</text>
   <rect x="110" y="54" width="75" height="26" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1"/>
@@ -43,5 +43,5 @@
   <rect x="656" y="204" width="75" height="26" rx="5" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1"/>
   <text x="694.0" y="222" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">D</text>
   <text x="110" y="256" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">蓝色：在执行    灰色：在等显存的数据。每个 warp 等得一样久，运算单元却一直有活干</text>
-  <text x="746" y="267" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="284" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

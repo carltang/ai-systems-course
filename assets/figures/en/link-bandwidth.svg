@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 252" width="760" height="252" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Bandwidth of NVLink, PCIe and the NIC">
+  <title>Bandwidth of NVLink, PCIe and the NIC</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="252" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">The three roads an H100 can use (official figures)</text>
+  <text x="24" y="78" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">NVLink</text>
+  <rect x="150" y="56" width="580" height="32" rx="7" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="164" y="77" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">18 links, 900 GB/s both directions</text>
+  <text x="24" y="124" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">PCIe Gen5 x16</text>
+  <rect x="150" y="102" width="83" height="32" rx="7" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
+  <text x="245" y="123" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">128 GB/s both directions (64 each way)</text>
+  <text x="24" y="170" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">400 Gb/s NIC</text>
+  <rect x="150" y="148" width="32" height="32" rx="7" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="194" y="169" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">about 50 GB/s</text>
+  <text x="24" y="204" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">Inside and across machines differ by an order of magnitude: the most communication-heavy parallelism must stay inside</tspan><tspan x="24" dy="17.5">a machine</tspan></text>
+  <text x="746" y="244" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

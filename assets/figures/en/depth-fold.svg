@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 286" width="760" height="286" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Layer 1 folds the input axis into three pieces; the four pieces layer 2 draws appear once in each fold, twelve in all">
+  <title>Layer 1 folds the input axis into three pieces; the four pieces layer 2 draws appear once in each fold, twelve in all</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="286" rx="14" fill="#fbf9f4"/>
+  <rect x="24" y="70" width="216" height="150" rx="8" fill="#fbfbfa" stroke="#d9d4c8"/>
+  <text x="24" y="56" font-size="13" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">Layer 1: x → hidden, 3 pieces</text>
+  <line x1="32.0" y1="212.0" x2="98.7" y2="78.0" stroke="#8aa2e6" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="98.7" y1="78.0" x2="165.3" y2="212.0" stroke="#a892dc" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="165.3" y1="212.0" x2="232.0" y2="78.0" stroke="#8aa2e6" stroke-width="2.4" stroke-linecap="round"/>
+  <rect x="264" y="70" width="216" height="150" rx="8" fill="#fbfbfa" stroke="#d9d4c8"/>
+  <text x="264" y="56" font-size="13" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">Layer 2: hidden → output, 4 pieces</text>
+  <line x1="272.0" y1="187.9" x2="322.0" y2="108.8" stroke="#8aa2e6" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="322.0" y1="108.8" x2="372.0" y2="184.5" stroke="#7fbf99" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="372.0" y1="184.5" x2="422.0" y2="105.5" stroke="#a892dc" stroke-width="2.8" stroke-linecap="round"/>
+  <line x1="422.0" y1="105.5" x2="472.0" y2="181.2" stroke="#e0b860" stroke-width="2.8" stroke-linecap="round"/>
+  <rect x="504" y="70" width="216" height="150" rx="8" fill="#fbfbfa" stroke="#d9d4c8"/>
+  <text x="504" y="56" font-size="13" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">Composed: x → output, 3 × 4 = 12</text>
+  <line x1="512.0" y1="187.9" x2="528.7" y2="108.8" stroke="#8aa2e6" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="528.7" y1="108.8" x2="545.3" y2="184.5" stroke="#7fbf99" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="545.3" y1="184.5" x2="562.0" y2="105.5" stroke="#a892dc" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="562.0" y1="105.5" x2="578.7" y2="181.2" stroke="#e0b860" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="645.3" y1="187.9" x2="628.7" y2="108.8" stroke="#8aa2e6" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="628.7" y1="108.8" x2="612.0" y2="184.5" stroke="#7fbf99" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="612.0" y1="184.5" x2="595.3" y2="105.5" stroke="#a892dc" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="595.3" y1="105.5" x2="578.7" y2="181.2" stroke="#e0b860" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="645.3" y1="187.9" x2="662.0" y2="108.8" stroke="#8aa2e6" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="662.0" y1="108.8" x2="678.7" y2="184.5" stroke="#7fbf99" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="678.7" y1="184.5" x2="695.3" y2="105.5" stroke="#a892dc" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="695.3" y1="105.5" x2="712.0" y2="181.2" stroke="#e0b860" stroke-width="2.4" stroke-linecap="round"/>
+  <text x="24" y="30" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Each piece layer 2 draws appears once in each of layer 1&#x27;s three folds (some mirrored)</text>
+  <text x="736" y="254" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing="0">With the same neurons in a single layer, the number of pieces is only &quot;number of neurons plus one&quot;</text>
+  <text x="746" y="278" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

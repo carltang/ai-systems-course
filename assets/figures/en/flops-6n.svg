@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 192" width="760" height="192" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Where 6N comes from">
+  <title>Where 6N comes from</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="192" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Floating-point operations per token processed in training (N is the number of parameters)</text>
+  <rect x="24" y="54" width="230" height="58" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="139.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">forward  2N</text>
+  <text x="139.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">one multiply and one add per weight</text>
+  <rect x="265" y="54" width="230" height="58" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="380.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">backward, inputs  2N</text>
+  <text x="380.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">gradient to pass further back</text>
+  <rect x="506" y="54" width="230" height="58" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="621.0" y="79.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">backward, weights  2N</text>
+  <text x="621.0" y="100.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">gradient to update parameters</text>
+  <text x="24" y="150" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing="0">About 6N in total. Inference is forward only, about 2N.</text>
+  <text x="746" y="184" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

@@ -6,7 +6,8 @@
 (function () {
     'use strict';
     var KEY = 'ka-theme', root = document.documentElement, mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-    var MODES = ['auto', 'dark', 'light'], NAMES = { auto: '跟随系统', dark: '夜间', light: '日间' };
+    var EN = /^en/i.test(root.getAttribute('lang') || '');          // the English edition's pages say lang="en"
+    var MODES = ['auto', 'dark', 'light'], NAMES = EN ? { auto: 'Auto', dark: 'Night', light: 'Day' } : { auto: '跟随系统', dark: '夜间', light: '日间' };
     var ICONS = {
         auto: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg>',
         dark: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z" fill="currentColor"/></svg>',
@@ -19,7 +20,7 @@
         root.setAttribute('data-theme', dark ? 'dark' : 'light');
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--k-page').trim() || (dark ? '#0F1012' : '#EBEEF2'));
-        if (button) { button.innerHTML = ICONS[mode] + '<span>' + NAMES[mode] + '</span>'; button.title = '日间 / 夜间：现在是“' + NAMES[mode] + '”，点一下切换'; }
+        if (button) { button.innerHTML = ICONS[mode] + '<span>' + NAMES[mode] + '</span>'; button.title = EN ? 'Day / night: now "' + NAMES[mode] + '", click to switch' : '日间 / 夜间：现在是“' + NAMES[mode] + '”，点一下切换'; }
     }
     var button = null, nav = document.querySelector('.unit-nav');
     if (nav) {

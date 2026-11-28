@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 230" width="760" height="230" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Case two: where the lost 38% went">
+  <title>Case two: where the lost 38% went</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="230" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Case two: the ideal throughput of 8 GPUs is 1.6 million tokens/s, measured 1 million</text>
+  <rect x="24" y="56" width="438" height="54" rx="7" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="244.72" y="80" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">actually obtained</text>
+  <text x="244.72" y="99" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">62%</text>
+  <rect x="465" y="56" width="139" height="54" rx="7" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="536.64" y="80" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">data loading (CPU)</text>
+  <text x="536.64" y="99" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">about 20%</text>
+  <rect x="608" y="56" width="111" height="54" rx="7" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="664.8000000000001" y="80" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">NUMA side</text>
+  <text x="664.8000000000001" y="99" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">about 16%</text>
+  <rect x="722" y="56" width="11" height="54" rx="7" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="736" y="132" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing="0">Far right: communication itself, only 1%–2%. &quot;NUMA side&quot; is one misplaced process slowing everyone</text>
+  <text x="24" y="170" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">&quot;Taking communication away&quot; took minutes and split the problem in two: most of the loss was not communication</text>
+  <text x="24" y="192" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">The shares are the numbers from the text; this is a composite case made up for teaching, not a measurement</text>
+  <text x="746" y="222" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

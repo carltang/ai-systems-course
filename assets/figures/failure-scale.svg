@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 232" width="760" height="232" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="机器越多，故障越是常态">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 248" width="760" height="248" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="机器越多，故障越是常态">
   <title>机器越多，故障越是常态</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="232" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="248" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">假设一台机器平均 5 年出一次会让训练中断的故障，作业多久遇到一次</text>
   <text x="24" y="74" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">1 台</text>
   <rect x="110" y="54" width="620" height="28" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
@@ -16,5 +16,5 @@
   <rect x="110" y="168" width="26" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
   <text x="148" y="187" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">4.4 小时</text>
   <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">条长是示意（每行实际相差 100 倍或 10 倍）。数字只说明量级：所有机器同时正常，作业才正常</text>
-  <text x="746" y="223" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="240" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="去掉主内存这个中转站">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 266" width="760" height="266" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="去掉主内存这个中转站">
   <title>去掉主内存这个中转站</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="266" rx="14" fill="#fbf9f4"/>
   <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">普通路径：主内存当中转站</text>
   <rect x="24" y="50" width="150" height="52" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
   <text x="99.0" y="81.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">硬盘 / 网卡</text>
@@ -21,5 +21,5 @@
   <text x="661.0" y="203.0" font-size="14" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">显存</text>
   <line x1="176" y1="198" x2="584" y2="198" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="380.0" y="191.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">一次 DMA，主内存和 CPU 不参与</text>
-  <text x="746" y="241" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="258" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

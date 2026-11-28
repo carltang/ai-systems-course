@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 244" width="760" height="244" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="拓扑管理器">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="拓扑管理器">
   <title>拓扑管理器</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="244" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="260" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">kubelet 里三方各管一样资源，默认各自为政</text>
   <rect x="24" y="52" width="220" height="42" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
   <text x="134.0" y="69.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">CPU 管理器</text>
@@ -24,5 +24,5 @@
   <text x="651.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">核、内存、卡在同一侧</text>
   <line x1="502" y1="115" x2="564" y2="115" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="24" y="226" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">策略由管理员在 kubelet 上设置，默认是 none（不协调）；对不齐时，严格的策略会直接拒绝这个 Pod</text>
-  <text x="746" y="235" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="252" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

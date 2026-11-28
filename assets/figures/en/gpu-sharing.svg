@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 314" width="760" height="314" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Three ways to share one GPU">
+  <title>Three ways to share one GPU</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="314" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">Three ways of giving one GPU to several Pods</text>
+  <text x="136" y="62" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">Time-slicing</text>
+  <rect x="24" y="74" width="224" height="96" rx="12" fill="#ffffff" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="36" y="98" width="30" height="48" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="51.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="70" y="98" width="30" height="48" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="85.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="104" y="98" width="30" height="48" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="119.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="138" y="98" width="30" height="48" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="153.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="172" y="98" width="30" height="48" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="187.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="206" y="98" width="30" height="48" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="221.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <text x="136" y="192" font-size="13" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing="0">taking turns</text>
+  <text x="136" y="212" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">no memory isolation, no fault isolation</text>
+  <text x="380" y="62" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">MPS</text>
+  <rect x="268" y="74" width="224" height="96" rx="12" fill="#ffffff" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="280" y="88" width="200" height="30" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="380.0" y="108.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="280" y="126" width="200" height="30" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="380.0" y="146.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <text x="380" y="192" font-size="13" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing="0">truly at the same time</text>
+  <text x="380" y="212" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">memory can be capped, weak fault isolation</text>
+  <text x="624" y="62" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">MIG</text>
+  <rect x="512" y="74" width="224" height="96" rx="12" fill="#ffffff" stroke="#c9c5ba" stroke-width="1.2"/>
+  <rect x="524" y="88" width="96" height="68" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="572.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <rect x="628" y="88" width="96" height="68" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="676.0" y="127.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0"></text>
+  <line x1="624" y1="80" x2="624" y2="164" stroke="#2b303b" stroke-width="1.6"/>
+  <text x="624" y="192" font-size="13" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing="0">cut into fixed-size instances</text>
+  <text x="624" y="212" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="624" dy="0">hardware memory isolation, strong fault</tspan><tspan x="624" dy="16.1">isolation</tspan></text>
+  <g transform="translate(0 16.1)"><text x="24" y="250" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">Blue and yellow are two Pods. Multi-GPU training needs whole GPUs to itself and takes no part in sharing; beware of your</tspan><tspan x="24" dy="17.5">own GPU being quietly configured for sharing</tspan></text></g>
+  <text x="746" y="306" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

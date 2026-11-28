@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="环形 all-reduce 和每张卡的通信量">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 296" width="760" height="296" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="环形 all-reduce 和每张卡的通信量">
   <title>环形 all-reduce 和每张卡的通信量</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="296" rx="14" fill="#fbf9f4"/>
   <line x1="134.8456710674493" y1="94.84567106744929" x2="165.1543289325507" y2="94.8456710674493" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="205.1543289325507" y1="120.8456710674493" x2="205.1543289325507" y2="179.1543289325507" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="165.1543289325507" y1="205.1543289325507" x2="134.8456710674493" y2="205.1543289325507" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
@@ -31,5 +31,5 @@
   <rect x="404" y="196" width="260" height="30" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
   <text x="674.0" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">趋近 2 份</text>
   <text x="330" y="252" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">卡数从 2 到上千，每张卡的通信量最多只翻一倍</text>
-  <text x="746" y="271" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="288" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

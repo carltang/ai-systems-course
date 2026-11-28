@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="标准注意力：小的输入输出，大的中间结果">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 266" width="760" height="266" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="标准注意力：小的输入输出，大的中间结果">
   <title>标准注意力：小的输入输出，大的中间结果</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="266" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">标准注意力里各个张量的大小（N 是 4096、d 是 64 时）</text>
   <rect x="24" y="96" width="26" height="110" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="37.0" y="156.0" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">Q</text>
@@ -23,5 +23,5 @@
   <line x1="382" y1="130" x2="408" y2="130" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <line x1="602" y1="150" x2="666" y2="150" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="395" y="226" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="middle" letter-spacing=".02em">中间结果是输入输出的 64 倍，还要在显存里进出好几趟</text>
-  <text x="746" y="241" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="258" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

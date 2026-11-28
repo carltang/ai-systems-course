@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 266" width="760" height="266" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="The more machines, the more failures are the norm">
+  <title>The more machines, the more failures are the norm</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="266" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">If one machine has a failure that interrupts training once every 5 years on average, how often does a job meet one?</text>
+  <text x="24" y="74" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">1 machine</text>
+  <rect x="146" y="54" width="583" height="28" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="160" y="73" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">44,000 hours</text>
+  <text x="24" y="112" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">100 machines</text>
+  <rect x="146" y="92" width="291" height="28" rx="6" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="449" y="111" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">440 hours, about 18 days</text>
+  <text x="24" y="150" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">1000 machines</text>
+  <rect x="146" y="130" width="146" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="304" y="149" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">44 hours</text>
+  <text x="24" y="188" font-size="13.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">10,000 machines</text>
+  <rect x="146" y="168" width="24" height="28" rx="6" fill="#fbe9ec" stroke="#dc97a3" stroke-width="1.2"/>
+  <text x="182" y="187" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">4.4 hours</text>
+  <text x="24" y="218" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">Bar lengths are illustrative (the rows really differ by 100× or 10×). The numbers only show the order of magnitude: the job</tspan><tspan x="24" dy="17.5">works only while every machine works</tspan></text>
+  <text x="746" y="258" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

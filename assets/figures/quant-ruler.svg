@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" width="760" height="220" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="量化是换一把刻度更粗的尺子">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 236" width="760" height="236" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="量化是换一把刻度更粗的尺子">
   <title>量化是换一把刻度更粗的尺子</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="220" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="236" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">把 −0.8 到 +0.8 这段范围分成等宽的格子（这里只画了 16 格）</text>
   <line x1="60" y1="110" x2="700" y2="110" stroke="#2b303b" stroke-width="1.4"/>
   <line x1="60.0" y1="101" x2="60.0" y2="119" stroke="#2b303b" stroke-width="1.2"/>
@@ -31,5 +31,5 @@
   <text x="450" y="94" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="end" letter-spacing=".02em">存下最近的刻度</text>
   <text x="24" y="176" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">误差最多半格。格子的宽度是范围除以格数：要么多用几位（格更多），要么想办法缩小范围</text>
   <text x="24" y="198" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">8 位是 256 格，4 位只有 16 格</text>
-  <text x="746" y="211" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="228" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

@@ -21,10 +21,37 @@
     var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var registry = {};
 
+    // The English edition: its pages say lang="en" and load demos-en.js first, which puts the English
+    // for every Chinese string the demos show in window.KA_EN. A string with numbers in it is found by
+    // its shape, the numbers turned into # (or {0}, {1}… where the English puts them in another order).
+    var EN = /^en/i.test(document.documentElement.getAttribute('lang') || ''), WORDS = window.KA_EN || {};
+    // The same Chinese can need different English in two demos (段 is a stage in one, a piece in
+    // another): an entry "demo|中文" is tried first while that demo is being built or drawn.
+    var HAN = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/, NUM = /-?\d[\d,]*(?:\.\d+)?/g, SCOPE = null;
+    function look(k) { var t = SCOPE != null ? WORDS[SCOPE + '|' + k] : null; return t != null ? t : WORDS[k]; }
+    function within(scope, fn) { var prev = SCOPE; SCOPE = scope; try { return fn(); } finally { SCOPE = prev; } }
+    function missing(key, s) { (window.KA_MISSING = window.KA_MISSING || {})[key] = (SCOPE || '?') + ' :: ' + s; }
+    function tr(s) {
+        if (!EN || typeof s !== 'string' || !HAN.test(s)) return s;
+        var t = look(s);
+        if (t != null) return t;
+        var nums = s.match(NUM) || [], shape = s.replace(NUM, '#');
+        t = look(shape);
+        if (t == null) { missing(shape, s); return s; }
+        var i = 0;
+        return t.replace(/\{(\d)\}|#/g, function (m, k) { return k != null ? nums[+k] : nums[i++]; });
+    }
+    // A sentence with a word from the demo's own data in it ({0}, {1}…): looked up whole, then filled.
+    function fill(f) {
+        var args = arguments, t = f;
+        if (EN && HAN.test(f)) { if (look(f) != null) t = look(f); else missing(f, f); }
+        return t.replace(/\{(\d)\}/g, function (m, k) { return args[+k + 1]; });
+    }
+
     function el(tag, cls, text) {
         var node = document.createElement(tag);
         if (cls) node.className = cls;
-        if (text != null) node.textContent = text;
+        if (text != null) node.textContent = tr(text);
         return node;
     }
     function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -48,20 +75,35 @@
     }
     function text(ctx, s, x, y, opt) {
         opt = opt || {};
-        ctx.font = (opt.weight || 500) + ' ' + (opt.size || 12) + 'px ' + (opt.mono ? MONO : SANS);
+        var font = function (k) { return (opt.weight || 500) + ' ' + (opt.size || 12) * k + 'px ' + (opt.mono ? MONO : SANS); };
+        ctx.font = font(1);
         ctx.fillStyle = opt.color || C.soft;
         ctx.textAlign = opt.align || 'left';
         ctx.textBaseline = opt.base || 'alphabetic';
+        s = tr(s);
+        fitIn(ctx, s, x, font);
+        if (opt.max) { var wd = ctx.measureText(s).width; if (wd > opt.max) ctx.font = font(Math.max(0.74, opt.max / wd)); }   // a box to stay inside
         ctx.fillText(s, x, y);
+    }
+    // A line that would leave the canvas (English runs longer than the Chinese a layout was made
+    // for; a long tick label at the edge) is set a little smaller, down to about three quarters.
+    function fitIn(ctx, s, x, font) {
+        var t = ctx.getTransform ? ctx.getTransform() : null;
+        if (!t || t.b || t.c) return;
+        var dpr = Math.min(window.devicePixelRatio || 1, 2), k = t.a / dpr, cx = (t.a * x + t.e) / dpr, room = ctx.canvas.clientWidth - 3;
+        var wd = ctx.measureText(s).width * k, a = ctx.textAlign;
+        var avail = a === 'center' ? 2 * Math.min(cx - 3, room - cx) : a === 'right' || a === 'end' ? cx - 3 : room - cx;
+        if (wd > avail && avail > 0) ctx.font = font(Math.max(0.74, avail / wd));
     }
 
     /* The panel every demo lives in: a title row, a canvas, controls, readouts. */
     function Panel(figure, spec) {
         var self = this;
         this.figure = figure;
+        this.scope = SCOPE;
         this.root = el('div', 'demo');
         this.root.setAttribute('role', 'group');
-        this.root.setAttribute('aria-label', spec.title);
+        this.root.setAttribute('aria-label', tr(spec.title));
         var head = el('div', 'demo-head');
         head.appendChild(el('span', 'demo-title', spec.title));
         if (spec.note) head.appendChild(el('span', 'demo-note', spec.note));
@@ -81,7 +123,7 @@
         this.cells = {};
         var img = figure.querySelector('img'), cap = figure.querySelector('figcaption');
         if (img) img.classList.add('demo-fallback');
-        if (cap && spec.caption) { cap.setAttribute('data-drawing-caption', cap.textContent); cap.textContent = spec.caption; }
+        if (cap && spec.caption) { cap.setAttribute('data-drawing-caption', cap.textContent); cap.textContent = tr(spec.caption); }
         this.maxHeight = spec.maxHeight || 560;
         figure.classList.add('has-demo');
         figure.insertBefore(this.root, figure.firstChild);
@@ -89,6 +131,11 @@
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { self.draw && self.draw(); });
         if (window.ResizeObserver) new ResizeObserver(function () { self.resize(); self.draw && self.draw(); }).observe(this.stage);
     }
+    // Whatever a demo draws, it draws inside its own scope (see look()).
+    Object.defineProperty(Panel.prototype, 'draw', {
+        get: function () { var self = this, f = this._draw; return f && function () { var a = arguments; return within(self.scope, function () { return f.apply(self, a); }); }; },
+        set: function (f) { this._draw = f; }
+    });
     Panel.prototype.resize = function () {
         var w = this.stage.clientWidth || 600;
         var h = this.fixedH || Math.min(this.maxHeight, Math.max(this.minHeight, Math.round(w * this.ratio)));
@@ -121,13 +168,16 @@
         function update() {
             var v = parseFloat(input.value);
             self.values[key] = v;
-            out.textContent = show(v);
+            out.textContent = tr(show(v));
             input.style.setProperty('--fill', ((v - min) / (max - min) * 100) + '%');
         }
-        input.addEventListener('input', function () { update(); onInput && onInput(); self.draw && self.draw(); });
+        input.addEventListener('input', function () { within(self.scope, function () { update(); onInput && onInput(); }); self.draw && self.draw(); });
         // room for the widest value up front, so the label never re-wraps while the slider moves
         var widest = 0;
-        [min, max, (min + max) / 2, min + (max - min) * 0.9].forEach(function (v) { out.textContent = show(v); widest = Math.max(widest, out.offsetWidth); });
+        [min, max, (min + max) / 2, min + (max - min) * 0.9].forEach(function (v) {
+            v = +(min + Math.round((v - min) / step) * step).toFixed(6);    // a value the slider can take (no 57.800000000000004)
+            out.textContent = tr(show(v)); widest = Math.max(widest, out.offsetWidth);
+        });
         out.style.minWidth = Math.ceil(widest + 4) + 'px';
         update();
         return input;
@@ -140,7 +190,7 @@
             var b = el('button', '', o[1]);
             b.type = 'button';
             b.setAttribute('role', 'radio');
-            b.addEventListener('click', function () { set(o[0]); onChange && onChange(); self.draw && self.draw(); });
+            b.addEventListener('click', function () { within(self.scope, function () { set(o[0]); onChange && onChange(); }); self.draw && self.draw(); });
             wrap.appendChild(b);
             return b;
         });
@@ -158,7 +208,7 @@
         var self = this;
         var b = el('button', 'demo-button' + (cls ? ' ' + cls : ''), label);
         b.type = 'button';
-        b.addEventListener('click', function () { onClick(b); self.draw && self.draw(); });
+        b.addEventListener('click', function () { within(self.scope, function () { onClick(b); }); self.draw && self.draw(); });
         this.controls.appendChild(b);
         return b;
     };
@@ -174,6 +224,7 @@
     Panel.prototype.set = function (key, value, tone) {
         var c = this.cells[key];
         if (!c) return;
+        value = within(this.scope, function () { return tr(value); });
         if (c.value.textContent !== value) { c.value.textContent = value; shrink(c.value); }
         if (tone) c.cell.style.setProperty('--tone', C[tone] || tone);
     };
@@ -181,6 +232,7 @@
     // a long one is set a little smaller instead.
     function shrink(node) {
         node.style.fontSize = '';
+        if (EN) node.style.fontFamily = /[A-Za-z]{3}/.test(node.textContent) ? SANS : '';
         var size = parseFloat(getComputedStyle(node).fontSize);
         while (node.scrollWidth > node.clientWidth + 1 && size > 11) { size -= 0.5; node.style.fontSize = size + 'px'; }
     }
@@ -191,7 +243,7 @@
             frame = 0;
             var dt = last ? Math.min((t - last) / 1000, 0.05) : 0;
             last = t;
-            tick(dt);
+            within(self.scope, function () { tick(dt); });
             self.draw();
             if (visible && !still && !self.paused) frame = requestAnimationFrame(step);
         }
@@ -202,7 +254,7 @@
                 if (visible) self.kick(); else if (frame) { cancelAnimationFrame(frame); frame = 0; }
             }, { rootMargin: '80px' }).observe(this.root);
         } else { visible = true; this.kick(); }
-        if (still) { for (var i = 0; i < 400; i++) tick(0.02); }
+        if (still) within(self.scope, function () { for (var i = 0; i < 400; i++) tick(0.02); });
         this.draw();
     };
     Panel.prototype.clear = function () {
@@ -289,7 +341,9 @@
         }
         p.draw = function () {
             var w = p.w, narrow = w < 640, pad = 14;
-            var gap = narrow ? 14 : Math.max(20, w * 0.032), bw = narrow ? w - pad * 2 - 74 : (w - pad * 2 - gap * (n - 1)) / n, bh = narrow ? 56 : 100;
+            var gap = narrow ? 14 : Math.max(20, w * 0.032), side = EN ? 10 : 0, bw = narrow ? w - pad * 2 - 74 - side : (w - pad * 2 - gap * (n - 1)) / n, bh = narrow ? 56 : 100;
+            // the narrow column beside each stage names its wait; in English just what it waits for
+            var waitName = function (k) { return narrow && EN ? tr(WAIT[k]).replace(/^Waiting for /, '') : WAIT[k]; };
             var top = narrow ? 16 : 22, groupsH = narrow ? 0 : 74;
             p.fit(narrow ? top + n * bh + (n - 1) * gap + 50 : top + bh + groupsH + 40);
             var ctx = p.ctx, h = p.h;
@@ -310,20 +364,20 @@
                 if (narrow) {
                     text(ctx, (i + 1) + ' ' + ST[i].name, x + 12, by + 21, { size: 13, weight: 600, color: C.ink });
                     text(ctx, fmt(r[i]) + ' /秒', x + 12, by + 39, { size: 11.5, mono: true, color: alpha(col, 0.95) });
-                    text(ctx, ST[i].hw, x + 12 + ctx.measureText(fmt(r[i]) + ' /秒').width + 10, by + 39, { size: 11, color: C.dim });
+                    text(ctx, ST[i].hw, x + 12 + ctx.measureText(tr(fmt(r[i]) + ' /秒')).width + 10, by + 39, { size: 11, color: C.dim });
                     text(ctx, '忙 ' + fmt(cap * 100) + '%', x + bw - 12, by + 21, { size: 11.5, mono: true, align: 'right', color: C.soft });
                     round(ctx, x + 12, by + bh - 9, bw - 24, 3, 1.5); ctx.fillStyle = C.faint; ctx.fill();
                     round(ctx, x + 12, by + bh - 9, Math.max(3, (bw - 24) * cap), 3, 1.5); ctx.fillStyle = col; ctx.fill();
                     // which wait this stage belongs to, at the right edge
                     var own = ST[i].wait, lit = neck === i;
-                    ctx.fillStyle = C[own]; ctx.fillRect(w - pad - 64, by + 6, 3, bh - 12);
-                    text(ctx, WAIT[own], w - pad - 56, by + (ST[i].launch ? bh / 2 - 2 : bh / 2 + 4), { size: 11.5, weight: lit && wt === own ? 600 : 500, color: lit && wt === own ? C[own] : alpha(C[own], 0.7) });
-                    if (ST[i].launch) text(ctx, WAIT.launch, w - pad - 56, by + bh / 2 + 14, { size: 11, weight: lit && wt === 'launch' ? 600 : 500, color: lit && wt === 'launch' ? C.launch : alpha(C.launch, 0.7) });
+                    ctx.fillStyle = C[own]; ctx.fillRect(w - pad - 64 - side, by + 6, 3, bh - 12);
+                    text(ctx, waitName(own), w - pad - 56 - side, by + (ST[i].launch ? bh / 2 - 2 : bh / 2 + 4), { size: 11.5, weight: lit && wt === own ? 600 : 500, color: lit && wt === own ? C[own] : alpha(C[own], 0.7) });
+                    if (ST[i].launch) text(ctx, waitName('launch'), w - pad - 56 - side, by + bh / 2 + 14, { size: 11, weight: lit && wt === 'launch' ? 600 : 500, color: lit && wt === 'launch' ? C.launch : alpha(C.launch, 0.7) });
                 } else {
                     var fs = bw < 110 ? 12.5 : 13.5;
                     text(ctx, String(i + 1), x + 10, by + 20, { size: 11, mono: true, weight: 600, color: alpha(col, 0.95) });
-                    text(ctx, ST[i].hw, x + 24, by + 20, { size: 10.5, color: C.dim });
-                    text(ctx, ST[i].name, x + 10, by + 40, { size: fs, weight: 600, color: C.ink });
+                    text(ctx, ST[i].hw, x + 24, by + 20, { size: 10.5, color: C.dim, max: bw - 32 });
+                    text(ctx, ST[i].name, x + 10, by + 40, { size: fs, weight: 600, color: C.ink, max: bw - 18 });
                     text(ctx, fmt(r[i]), x + 10, by + 60, { size: 12, mono: true, color: alpha(col, 0.95) });
                     text(ctx, fmt(cap * 100) + '%', x + bw - 10, by + 60, { size: 11, mono: true, align: 'right', color: C.soft });
                     round(ctx, x + 10, by + bh - 18, bw - 20, 5, 2.5); ctx.fillStyle = C.faint; ctx.fill();
@@ -422,10 +476,13 @@
             ctx.restore();
             ctx.setLineDash([3, 4]); ctx.strokeStyle = C.dim;
             ctx.beginPath(); ctx.moveTo(X(knee), Y(peak)); ctx.lineTo(X(knee), B); ctx.stroke(); ctx.setLineDash([]);
-            text(ctx, '拐点 ' + fmt(knee, knee < 10 ? 1 : 0) + ' FLOP/B', X(knee) + 6, B - 8, { size: 11, mono: true, color: C.soft });
+            var inward = X(knee) > R - 110, narrow = w < 600;
+            text(ctx, '拐点 ' + fmt(knee, knee < 10 ? 1 : 0) + ' FLOP/B', X(knee) + (inward ? -6 : 6), B - 8, { size: 11, mono: true, color: C.soft, align: inward ? 'right' : 'left' });
             var mid = Math.sqrt(0.1 * knee);
-            text(ctx, '带宽受限', X(mid), Math.min(B - 12, Y(bw * mid) + 34), { size: 12.5, weight: 600, color: C.data, align: 'center' });
-            text(ctx, '算力受限', (X(knee) + R) / 2, Y(peak) + 30, { size: 12.5, weight: 600, color: C.compute, align: 'center' });
+            if (narrow) text(ctx, '带宽受限', X(knee) - 8, B - (inward ? 26 : 10), { size: 12.5, weight: 600, color: C.data, align: 'right' });
+            else text(ctx, '带宽受限', X(mid), Math.min(B - 12, Y(bw * mid) + 34), { size: 12.5, weight: 600, color: C.data, align: 'center' });
+            if (narrow && !inward) text(ctx, '算力受限', X(knee) + 8, Y(peak) + 22, { size: 12.5, weight: 600, color: C.compute });
+            else text(ctx, '算力受限', (X(knee) + R) / 2, Y(peak) + 30, { size: 12.5, weight: 600, color: C.compute, align: 'center' });
             // marks from the lesson
             [[0.25, '朴素'], [4, 'T = 16']].forEach(function (m) {
                 var pv = Math.min(peak, bw * m[0]);
@@ -457,9 +514,9 @@
         var p = new Panel(figure, { title: '环形 all-reduce', note: '每一格是一段数据，越亮代表加进去的卡越多', ratio: 0.56, minHeight: 330 });
         var N, have, step, phase, t, playing = true, moving;
         p.slider('n', '卡数 N', 2, 8, 1, 4, function (v) { return v + ' 张'; }, reset);
-        var play = p.button('暂停', function (b) { playing = !playing; b.textContent = playing ? '暂停' : '播放'; p.kick && p.kick(); });
+        var play = p.button('暂停', function (b) { playing = !playing; b.textContent = tr(playing ? '暂停' : '播放'); p.kick && p.kick(); });
         if (still) { play.style.display = 'none'; playing = false; }                 // with less motion the reader steps through by hand
-        p.button('下一步', function () { playing = false; play.textContent = '播放'; advance(); }, 'ghost');
+        p.button('下一步', function () { playing = false; play.textContent = tr('播放'); advance(); }, 'ghost');
         p.button('重来', function () { reset(); }, 'ghost');
         p.readout('stage', '阶段', 'peers');
         p.readout('steps', '已走的步数', 'ink');
@@ -780,10 +837,11 @@
         return fmt(s * 1e6, s < 1e-5 ? 1 : 0) + ' 微秒';
     }
     function legend(ctx, items, x, y, step) {
-        items.forEach(function (it, n) {
-            var lx = x + n * step;
+        var lx = x;
+        items.forEach(function (it) {
             ctx.fillStyle = it[0]; round(ctx, lx, y - 9, 10, 10, 2.5); ctx.fill();
             text(ctx, it[1], lx + 15, y, { size: 11, color: C.soft });
+            lx += Math.max(step, 15 + ctx.measureText(tr(it[1])).width + 16);
         });
     }
 
@@ -908,7 +966,7 @@
         p.draw = function () {
             if (!plan) plan = build();
             var ctx = p.ctx, w = p.w, narrow = w < 560;
-            var L = narrow ? 62 : 84, R = w - 16, top = 34, laneH = 34, gap = 46;
+            var L = (narrow ? 62 : 84) + (EN ? 14 : 0), R = w - 16, top = 34, laneH = 34, gap = 46;
             p.fit(top + laneH * 2 + gap + 74);
             ctx = p.ctx; var h = p.h;
             p.clear();
@@ -1022,7 +1080,7 @@
     registry['kv-memory'] = function (figure) {
         var p = new Panel(figure, { title: '一张卡能同时服务多少请求', note: '80 GB 的卡：权重 14 GB，留给 KV cache 约 60 GB', ratio: 0.36, minHeight: 250 });
         function tokens(v) { return Math.round(Math.pow(10, 2.5 + v / 100 * 2.6) / 100) * 100; }
-        p.slider('ctx', '每个请求的上下文', 0, 100, 0.5, 100 * (Math.log10(4000) - 2.5) / 2.6, function (v) { return fmt(tokens(v)) + ' token'; }, refill, 'data');
+        p.slider('ctx', '每个请求的上下文', 0, 100, 0.5, 100 * (Math.log10(4000) - 2.5) / 2.6, function (v) { return fmt(tokens(v)) + (EN ? ' tokens' : ' token'); }, refill, 'data');
         p.slider('layers', '层数', 8, 80, 4, 32, function (v) { return v + ' 层'; }, refill);
         p.slider('hidden', '隐藏维度', 1024, 8192, 512, 4096, function (v) { return fmt(v); }, refill);
         p.toggle('group', [[1, '每个头一组 K、V'], [4, 'GQA：4 个头共用'], [8, '8 个头共用']], 1, refill);
@@ -1634,7 +1692,7 @@
             });
             var ly = top + 3 * rowH + 12;
             [[C.alert, '符号'], [C.data, narrow ? '指数（范围）' : '指数：管范围'], [C.compute, narrow ? '有效数字（精度）' : '有效数字：管精度']].forEach(function (lg, n) {
-                var x = pad + (narrow ? 0 : labelW) + n * (narrow ? [0, 54, 150][n] / Math.max(1, n) : 120);
+                var x = pad + (narrow ? 0 : labelW) + n * (narrow ? (EN ? [0, 48, 166] : [0, 54, 150])[n] / Math.max(1, n) : EN ? 128 : 120);
                 ctx.fillStyle = lg[0]; ctx.fillRect(x, ly - 9, 10, 10);
                 text(ctx, lg[1], x + 15, ly, { size: 11, color: C.soft });
             });
@@ -1664,10 +1722,10 @@
         p.slider('M', '平均多久出一次故障', 1, 100, 1, 4, function (v) { return v + ' 小时'; }, null, 'alert');
         var Tin = p.slider('T', '你选的间隔', 0, 2.78, 0.01, Math.log10(22), function (v) { var m = Math.pow(10, v); return m < 90 ? fmt(m) + ' 分钟' : fmt(m / 60, 1) + ' 小时'; }, null, 'peers');
         var best = p.button('用最优间隔', function () { Tin.value = Math.log10(Math.sqrt(2 * cOf(p.values.c) / 60 * p.values.M * 60)); Tin.dispatchEvent(new Event('input')); }, 'ghost');
-        best.textContent = '已是最优间隔'; best.style.minWidth = Math.ceil(best.offsetWidth) + 'px'; best.textContent = '用最优间隔';
+        best.textContent = tr('已是最优间隔'); best.style.minWidth = Math.ceil(best.offsetWidth) + 'px'; best.textContent = tr('用最优间隔');
         function bestLabel(opt) {                                                     // a click that would change nothing says so
             var at = Math.abs(Math.pow(10, p.values.T) / opt - 1) < 0.03;
-            best.textContent = at ? '已是最优间隔' : '用最优间隔'; best.disabled = at; best.classList.toggle('on', at);
+            best.textContent = tr(at ? '已是最优间隔' : '用最优间隔'); best.disabled = at; best.classList.toggle('on', at);
         }
         p.readout('opt', '最优间隔 √(2cM)', 'peers');
         p.readout('waste', '你选的间隔：浪费', 'ink');
@@ -1721,7 +1779,7 @@
                 text(ctx, lg[1], lx + 21, ly, { size: 11, color: C.soft });
             });
             var wOpt = cMin / Topt + Topt / (2 * Mmin), wT = cMin / T + T / (2 * Mmin);
-            if (Topt >= 1 && Topt <= 600) { ctx.beginPath(); ctx.arc(X(Topt), Y(wOpt), 4, 0, Math.PI * 2); ctx.fillStyle = C.peers; ctx.fill(); text(ctx, '最优', X(Topt), Y(wOpt) + 18, { size: 11, align: 'center', color: C.peers }); }
+            if (Topt >= 1 && Topt <= 600) { ctx.beginPath(); ctx.arc(X(Topt), Y(wOpt), 4, 0, Math.PI * 2); ctx.fillStyle = C.peers; ctx.fill(); text(ctx, '最优', X(Topt), Y(wOpt) + 18 > B - 4 ? Y(wOpt) - 10 : Y(wOpt) + 18, { size: 11, align: 'center', color: C.peers }); }
             ctx.save(); if (!still) { ctx.shadowColor = C.peers; ctx.shadowBlur = 14; }
             ctx.beginPath(); ctx.arc(X(T), Y(wT), 7, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill(); ctx.restore();
             // a replay: the first 3M of a run, and the waste measured over a long one
@@ -1821,7 +1879,7 @@
      * later positions. Training computes every row at once; generation one row per step. */
     registry['causal-mask'] = function (figure) {
         var p = new Panel(figure, { title: '因果掩码：每个位置只看它前面', note: '分数是随手取的；被遮住的格子在 softmax 之后权重为 0', ratio: 0.55, minHeight: 340 });
-        var WORDS = ['今天', '天气', '很', '好', '我们', '去', '公园', '走走', '吧', '。'], clock = 0;
+        var WORDS = EN ? ['The', 'sky', 'is', 'clear', 'so', 'we', 'can', 'go', 'out', 'today'] : ['今天', '天气', '很', '好', '我们', '去', '公园', '走走', '吧', '。'], clock = 0;
         p.slider('n', '序列长度 N', 3, 10, 1, 6, function (v) { return v + ' 个词'; }, function () { clock = 0; p.kick && p.kick(); }, 'compute');
         p.toggle('mode', [['train', '训练：所有行一次算完'], ['gen', '生成：一次一行']], 'train', function () { clock = 0; p.kick && p.kick(); });
         p.readout('masked', '被遮住的格子 N(N−1)/2', 'alert');
@@ -1863,7 +1921,7 @@
             if (!gen && !still) { ctx.strokeStyle = alpha(C.peers, 0.35 + 0.3 * Math.sin(clock * 4)); ctx.lineWidth = 2; round(ctx, mx - 2, my - 2, mat + 4, mat + 4, 8); ctx.stroke(); }
             // the highlighted row as weights
             var bx = narrow ? pad + lab : mx + mat + 46, bw = narrow ? w - bx - pad : w - bx - pad, bh = barsH, W2 = weights(showRow), bar = bw / N;
-            text(ctx, '“' + WORDS[showRow] + '”这一行 softmax 之后的权重', bx, barsTop - 14, { size: 11.5, color: C.soft });
+            text(ctx, fill('“{0}”这一行 softmax 之后的权重', WORDS[showRow]), bx, barsTop - 14, { size: 11.5, color: C.soft });
             for (c = 0; c < N; c++) {
                 var v = c <= showRow ? W2[c] : 0, hh = (bh - 46) * v, xx = bx + c * bar;
                 round(ctx, xx + 3, barsTop + bh - 34 - hh, bar - 6, Math.max(2, hh), 4);
@@ -1872,7 +1930,7 @@
                 text(ctx, WORDS[c], xx + bar / 2, barsTop + bh - 16, { size: Math.min(11, bar * 0.4), align: 'center', color: c <= showRow ? C.soft : C.dim });
             }
             var nextWord = showRow + 1 < WORDS.length ? WORDS[showRow + 1] : '…';
-            text(ctx, '用它预测下一个词：“' + nextWord + '”', bx, barsTop + bh + 2, { size: 11.5, color: C.peers });
+            text(ctx, fill('用它预测下一个词：“{0}”', nextWord), bx, barsTop + bh + 2, { size: 11.5, color: C.peers });
             p.set('masked', String(N * (N - 1) / 2));
             p.set('preds', gen ? '1 个' : N + ' 个（N 个损失）', gen ? 'ink' : 'peers');
             p.set('steps', gen ? N + ' 步，后一步等前一步' : '1 步', gen ? 'alert' : 'peers');
@@ -1985,7 +2043,7 @@
                 text(ctx, M.rows > 24 ? '× ' + fmt(M.rows) + ' 行输出' : M.rows + ' 行输出', ox, gy + gs / 2 + shown * 3 + 18, { size: 11.5, color: C.peers });
             }
             // time for one pass: reading against arithmetic, on one scale
-            var by = gy + gs + 40, bl = narrow ? 70 : 96, bwid = w - pad - bl - 90, longest = Math.max(M.tRead, M.tMath);
+            var by = gy + gs + 40, bl = (narrow ? 70 : 96) + (EN ? 16 : 0), bwid = w - pad - bl - 90, longest = Math.max(M.tRead, M.tMath);
             [['读权重', M.tRead, C.data], ['做运算', M.tMath, C.compute]].forEach(function (b, k) {
                 var y = by + k * 26, len = Math.max(2, b[1] / longest * bwid), mine = b[1] === longest;
                 text(ctx, b[0], bl - 10, y + 12, { size: 12, align: 'right', color: mine ? C.ink : C.dim });
@@ -2006,7 +2064,7 @@
      * 0.2 s. The replay runs at the real speed. */
     registry['prefill-decode'] = function (figure) {
         var p = new Panel(figure, { title: '一个请求的两段：prefill 和 decode', note: '7B 模型、16 位权重，显存带宽 1 TB/s，峰值 300 TFLOPS、prefill 用到五成；按真实速度回放', ratio: 0.42, minHeight: 290 });
-        p.slider('N', '提示词长度', 100, 8000, 100, 2000, function (v) { return fmt(v) + ' token'; }, restart, 'compute');
+        p.slider('N', '提示词长度', 100, 8000, 100, 2000, function (v) { return fmt(v) + (EN ? ' tokens' : ' token'); }, restart, 'compute');
         p.slider('G', '要生成多少个 token', 10, 300, 10, 60, function (v) { return v + ' 个'; }, restart, 'data');
         p.readout('ttft', '首 token 延迟（不算排队）', 'compute');
         p.readout('tpot', '之后每个 token 的间隔', 'data');
@@ -2295,6 +2353,7 @@
     // Break a sentence into lines that fit: Chinese may break between any two characters, a run of
     // Latin letters or digits stays whole, and a closing mark never starts a line.
     function wrapLines(ctx, s, maxW) {
+        s = tr(s);
         var cjk = '　-〿一-鿿＀-￯', lines = [], cur = '';
         var tokens = s.match(new RegExp('[' + cjk + ']|[^\\s' + cjk + ']+\\s*|\\s+', 'g')) || [];
         tokens.forEach(function (t) {
@@ -2333,9 +2392,9 @@
         p.slider('w1', '权重 w₁', -2, 2, 0.1, 0.6, function (v) { return v.toFixed(1); }, null, 'launch');
         p.slider('w2', '权重 w₂', -2, 2, 0.1, 1.2, function (v) { return v.toFixed(1); }, null, 'launch');
         // the same controls as the ring demo: the button says what a click will do, so it shows the state too
-        var play = p.button('暂停', function (b) { auto = !auto; clock = 0; b.textContent = auto ? '暂停' : '播放'; p.kick && p.kick(); });
+        var play = p.button('暂停', function (b) { auto = !auto; clock = 0; b.textContent = tr(auto ? '暂停' : '播放'); p.kick && p.kick(); });
         if (still) { play.style.display = 'none'; auto = false; }                     // with less motion the reader steps through by hand
-        p.button('下一步', function () { auto = false; play.textContent = '播放'; step = (step + 1) % N; }, 'ghost');
+        p.button('下一步', function () { auto = false; play.textContent = tr('播放'); step = (step + 1) % N; }, 'ghost');
         p.button('重来', function () { clock = 0; step = 0; }, 'ghost');
         p.readout('L', '损失 L', 'ink');
         p.readout('g', '∂L/∂w₁：反向传播算的', 'peers');
@@ -2478,7 +2537,8 @@
      * drawn in two dimensions and picked by hand so that "它" finds "小猫". */
     registry.attention = function (figure) {
         var p = new Panel(figure, { title: '注意力是一次“软查表”', note: 'Q、K 画成平面上的箭头（真实的有几十上百维）；箭头的方向是挑过的，好让“它”找到“小猫”', ratio: 0.5, minHeight: 320 });
-        var W = ['小猫', '追', '毛线球', '因为', '它', '很', '好奇'];
+        // The sentence is the data: in English, a sentence of the same length whose "they" (position 4) finds "Cats" (position 0).
+        var W = EN ? ['Cats', 'chase', 'yarn', 'because', 'they', 'are', 'curious'] : ['小猫', '追', '毛线球', '因为', '它', '很', '好奇'];
         var KA = [35, 140, 90, 230, 110, 190, 300], QA = [300, 60, 140, 110, 40, 300, 110], QLEN = 3.5;
         var PAL = [C.data, C.compute, C.peers, C.launch, '#FF9F7A', '#7FD3FF', '#C6D0DB'];
         p.toggle('q', W.map(function (wd, i) { return [i, wd]; }), 4);
@@ -2516,7 +2576,7 @@
             var qa = shownAngle * Math.PI / 180;
             ctx.save(); if (!still) { ctx.shadowColor = C.ink; ctx.shadowBlur = 12; }
             ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(qa) * cr * 0.9, cy - Math.sin(qa) * cr * 0.9); ctx.stroke(); ctx.restore();
-            text(ctx, '白色：“' + W[qi] + '”的 Q（它在找什么）', cx, cy + cr + 34, { size: 11.5, align: 'center', color: C.ink });
+            text(ctx, fill('白色：“{0}”的 Q（它在找什么）', W[qi]), cx, cy + cr + 34, { size: 11.5, align: 'center', color: C.ink });
             text(ctx, '彩色：每个位置的 K（它有什么）', cx, cy + cr + 50, { size: 10.5, align: 'center', color: C.dim });
             // right: scores, weights, and the mixture of V's
             var tw = w - tx - 16, lab = 52, barX = tx + lab + 58, barW = tw - lab - 58 - 46;
@@ -2534,7 +2594,7 @@
             var ox = tx;
             W.forEach(function (wd, i) { var sw = tw * shownW[i]; if (sw < 0.5) return; ctx.fillStyle = PAL[i]; ctx.fillRect(ox, oy + 8, sw, 16); ox += sw; });
             var best = R.w.indexOf(Math.max.apply(null, R.w));
-            p.set('top', '“' + W[best] + '”', 'data');
+            p.set('top', EN ? '"' + W[best] + '"' : '“' + W[best] + '”', 'data');
             p.set('wt', fmt(R.w[best] * 100) + '%');
             p.set('sum', R.w.reduce(function (a, b) { return a + b; }, 0).toFixed(2));
             p.set('nn', W.length + ' × ' + W.length + ' = ' + W.length * W.length + ' 个');
@@ -2695,7 +2755,7 @@
             [[C.launch, '发任务'], [alpha(C.soft, 0.45), '别的 Python'], [alpha(C.alert, 0.6), '等 GPU'], [C.compute, 'GPU 在算']].forEach(function (it) {
                 ctx.font = '500 11px ' + SANS;
                 ctx.fillStyle = it[0]; round(ctx, lx, ly - 9, 10, 10, 2.5); ctx.fill(); text(ctx, it[1], lx + 15, ly, { size: 11, color: C.soft });
-                lx += ctx.measureText(it[1]).width + (narrow ? 24 : 34);
+                lx += ctx.measureText(tr(it[1])).width + (narrow ? 24 : 34);
             });
             p.set('real', fmt(plan.real) + ' 微秒' + (timing ? '' : ' / 步'));
             p.set('meas', fmt(plan.meas) + ' 微秒' + (timing ? '' : ' / 步'), plan.meas < plan.real * 0.9 ? 'alert' : 'peers');
@@ -3150,9 +3210,9 @@
         (root || document).querySelectorAll('figure.fig').forEach(function (figure) {
             if (figure.classList.contains('has-demo')) return;
             var img = figure.querySelector('img');
-            var m = img && /figures\/([a-z0-9-]+)\.svg/.exec(img.getAttribute('src') || '');
+            var m = img && /figures\/(?:en\/)?([a-z0-9-]+)\.svg/.exec(img.getAttribute('src') || '');
             if (m && registry[m[1]]) {
-                try { registry[m[1]](figure); } catch (e) { if (window.console) console.error('demo', m[1], e); }
+                try { within(m[1], function () { registry[m[1]](figure); }); } catch (e) { if (window.console) console.error('demo', m[1], e); }
             }
         });
     }

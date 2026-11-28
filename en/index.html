@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Systems: From Deep Learning Principles to GPUs and Distributed Training</title>
+<meta name="description" content="A course that explains the principles: what one training step actually goes through inside the machine, where it is slow when it is slow, and how to trace a symptom layer by layer to its cause. It starts from neural networks and PyTorch, and goes through GPUs and CUDA, operators and kernels, high-speed interconnects and NCCL, to distributed training; the three parts on clusters, inference and reinforcement learning are optional.">
+<meta name="author" content="Zongyao Tang & Claude">
+<meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='en')location.replace('../index.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/index.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/index.html">
+<style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
+<script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
+<link rel="manifest" href="../manifest-en.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+</head>
+<body>
+<main class="main">
+<div class="unit-nav"><a class="learn-meta" href="about.html">About this course</a><a class="lang-switch" href="../index.html" hreflang="zh-CN" lang="zh-CN" data-lang="zh" title="用中文读这一页">中文</a></div>
+<div class="cover">
+<p class="eyebrow">One course · 45 units</p>
+<h1>AI Systems: From Deep Learning Principles to GPUs and Distributed Training</h1>
+<p class="byline">Zongyao Tang & Claude</p>
+<p class="translated">Translated by AI (Anthropic's Claude) from the Chinese edition. <a href="../index.html" hreflang="zh-CN" data-lang="zh">The Chinese original</a> is the reference.</p>
+<figure class="fig"><img src="../assets/figures/en/pipeline.svg" alt="The pipeline of one training step, and the four waits"><figcaption>A map of the whole course: one training step, and the four waits</figcaption></figure>
+<p class="intro">A course that explains the principles: what one training step actually goes through inside the machine, where it is slow when it is slow, and how to trace a symptom layer by layer to its cause. It starts from neural networks and PyTorch, and goes through GPUs and CUDA, operators and kernels, high-speed interconnects and NCCL, to distributed training; the three parts on clusters, inference and reinforcement learning are optional.</p>
+<p class="how">If this is your first time, start with part 0 (3 units): it is the map for everything that follows. Each unit's explanation is made of a few principles, each with an analogy, a "so", the principle it builds on and where it is used later.</p>
+</div>
+<section class="part"><h2>Part 0 · The big picture and measurement</h2><ul>
+<li><a href="units/0-1.html"><span class="num">0.1</span><span class="name">The journey of one training step</span><span class="goal">A map for the whole course: which stages one training step passes through, the layers the system is made of, and the few kinds of &quot;slow&quot;.</span></a></li>
+<li><a href="units/0-2.html"><span class="num">0.2</span><span class="name">The language of measurement: utilisation, throughput and MFU</span><span class="goal">Tell apart what utilisation, throughput and MFU each measure; know how to set up a baseline and how to split the time across the stages of the pipeline.</span></a></li>
+<li><a href="units/0-3.html"><span class="num">0.3</span><span class="name">A refresher on systems fundamentals</span><span class="goal">Pick up the operating-system and computer-organisation knowledge used later: the memory hierarchy, pinned memory, DMA, the kernel network stack, processes and threads.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 1 · Principles of deep learning</h2><ul>
+<li><a href="units/1-1.html"><span class="num">1.1</span><span class="name">Neural networks and backpropagation</span><span class="goal">Write a neural network that trains, from scratch, and really understand how gradients are computed.</span></a></li>
+<li><a href="units/1-2.html"><span class="num">1.2</span><span class="name">Loss, optimisation and generalisation</span><span class="goal">Why a model can learn at all, what decides how fast it learns, and why it can overfit.</span></a></li>
+<li><a href="units/1-3.html"><span class="num">1.3</span><span class="name">Training in practice, and diagnosis</span><span class="goal">Get a model actually trained: how to schedule the learning rate, what regularisation guards against, how to see problems in the loss curves, and in what order to look when something is wrong.</span></a></li>
+<li><a href="units/1-4.html"><span class="num">1.4</span><span class="name">The Transformer</span><span class="goal">Build by hand a small GPT that generates text, and understand attention, residual connections and layer normalisation.</span></a></li>
+<li><a href="units/1-5.html"><span class="num">1.5</span><span class="name">Reproducing GPT-2: from model to efficient training</span><span class="goal">Turn the small GPT into a real training job, and meet mixed precision, FlashAttention, torch.compile and multi-GPU training for the first time.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 2 · The PyTorch execution stack</h2><ul>
+<li><a href="units/2-1.html"><span class="num">2.1</span><span class="name">Tensors and memory</span><span class="goal">What a tensor is in memory, which operations copy no data, how PyTorch manages GPU memory, and where the memory goes during training.</span></a></li>
+<li><a href="units/2-2.html"><span class="num">2.2</span><span class="name">The autograd engine</span><span class="goal">How the computation graph is recorded during the forward pass, and how backward() walks along it to compute the gradients.</span></a></li>
+<li><a href="units/2-3.html"><span class="num">2.3</span><span class="name">From a line of Python to a kernel</span><span class="goal">Follow one operator call from Python to the GPU, and see what each layer in between does and how long it takes.</span></a></li>
+<li><a href="units/2-4.html"><span class="num">2.4</span><span class="name">The data supply</span><span class="goal">How a batch is prepared and delivered to the GPU, and which stretch of the pipeline each DataLoader argument tunes.</span></a></li>
+<li><a href="units/2-5.html"><span class="num">2.5</span><span class="name">The three-layer stack of torch.compile</span><span class="goal">How torch.compile turns a piece of Python into a few fused kernels, and when it stops working.</span></a></li>
+<li><a href="units/2-6.html"><span class="num">2.6</span><span class="name">Mixed precision and speeding up single-GPU training</span><span class="goal">Gather up the remaining speed-ups on a single GPU: mixed precision, fused optimizers, specialised libraries, simplifying the model.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 3 · The GPU and the CUDA execution model</h2><ul>
+<li><a href="units/3-1.html"><span class="num">3.1</span><span class="name">The GPU environment and a first performance analysis</span><span class="goal">Set up a CUDA development environment, and learn to use the profiler to see where a PyTorch program is really slow.</span></a></li>
+<li><a href="units/3-2.html"><span class="num">3.2</span><span class="name">The first CUDA kernel</span><span class="goal">Understand threads, thread blocks and grids, and be able to write and launch a simple CUDA kernel correctly on your own.</span></a></li>
+<li><a href="units/3-3.html"><span class="num">3.3</span><span class="name">Compute and memory architecture</span><span class="goal">Know what SMs, warps and shared memory are, and use tiling to write a matrix multiplication that is clearly faster.</span></a></li>
+<li><a href="units/3-4.html"><span class="num">3.4</span><span class="name">The CUDA performance checklist</span><span class="goal">Master a checklist of kernel optimisations that works if you follow it: coalesced memory access, occupancy, branch divergence, thread coarsening.</span></a></li>
+<li><a href="units/3-5.html"><span class="num">3.5</span><span class="name">Parallel patterns: reduction and scan</span><span class="goal">Write an efficient parallel reduction, and understand how &quot;seemingly serial&quot; computations like scan are parallelised.</span></a></li>
+<li><a href="units/3-6.html"><span class="num">3.6</span><span class="name">Streams, asynchrony and CUDA Graphs</span><span class="goal">How the CPU hands tasks to the GPU: asynchronous queues, streams, synchronisation points, and how to reduce the overhead of giving orders.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 4 · Operators and kernels</h2><ul>
+<li><a href="units/4-1.html"><span class="num">4.1</span><span class="name">Taking a Transformer apart into operators</span><span class="goal">Write the Transformer of 1.4 in plain CUDA: from naive kernels to training and inference that run end to end.</span></a></li>
+<li><a href="units/4-2.html"><span class="num">4.2</span><span class="name">Operator fusion</span><span class="goal">Why operator fusion removes unnecessary memory reads and writes, and how to read the fused kernels a compiler generates.</span></a></li>
+<li><a href="units/4-3.html"><span class="num">4.3</span><span class="name">Getting started with Triton</span><span class="goal">Write kernels in Triton that come close to hand-written CUDA in performance, and get a feel for &quot;programming by blocks&quot;.</span></a></li>
+<li><a href="units/4-4.html"><span class="num">4.4</span><span class="name">Flash Attention</span><span class="goal">Understand and implement FlashAttention: tiling + online softmax, cutting the memory reads and writes of attention.</span></a></li>
+<li><a href="units/4-5.html"><span class="num">4.5</span><span class="name">The limits of matrix multiplication, and Tensor Cores</span><span class="goal">Optimise the kernel of 4.1 step by step, and learn to do matrix multiplication with Tensor Cores.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 5 · High-speed interconnects</h2><ul>
+<li><a href="units/5-1.html"><span class="num">5.1</span><span class="name">Interconnects inside a machine: PCIe, NVLink and NVSwitch</span><span class="goal">How GPUs, CPUs and network cards are connected inside a multi-GPU server, how wide each road is, and how to check.</span></a></li>
+<li><a href="units/5-2.html"><span class="num">5.2</span><span class="name">RDMA and InfiniBand</span><span class="goal">How RDMA bypasses the kernel to read and write the other side&#x27;s memory directly, what InfiniBand and RoCE each are, and which counters to look at when a link has a problem.</span></a></li>
+<li><a href="units/5-3.html"><span class="num">5.3</span><span class="name">Cluster networks: topology, traffic and congestion</span><span class="goal">What the network between hundreds or thousands of GPUs looks like, what is special about training traffic, and how congestion arises and is controlled.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 6 · Collective communication and NCCL</h2><ul>
+<li><a href="units/6-1.html"><span class="num">6.1</span><span class="name">Collective communication and NCCL</span><span class="goal">Understand the algorithms and bandwidth model of collective operations such as all-reduce, and be able to use NCCL and torch.distributed.</span></a></li>
+<li><a href="units/6-2.html"><span class="num">6.2</span><span class="name">Inside NCCL: topology, channels and protocols</span><span class="goal">Work out what one all-reduce goes through inside NCCL, as groundwork for reading NCCL&#x27;s logs and source.</span></a></li>
+<li><a href="units/6-3.html"><span class="num">6.3</span><span class="name">Measuring and troubleshooting communication</span><span class="goal">Learn to judge whether communication is fast: how to measure it, how to read NCCL&#x27;s logs, and in what order to check when something is wrong.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 7 · Distributed training</h2><ul>
+<li><a href="units/7-1.html"><span class="num">7.1</span><span class="name">Data parallelism with DDP</span><span class="goal">Use DDP to scale training to many GPUs, and understand gradient synchronisation and the overlap of computation with communication.</span></a></li>
+<li><a href="units/7-2.html"><span class="num">7.2</span><span class="name">ZeRO and FSDP</span><span class="goal">Understand the idea of sharding optimizer state, gradients and parameters, and be able to use FSDP to train a model that does not fit on one GPU.</span></a></li>
+<li><a href="units/7-3.html"><span class="num">7.3</span><span class="name">Model parallelism and TorchTitan</span><span class="goal">Learn how tensor, pipeline and context parallelism are combined, and be able to read a modern framework for training large models.</span></a></li>
+<li><a href="units/7-4.html"><span class="num">7.4</span><span class="name">Checkpoints, fault tolerance and large-scale data loading</span><span class="goal">Understand how long, large-scale training copes with machine failures, what a checkpoint must contain and how often to save one, and how to read huge amounts of data efficiently.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 8 · Clusters and platforms (optional)</h2><ul>
+<li><a href="units/8-1.html"><span class="num">8.1</span><span class="name">The core objects of Kubernetes</span><span class="goal">Work out how a training job handed to Kubernetes becomes a set of processes on several machines, and what to look at when it will not start.</span></a></li>
+<li><a href="units/8-2.html"><span class="num">8.2</span><span class="name">GPUs in the cluster: devices, scheduling and queueing</span><span class="goal">Work out how GPUs become resources that can be requested in Kubernetes, what decides where a job&#x27;s GPUs are placed, and how jobs queue when many people share a cluster.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 9 · Inference systems (optional)</h2><ul>
+<li><a href="units/9-1.html"><span class="num">9.1</span><span class="name">LLM inference and serving</span><span class="goal">Understand the KV cache, batch scheduling and the main optimisations of inference engines.</span></a></li>
+<li><a href="units/9-2.html"><span class="num">9.2</span><span class="name">Quantisation and low precision</span><span class="goal">Understand the principles and costs of int8, int4 and fp8 quantisation, and be able to write a simple quantisation kernel.</span></a></li>
+<li><a href="units/9-3.html"><span class="num">9.3</span><span class="name">Inference engines: batching, memory and scheduling</span><span class="goal">Work out what an inference engine does beyond the model, and why the same model on a different engine can differ several times in throughput.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 10 · Reinforcement learning (optional)</h2><ul>
+<li><a href="units/10-1.html"><span class="num">10.1</span><span class="name">What reinforcement learning is</span><span class="goal">Build the basic picture of reinforcement learning from scratch: what problem it solves, and how it fundamentally differs from supervised learning.</span></a></li>
+<li><a href="units/10-2.html"><span class="num">10.2</span><span class="name">Value and policy: two routes</span><span class="goal">Work out the thinking behind each of the two main families of reinforcement learning methods, and why PPO became the most commonly used algorithm.</span></a></li>
+<li><a href="units/10-3.html"><span class="num">10.3</span><span class="name">The shape of reinforcement learning systems</span><span class="goal">Work out what a reinforcement learning training system looks like, and how its bottlenecks differ from those of large-model training.</span></a></li>
+<li><a href="units/10-4.html"><span class="num">10.4</span><span class="name">How industry uses reinforcement learning</span><span class="goal">Learn the main uses of reinforcement learning in industry today, especially its relationship with large models, and what problems suit it.</span></a></li>
+</ul></section>
+<section class="part"><h2>Part 11 · Capstone project</h2><ul>
+<li><a href="units/11-1.html"><span class="num">11.1</span><span class="name">Capstone project</span><span class="goal">Walk through the whole course with four troubleshooting cases: measure first, then break it down, find the biggest part, change only one thing. The hands-on project is optional.</span></a></li>
+</ul></section>
+</main>
+<footer class="foot"><a href="index.html">Contents</a> · <a href="about.html">About this course</a> · <a href="about.html#versions">Version 1.12</a><br>
+Zongyao Tang & Claude · © 2026 Zongyao Tang<br>Shared under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a>: you may share and adapt it, with attribution, not for commercial use, and adaptations under the same licence</footer>
+<script src="../assets/reading.js?v=44d46eb3"></script>
+<script src="../assets/demos-en.js?v=44d46eb3"></script>
+<script src="../assets/demos.js?v=44d46eb3"></script>
+<script src="../assets/code.js?v=44d46eb3"></script>
+<script src="../assets/motion.js?v=44d46eb3"></script>
+<script src="../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
+</body>
+</html>

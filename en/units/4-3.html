@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4.3 Getting started with Triton · AI Systems: From Deep Learning Principles to GPUs and Distributed Training</title>
+<meta name="description" content="Write kernels in Triton that come close to hand-written CUDA in performance, and get a feel for &quot;programming by blocks&quot;.">
+<meta name="author" content="Zongyao Tang & Claude">
+<meta name="theme-color" content="#EBEEF2">
+<script>try{var l=localStorage.getItem('ka-lang');if(l&&l!=='en')location.replace('../../units/4-3.html'+location.hash)}catch(e){}</script>
+<link rel="alternate" hreflang="zh-CN" href="https://carltang.github.io/ai-systems-course/units/4-3.html"><link rel="alternate" hreflang="en" href="https://carltang.github.io/ai-systems-course/en/units/4-3.html">
+<style>@view-transition{navigation:auto}@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}</style>
+<script>try{if(localStorage.getItem('ka-reading')){var c=document.documentElement.classList,w=localStorage.getItem('ka-reading-width');c.add('reading');if(w==='0')c.add('read-narrow');if(w==='2')c.add('read-wide')}}catch(e){}</script><script>(function(){var r=document.documentElement,m='auto';try{m=localStorage.getItem('ka-theme')||'auto'}catch(e){}var d=m==='dark'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'dark':'light');try{var n=sessionStorage.getItem('ka-nav');if(n){r.setAttribute('data-nav',n);sessionStorage.removeItem('ka-nav')}}catch(e){}})();</script>
+<link rel="manifest" href="../../manifest-en.webmanifest">
+<link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../assets/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
+<link rel="stylesheet" href="../../assets/site.css?v=44d46eb3">
+</head>
+<body>
+<main class="main">
+<div class="item-page">
+<div class="unit-nav">
+<a class="learn-meta" href="../index.html">← Contents</a>
+<span class="unit-steps">
+<a href="4-2.html" title="4.2 Operator fusion" data-step="prev">‹ 4.2</a>
+<a href="4-4.html" title="4.4 Flash Attention" data-step="next">4.4 ›</a>
+</span><a class="lang-switch" href="../../units/4-3.html" hreflang="zh-CN" lang="zh-CN" data-lang="zh" title="用中文读这一页">中文</a><button type="button" class="read-toggle" id="read-toggle">Full-screen reading</button></div>
+<section class="essence" id="essence">
+<h1 class="unit-title"><span>Part 4 · Operators and kernels</span>4.3 Getting started with Triton</h1>
+<p class="translated">Translated by AI (Anthropic's Claude) from the Chinese edition. <a href="../../units/4-3.html" hreflang="zh-CN" data-lang="zh">The Chinese original</a> is the reference.</p>
+<div class="frame"><div class="frame-q"><span>This unit answers</span>Can you get close to hand-written performance without writing thread-level CUDA?</div><div class="frame-c">Follows 4.1–4.2: the same operators, written in a higher-level way.</div></div>
+<div class="story"><p>The thread: hand-written CUDA means worrying about thread-level details, and Triton raises the abstraction one level, letting you write in terms of "blocks" → parameters such as the block size are searched for automatically → finally a practical judgement: when Triton is enough, and when you still have to go back to CUDA. 2.5 said that what torch.compile generates is Triton code; after this unit you can read that code.</p></div>
+<ol class="thread"><li><a href="#c-3-4-blocks">Triton lets you think in &quot;blocks&quot;</a></li><li><a href="#c-3-4-autotune">How large should the block be? Let it try for itself</a></li><li><a href="#c-3-4-when-cuda">Use Triton first; write CUDA only when it is shown not to be enough</a></li></ol>
+<div class="essence-head"><h2>Explanation</h2></div><ol class="icards">
+<li class="icard" id="c-3-4-blocks"><h3><span class="i-num">1</span>Triton lets you think in &quot;blocks&quot;</h3>
+<p class="i-essence">One program instance in Triton handles a whole block of data, with vectorised operations; how the block is divided among threads, how memory accesses coalesce, whether to use shared memory and when to synchronise are all decided by the compiler.</p>
+<div class="i-detail"><p><strong class="h">CUDA's view: one thread.</strong> As 3.2 explained, when writing a CUDA kernel you stand in the place of one thread: which thread am I, which element am I responsible for. For good performance you also have to handle the things of part 3 yourself: make neighbouring threads' memory accesses coalesce, decide which data goes into shared memory, synchronise in the right places, and handle the partial block at the boundary.</p><p><strong class="h">Triton's view: a block of data.</strong> Triton is a language for writing kernels, embedded in Python. One program instance is responsible for a whole block of data (say a 64×64 tile), and the code operates on "a block", written much like NumPy:</p><pre>@triton.jit
+def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+    pid = tl.program_id(0)                     # which program instance am I
+    offs = pid * BLOCK + tl.arange(0, BLOCK)   # the indices of the block I am responsible for
+    mask = offs &lt; n                            # the last block may be partial
+    x = tl.load(x_ptr + offs, mask=mask)       # read a whole block
+    y = tl.load(y_ptr + offs, mask=mask)
+    tl.store(out_ptr + offs, x + y, mask=mask) # write a whole block</pre><p>(This is the structure of vector addition from the official introductory tutorial, with details left out.)</p><p>No "thread" appears in the code. <code>x + y</code> adds a whole block; how the elements of the block are divided among threads, and which ones each thread reads, is decided by the compiler.</p><p><strong class="h">What the compiler does for you.</strong></p><ul><li>Distributes the operations within the block among the threads of a block.</li><li>Arranges memory accesses so they coalesce (3.4).</li><li>Uses shared memory where needed, inserting the necessary synchronisation.</li><li>For operations like matrix multiplication, generates instructions that use Tensor Cores.</li><li>Handles boundaries uniformly with <code>mask</code>, so you need not write a separate branch.</li></ul><p><strong class="h">What you still decide.</strong> How the data is cut into blocks, how large the blocks are, and how the loop over blocks is written. That is, the structure at the level of the algorithm. The tiled matrix multiplication of 3.3 written in Triton is still "the outer loop walks the blocks along K, each time reading in two tiles, multiplying and accumulating", only every step operates on blocks rather than single elements.</p><p>So Triton does not bypass the knowledge of part 3; it automates its mechanical half. <mark>What you need to understand is "why tile, and which level of storage the tiles go in"</mark>; you no longer need to write "which thread reads which address" by hand.</p><p><strong class="h">The link to torch.compile.</strong> As 2.5 explained, what Inductor generates on the GPU is Triton functions just like this. The code printed with <code>TORCH_LOGS=output_code</code> has the same structure as the example above: work out the indices of this block, read the same block of several inputs, do a chain of operations, write it out.</p></div>
+<p class="i-analogy"><b>An analogy</b>CUDA is like giving orders to each soldier; Triton is like giving orders to each company, with the company commander (the compiler) arranging how the work is divided inside.</p>
+<p class="i-impl">So Triton code is much shorter than CUDA, and most of the optimisations learned in part 3, coalescing and tiling, are done automatically; your job is to think through how to cut the data into blocks and how large they should be.</p>
+<div class="i-builds">Builds on <a href="3-3.html#c-2-3-tiling">Tiling: move one small block into shared memory at a time, and let everyone reuse it</a><a href="3-4.html#c-2-4-coalescing">Coalesced memory access: a warp&#x27;s 32 reads are best merged into one</a></div>
+<div class="i-builds">Used later in <a href="4-3.html#c-3-4-autotune">How large should the block be? Let it try for itself</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><span class="src">Lecture 14 notebook</span><a class="src" href="https://triton-lang.org/main/getting-started/tutorials/index.html" target="_blank" rel="noopener">Official Triton tutorials</a><span class="src">PyTorch 2 paper, page 8: why Triton was chosen as the code-generation target</span></div>
+</li>
+<li class="i-lead">The example above has a parameter BLOCK. Its value matters a lot for performance, yet is hard to settle by reasoning.</li>
+<li class="icard" id="c-3-4-autotune"><h3><span class="i-num">2</span>How large should the block be? Let it try for itself</h3>
+<p class="i-essence">The best block size, number of warps and number of pipeline stages depend on the shapes of the matrices and on the specific GPU. Triton&#x27;s autotune runs several candidate configurations and remembers the fastest.</p>
+<div class="i-detail"><p><strong class="h">What the parameters are.</strong> A Triton kernel usually has several parameters that affect performance but not the result:</p><ul><li>The block size in each direction (matrix multiplication has three: M, N and K).</li><li>How many warps each program instance uses.</li><li>The number of stages in the software pipeline (how many steps ahead to prefetch data; the double buffering of 4.5 is two stages).</li></ul><p><strong class="h">Why it is hard to work out.</strong> The block size involves several conflicting factors:</p><ul><li>Large blocks: data read in from memory is reused more times, and arithmetic intensity is higher (3.3).</li><li>Blocks too large: shared memory and registers cannot hold them; fewer blocks can be resident on an SM at once, and memory latency cannot be hidden (occupancy, 3.3).</li><li>The best compromise depends on the specific GPU model (how large its shared memory is, how many registers it has), the shapes of the matrices, and the data type.</li></ul><p>The relationships among these factors have no simple formula. The same code, on an A100 or an H100, for 1024×1024 or 128×8192 matrices, may have a different best configuration in each case.</p><p><strong class="h">The way: try them all.</strong> Add a decorator to the kernel listing a few candidate configurations:</p><pre>@triton.autotune(
+    configs=[
+        triton.Config({"BLOCK_M": 128, "BLOCK_N": 64,  "BLOCK_K": 32}, num_warps=4, num_stages=3),
+        triton.Config({"BLOCK_M": 64,  "BLOCK_N": 64,  "BLOCK_K": 32}, num_warps=4, num_stages=4),
+        ...
+    ],
+    key=["M", "N", "K"],          # search again when any of these values changes
+)</pre><p>The first time the kernel is called with a given shape, Triton compiles and runs every configuration and notes the fastest. Later calls with the same shape use it directly.</p><p><strong class="h">Costs and cautions.</strong></p><ul><li>The first call is slow (it compiles and runs every candidate). Always skip it when measuring performance.</li><li>Every new combination of the values in <code>key</code> triggers a new search. Where shapes vary a lot, either limit the number of candidates or put the shapes into a few size classes.</li><li>It only chooses among the candidates you give. If they are all poor, so is the choice.</li></ul><p>This is a very common attitude in performance engineering: <mark>when the model is too complex to reason through, do not derive; measure</mark>. "Measure first, then change" from 0.2 is automated here. The <code>max-autotune</code> mode of torch.compile (2.5) uses the same idea.</p></div>
+<p class="i-analogy"><b>An analogy</b>Like getting glasses: rather than guessing the prescription from experience, try several lenses in turn.</p>
+<p class="i-impl">So the same kernel adapts to different shapes and GPUs; the first run being a bit slow is it searching for a configuration.</p>
+<div class="i-builds">Builds on <a href="4-3.html#c-3-4-blocks">Triton lets you think in &quot;blocks&quot;</a></div>
+<div class="i-anchors"><span class="i-anchors-label">Sources</span><a class="src" href="https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html" target="_blank" rel="noopener">Official Triton tutorials: matrix multiplication (using autotune)</a></div>
+</li>
+<li class="i-lead">If Triton is convenient and performs well, is there any need to learn CUDA?</li>
+<li class="icard" id="c-3-4-when-cuda"><h3><span class="i-num">3</span>Use Triton first; write CUDA only when it is shown not to be enough</h3>
+<p class="i-essence">Triton covers most fused operators and many matrix multiplication cases, often performing close to hand-written CUDA; but when you need fine control over warp-level operations, special data layouts or the newest hardware features, you still have to go back to CUDA or CUTLASS.</p>
+<div class="i-detail"><p><strong class="h">What Triton is good at.</strong></p><ul><li>Fused element-wise operations and reductions (4.2): its main use, and what torch.compile uses it for.</li><li>Regular, dense operations that can be processed by blocks: matrix multiplication and its variants, attention, normalisation.</li><li>New operators that need quick experiments: short code, quick to change, in the same Python file as PyTorch.</li></ul><p>In these cases a kernel written in Triton usually reaches eighty or ninety percent of hand-written CUDA or matches it, with a fraction of the code.</p><p><strong class="h">What it is not good at.</strong></p><ul><li>Algorithms that need fine control over the behaviour of each warp and each thread. Some of the parallel patterns of 3.5 (such as scans that need threads to cooperate in particular ways) are hard to express with the "block" abstraction.</li><li>Irregular data: sparse matrices, graphs, sequences of uneven length.</li><li>Special memory layouts, or a proprietary feature of the newest hardware that the compiler does not yet support.</li><li>Chasing the last ten-odd percent of performance: library authors (cuBLAS, cuDNN) still use lower-level means.</li></ul><p><strong class="h">A practical order of decisions</strong> (an order often recommended; here are the reasons):</p><ul><li><strong>Libraries first.</strong> Matrix multiplication, convolution, standard attention: you are very unlikely to beat the library implementations.</li><li><strong>Then the compiler.</strong> For a chain of operations you assembled yourself, first see whether torch.compile fuses it well. Zero cost in code.</li><li><strong>Only then Triton.</strong> For patterns the compiler cannot fuse, or fuses badly, write one by hand in Triton.</li><li><strong>CUDA last.</strong> Only when the profiler shows this kernel is the bottleneck, the roofline shows it is far from the hardware's limit, and Triton cannot express the optimisation you want.</li></ul><p><mark>Each level down costs an order of magnitude more to develop and maintain, so go down only with evidence</mark>.</p><p><strong class="h">Then why did part 3 spend so long on CUDA?</strong> Because your goal is to read and troubleshoot, not only to write. The code Triton generates, the kernels in libraries, the metrics the profiler reports, all speak the language of warps, shared memory and coalesced access. Without understanding the layer underneath, you cannot understand why the layer above is fast or slow.</p></div>
+<p class="i-analogy"><b>An analogy</b>Like fitting out a home: for most of it, off-the-shelf furniture is enough; only the odd-sized corners are worth having a carpenter make something to measure.</p>
+<p class="i-impl">So use Triton first to get a version that is fast enough quickly; only when the profiler shows it is the bottleneck, and still far from the hardware&#x27;s limit, is it worth writing CUDA by hand.</p>
+<div class="i-builds">Builds on <a href="3-1.html#c-2-1-measure">Measure first, then optimise: the bottleneck is often not where you think</a></div>
+</li>
+</ol>
+<div class="recap"><h3>Putting it together</h3><p>Triton lets you write kernels in units of <strong>blocks</strong>; how threads are assigned within a block, how memory accesses coalesce and how shared memory is used are the compiler's job. Parameters such as the block size are searched with <strong>autotune</strong>. In practice, <strong>use Triton first</strong>, and write CUDA by hand only when the profiler shows it is not enough and it is still far from the hardware's limit.</p></div>
+<div class="selftest"><h3>Test yourself</h3><p class="hint">Without looking back at the explanation, say it in your own words.</p><ol><li>What is the essential difference between writing a kernel in Triton and in CUDA? What does Triton&#x27;s compiler do for you?</li><li>What problem does Triton&#x27;s autotune solve? Why can the best block size not be worked out in advance?</li><li>When is Triton enough? When is hand-written CUDA still needed?</li></ol></div>
+</section><nav class="unit-pager">
+<a href="4-2.html"><small>Previous unit</small>4.2 Operator fusion</a>
+<a class="next" href="4-4.html"><small>Next unit</small>4.4 Flash Attention</a>
+</nav></div>
+</main>
+<footer class="foot"><a href="../index.html">Contents</a> · <a href="../about.html">About this course</a> · <a href="../about.html#versions">Version 1.12</a><br>
+Zongyao Tang & Claude · © 2026 Zongyao Tang<br>Shared under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a>: you may share and adapt it, with attribution, not for commercial use, and adaptations under the same licence</footer>
+<script src="../../assets/reading.js?v=44d46eb3"></script>
+<script src="../../assets/demos-en.js?v=44d46eb3"></script>
+<script src="../../assets/demos.js?v=44d46eb3"></script>
+<script src="../../assets/code.js?v=44d46eb3"></script>
+<script src="../../assets/motion.js?v=44d46eb3"></script>
+<script src="../../assets/theme.js?v=44d46eb3"></script>
+<script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../../sw.js').catch(function () {});</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 346" width="760" height="346" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="Roofline: the two ceilings of bandwidth and compute">
+  <title>Roofline: the two ceilings of bandwidth and compute</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="346" rx="14" fill="#fbf9f4"/>
+  <line x1="96" y1="270" x2="716" y2="270" stroke="#d9d4c8" stroke-width="1.2"/>
+  <line x1="96" y1="270" x2="96" y2="46" stroke="#d9d4c8" stroke-width="1.2"/>
+  <polyline points="96.0,270.0 528.2,84.3 716.0,84.3" fill="none" stroke="#8aa2e6" stroke-width="2.6" stroke-linejoin="round"/>
+  <line x1="528.2" y1="84.3" x2="528.2" y2="270" stroke="#d9d4c8" stroke-width="1" stroke-dasharray="3 4"/>
+  <text x="170.74115827506637" y="290" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">0.25</text>
+  <text x="396.89917266066686" y="290" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">4</text>
+  <text x="528.1798345321333" y="290" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">20</text>
+  <text x="716" y="312" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing="0">arithmetic intensity (FLOP/B, log scale)</text>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">attainable performance</text>
+  <circle cx="170.7" cy="237.9" r="5.5" fill="#e0b860"/>
+  <text x="182.74115827506637" y="263.88413714532413" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">naive</text>
+  <circle cx="396.9" cy="140.7" r="5.5" fill="#e0b860"/>
+  <text x="408.89917266066686" y="166.70528761822527" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0">tiled T = 16</text>
+  <text x="298.6920002024834" y="160.90436714553167" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing="0">bandwidth ceiling: bandwidth × intensity</text>
+  <text x="630.3667846477807" y="72.29471238177473" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">compute ceiling: 20 TFLOPS</text>
+  <text x="322.1580143856005" y="254" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">left: bandwidth-bound</text>
+  <text x="625.5672085173936" y="254" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">right: compute-bound</text>
+  <text x="746" y="338" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

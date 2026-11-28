@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 322" width="760" height="322" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="归约是一场淘汰赛">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 338" width="760" height="338" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="归约是一场淘汰赛">
   <title>归约是一场淘汰赛</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="322" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="338" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">8 个数求和：每一轮内部的加法同时进行</text>
   <rect x="44" y="50" width="52" height="32" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
   <text x="70.0" y="71.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">a0</text>
@@ -51,5 +51,5 @@
   <text x="357.0" y="269.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">+</text>
   <text x="736" y="269" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="end" letter-spacing=".02em">第 3 轮：1 次加法</text>
   <text x="24" y="304" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">加法总数还是 n − 1 次，只是排成了一棵树：n 个数只要 log₂n 轮</text>
-  <text x="746" y="313" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="330" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

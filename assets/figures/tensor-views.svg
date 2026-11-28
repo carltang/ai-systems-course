@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 286" width="760" height="286" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="同一块存储的两种看法">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 302" width="760" height="302" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="同一块存储的两种看法">
   <title>同一块存储的两种看法</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="286" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="302" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">存储：一维的一串数，只有一份</text>
   <rect x="250" y="46" width="40" height="36" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
   <text x="270.0" y="69.0" font-size="15" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">0</text>
@@ -47,5 +47,5 @@
   <line x1="430" y1="86" x2="560" y2="138" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
   <text x="380" y="168" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">两个张量指向同一块存储</text>
   <text x="380" y="188" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">只是“怎么看它”的说明不同</text>
-  <text x="746" y="277" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="294" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

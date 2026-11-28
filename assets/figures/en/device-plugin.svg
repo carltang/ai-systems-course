@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="760" height="260" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" role="img" aria-label="The three things a device plugin does">
+  <title>The three things a device plugin does</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="260" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">on a GPU node</text>
+  <rect x="24" y="62" width="170" height="70" rx="10" fill="#e4f3ea" stroke="#7fbf99" stroke-width="1.2"/>
+  <text x="109.0" y="93.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">device plugin</text>
+  <text x="109.0" y="114.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">manages nvidia.com/gpu</text>
+  <rect x="296" y="62" width="170" height="70" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
+  <text x="381.0" y="102.0" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">kubelet</text>
+  <rect x="566" y="62" width="170" height="70" rx="10" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
+  <text x="651.0" y="83.7" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing="0">API server</text>
+  <text x="651.0" y="102.9" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0"><tspan x="651.0" dy="0">the node&#x27;s allocatable</tspan><tspan x="651.0" dy="16.5">resources</tspan></text>
+  <line x1="196" y1="80" x2="294" y2="80" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="245.0" y="73.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">register, report</text>
+  <line x1="294" y1="114" x2="196" y2="114" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="245.0" y="132.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">which GPUs?</text>
+  <line x1="468" y1="97" x2="564" y2="97" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="516.0" y="90.0" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing="0">report the total</text>
+  <text x="24" y="172" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing="0"><tspan x="24" dy="0">Register: what my resource is called; report: which GPUs there are and whether healthy; allocate: pick specific GPUs and</tspan><tspan x="24" dy="17.5">return the settings the container needs</tspan></text>
+  <g transform="translate(0 17.5)"><text x="24" y="194" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">When a GPU fails and is marked unhealthy, the allocatable count drops by one</text></g>
+  <g transform="translate(0 17.5)"><text x="24" y="212" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing="0">To the scheduler, GPUs are just an integer</text></g>
+  <text x="746" y="252" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

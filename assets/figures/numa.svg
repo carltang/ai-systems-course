@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="NUMA：进程和设备不在同一侧">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 296" width="760" height="296" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="NUMA：进程和设备不在同一侧">
   <title>NUMA：进程和设备不在同一侧</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="296" rx="14" fill="#fbf9f4"/>
   <rect x="24" y="46" width="336" height="150" rx="12" fill="none" stroke="#d9d4c8" stroke-width="1.2" stroke-dasharray="5 4"/>
   <text x="36" y="38" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">NUMA 节点 0</text>
   <rect x="40" y="62" width="140" height="44" rx="10" fill="#ffffff" stroke="#cfc9bb" stroke-width="1.2"/>
@@ -24,5 +24,5 @@
   <text x="380" y="214" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">每个 batch 都要穿过插槽之间的互联</text>
   <text x="24" y="244" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">放对的原则：一个进程用哪张卡，就让它的 CPU 核和内存都在那张卡所在的一侧</text>
   <text x="24" y="264" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">多张卡同时放错时，插槽之间的互联会成为瓶颈</text>
-  <text x="746" y="271" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="288" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

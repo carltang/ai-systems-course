@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" width="760" height="262" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPU 的存储层次">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 278" width="760" height="278" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="GPU 的存储层次">
   <title>GPU 的存储层次</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="262" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="278" rx="14" fill="#fbf9f4"/>
   <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">离运算单元越近：越快，也越小</text>
   <rect x="24" y="54" width="250" height="40" rx="8" fill="#e8eefc" stroke="#8aa2e6" stroke-width="1.2"/>
   <text x="40" y="79" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">寄存器</text>
@@ -15,5 +15,5 @@
   <rect x="24" y="204" width="712" height="40" rx="8" fill="#f1f0ec" stroke="#c9c5ba" stroke-width="1.2"/>
   <text x="40" y="229" font-size="14.5" fill="#2b303b" font-weight="500" text-anchor="start" letter-spacing=".02em">显存</text>
   <text x="124" y="229" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">几十 GB；在芯片外，每次访问要等几百个周期</text>
-  <text x="746" y="253" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="270" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>

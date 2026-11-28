@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" width="760" height="250" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="训练一步的管道和四种等待">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 266" width="760" height="266" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="训练一步的管道和四种等待">
   <title>训练一步的管道和四种等待</title>
   <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
-  <rect width="760" height="250" rx="14" fill="#fbf9f4"/>
+  <rect width="760" height="266" rx="14" fill="#fbf9f4"/>
   <text x="24" y="36" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一步训练，从左到右依次经过</text>
   <rect x="24" y="70" width="104" height="64" rx="10" fill="#fdf3dc" stroke="#e0b860" stroke-width="1.2"/>
   <text x="76.0" y="98.0" font-size="13.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">1 读取与预处理</text>
@@ -36,5 +36,5 @@
   <text x="686.0" y="182" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">等计算</text>
   <rect x="390" y="206" width="348" height="6" rx="3" fill="#a892dc"/>
   <text x="564.0" y="230" font-size="12.5" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">等发令：CPU 上的 Python 来不及把下一个任务派给 GPU</text>
-  <text x="746" y="241" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+  <text x="746" y="258" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
 </svg>
