@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=c9ddab52">
+<link rel="stylesheet" href="../assets/site.css?v=199360ca">
 </head>
 <body>
 <main class="main">
@@ -42,7 +42,7 @@
 <li class="i-lead">要不让 N×N 的矩阵落地，就得一块一块地处理。可 softmax 需要看完一整行才能归一化。这是要解决的第一个难题。</li>
 <li class="icard" id="c-3-3-online-softmax"><h3><span class="i-num">2</span>在线 softmax：不必看完整行，也能算对</h3>
 <p class="i-essence">softmax 需要整行的最大值和指数和。在线算法边读边维护“目前的最大值 m”和“目前的指数和 l”：遇到更大的值时，把之前累加的结果乘上 exp(旧 m − 新 m) 修正一下，再继续累加。输出也按同样的系数修正。</p>
-<div class="i-detail"><p><strong class="h">softmax 的定义。</strong> 对一行分数 s₁…s_N，第 i 个输出是 exp(sᵢ) ÷ Σⱼ exp(sⱼ)。分母要所有的分数。实际计算时为了防止 exp 溢出，还会先减去这一行的最大值 m：exp(sᵢ − m) ÷ Σⱼ exp(sⱼ − m)。结果不变，但又多了一个“要看完整行才知道”的量。</p><p><strong class="h">把一行分成两块来想。</strong> 假设先看到前一半分数，算出了它们的最大值 m₁ 和指数和 l₁ = Σ exp(sⱼ − m₁)。现在后一半来了，它们的最大值是 m₂。</p><ul><li>整行的最大值：m = max(m₁, m₂)。</li><li>前一半的指数和当初是以 m₁ 为基准算的，现在基准换成了 m。因为 exp(s − m) = exp(s − m₁) × exp(m₁ − m)，所以只要把 l₁ 乘上一个系数 exp(m₁ − m)，就换算成了新基准下的值。不需要回头重新看前一半的每个分数。</li><li>后一半的指数和直接以 m 为基准算，加上去：l = l₁ × exp(m₁ − m) + Σ_后一半 exp(sⱼ − m)。</li></ul><p>这就是全部的技巧：<strong>一个指数和，换基准只需要乘一个系数。</strong> 所以可以一块一块地读入分数，只维护两个数（当前最大值 m、当前指数和 l），每来一块就更新一次。</p><p><strong class="h">输出也能这样累加。</strong> 注意力最终要的不是 softmax 的结果本身，而是它乘以 V 之后的加权和 O = Σⱼ pⱼ vⱼ。同样的道理：先不除以分母，累加“未归一化的加权和” Σ exp(sⱼ − m) vⱼ；每次最大值更新，把已经累加的部分乘上同一个修正系数；全部块处理完之后，再除以最终的 l。</p><p><strong class="h">它和 3.5 的关系。</strong> 3.5 讲并行归约时有一条线索：很多看起来必须“从头到尾顺序做”的计算，只要找到合适的中间状态，就能拆成可以分段、可以合并的形式。求和的中间状态是部分和；这里的中间状态是（最大值，指数和，未归一化的输出）这三样，合并两段的规则就是上面的换基准公式。在线 softmax 就是 softmax 的“可分段”形式。</p><p><strong class="h">数值上。</strong> 结果和一次算完在数学上完全相等，只在浮点舍入的最后几位上有差别（4.1 讲的正常误差）。所以 <mark>Flash Attention 是精确的注意力，不是近似</mark>。</p></div>
+<div class="i-detail"><p><strong class="h">softmax 的定义。</strong> 对一行分数 s₁…s_N，第 i 个输出是 exp(sᵢ) ÷ Σⱼ exp(sⱼ)。分母要所有的分数。实际计算时为了防止 exp 溢出，还会先减去这一行的最大值 m：exp(sᵢ − m) ÷ Σⱼ exp(sⱼ − m)。结果不变，但又多了一个“要看完整行才知道”的量。</p><p><strong class="h">把一行分成两块来想。</strong> 假设先看到前一半分数，算出了它们的最大值 m₁ 和指数和 l₁ = Σ exp(sⱼ − m₁)。现在后一半来了，它们的最大值是 m₂。</p><ul><li>整行的最大值：m = max(m₁, m₂)。</li><li>前一半的指数和当初是以 m₁ 为基准算的，现在基准换成了 m。因为 exp(s − m) = exp(s − m₁) × exp(m₁ − m)，所以只要把 l₁ 乘上一个系数 exp(m₁ − m)，就换算成了新基准下的值。不需要回头重新看前一半的每个分数。</li><li>后一半的指数和直接以 m 为基准算，加上去：l = l₁ × exp(m₁ − m) + Σ_后一半 exp(sⱼ − m)。</li></ul><p>这就是全部的技巧：<strong>一个指数和，换基准只需要乘一个系数。</strong> 所以可以一块一块地读入分数，只维护两个数（当前最大值 m、当前指数和 l），每来一块就更新一次。</p><p><strong class="h">输出也能这样累加。</strong> 注意力最终要的不是 softmax 的结果本身，而是它乘以 V 之后的加权和 O = Σⱼ pⱼ vⱼ。同样的道理：先不除以分母，累加“未归一化的加权和” Σ exp(sⱼ − m) vⱼ；每次最大值更新，把已经累加的部分乘上同一个修正系数；全部块处理完之后，再除以最终的 l。</p><figure class="fig"><img src="../assets/figures/online-softmax.svg" alt="分块读入分数：最大值变了，就把已经加好的部分乘同一个系数，换到新的基准上" loading="lazy"><figcaption>分块读入分数：最大值变了，就把已经加好的部分乘同一个系数，换到新的基准上</figcaption></figure><p><strong class="h">它和 3.5 的关系。</strong> 3.5 讲并行归约时有一条线索：很多看起来必须“从头到尾顺序做”的计算，只要找到合适的中间状态，就能拆成可以分段、可以合并的形式。求和的中间状态是部分和；这里的中间状态是（最大值，指数和，未归一化的输出）这三样，合并两段的规则就是上面的换基准公式。在线 softmax 就是 softmax 的“可分段”形式。</p><p><strong class="h">数值上。</strong> 结果和一次算完在数学上完全相等，只在浮点舍入的最后几位上有差别（4.1 讲的正常误差）。所以 <mark>Flash Attention 是精确的注意力，不是近似</mark>。</p></div>
 <details class="i-more"><summary>动手：用几行 Python 验证在线 softmax</summary><div class="i-detail"><p>下面的代码把一行分数分成若干块，用在线的办法算“softmax 后对 v 的加权和”，再和一次算完的结果比较。可以直接在解释器里运行。</p><pre>import torch
 
 torch.manual_seed(0)
@@ -92,11 +92,11 @@ print(ref.item(), (o / l).item())         # 两个数应该只在最后几位不
 </main>
 <footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=c9ddab52"></script>
-<script src="../assets/demos.js?v=c9ddab52"></script>
-<script src="../assets/code.js?v=c9ddab52"></script>
-<script src="../assets/motion.js?v=c9ddab52"></script>
-<script src="../assets/theme.js?v=c9ddab52"></script>
+<script src="../assets/reading.js?v=199360ca"></script>
+<script src="../assets/demos.js?v=199360ca"></script>
+<script src="../assets/code.js?v=199360ca"></script>
+<script src="../assets/motion.js?v=199360ca"></script>
+<script src="../assets/theme.js?v=199360ca"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
 </html>

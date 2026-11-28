@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280" width="760" height="280" font-family="'PingFang SC','Noto Sans CJK SC','Source Han Sans SC','Hiragino Sans GB','Microsoft YaHei',sans-serif" role="img" aria-label="在线 softmax：分块读入，最大值变了就换基准">
+  <title>在线 softmax：分块读入，最大值变了就换基准</title>
+  <defs><marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker></defs>
+  <rect width="760" height="280" rx="14" fill="#fbf9f4"/>
+  <text x="24" y="34" font-size="13" fill="#6b7280" font-weight="400" text-anchor="start" letter-spacing=".02em">一行 12 个分数，分成 3 块依次读入；每块只更新三个数：最大值 m、指数和 l、未归一化的输出 O</text>
+  <rect x="30" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/>
+  <rect x="52" y="130.0" width="28" height="20.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="66" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">1.0</text>
+  <rect x="100" y="106.0" width="28" height="44.0" rx="3" fill="#e0b860" opacity="1"/>
+  <text x="114" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">2.2</text>
+  <rect x="148" y="140.0" width="28" height="10.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="162" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">0.5</text>
+  <rect x="196" y="118.0" width="28" height="32.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="210" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">1.6</text>
+  <text x="140" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">m = 2.2</text>
+  <text x="140" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">l = Σ exp(s − 2.2)</text>
+  <rect x="270" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/>
+  <rect x="292" y="88.0" width="28" height="62.0" rx="3" fill="#e0b860" opacity="1"/>
+  <text x="306" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">3.1</text>
+  <rect x="340" y="146.0" width="28" height="4.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="354" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">0.2</text>
+  <rect x="388" y="96.0" width="28" height="54.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="402" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">2.7</text>
+  <rect x="436" y="128.0" width="28" height="22.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="450" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">1.1</text>
+  <text x="380" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">m 变成 3.1</text>
+  <text x="380" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">l 先乘 exp(2.2 − 3.1)，再加这一块</text>
+  <line x1="252" y1="100" x2="266" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <rect x="510" y="56" width="220" height="102" rx="10" fill="none" stroke="#d9d4c8" stroke-dasharray="4 4"/>
+  <rect x="532" y="70.0" width="28" height="80.0" rx="3" fill="#e0b860" opacity="1"/>
+  <text x="546" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">4.0</text>
+  <rect x="580" y="134.0" width="28" height="16.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="594" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">0.8</text>
+  <rect x="628" y="110.0" width="28" height="40.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="642" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">2.0</text>
+  <rect x="676" y="80.0" width="28" height="70.0" rx="3" fill="#e0b860" opacity="0.55"/>
+  <text x="690" y="170" font-size="11.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">3.5</text>
+  <text x="620" y="196" font-size="13" fill="#2b303b" font-weight="500" text-anchor="middle" letter-spacing=".02em">m 变成 4.0</text>
+  <text x="620" y="216" font-size="12.5" fill="#6b7280" font-weight="400" text-anchor="middle" letter-spacing=".02em">l 先乘 exp(3.1 − 4.0)，再加这一块</text>
+  <line x1="492" y1="100" x2="506" y2="100" stroke="#6b7280" stroke-width="1.4" marker-end="url(#tip)"/>
+  <text x="24" y="262" font-size="12.5" fill="#2b303b" font-weight="400" text-anchor="start" letter-spacing=".02em">最大值变大时，已经加好的 l 和 O 统一乘一个系数换到新基准，不用回头看前面的分数；最后除以 l，结果和一次算完相同</text>
+  <text x="746" y="271" font-size="9.5" fill="#9AA5B4" text-anchor="end" letter-spacing=".04em">Zongyao Tang &amp; Claude · CC BY-NC-SA 4.0</text>
+</svg>

@@ -2285,6 +2285,856 @@
         p.loop(tick);
     };
 
+    /* ── shared helpers for the sixth set ── */
+    // Break a sentence into lines that fit: Chinese may break between any two characters, a run of
+    // Latin letters or digits stays whole, and a closing mark never starts a line.
+    function wrapLines(ctx, s, maxW) {
+        var cjk = '　-〿一-鿿＀-￯', lines = [], cur = '';
+        var tokens = s.match(new RegExp('[' + cjk + ']|[^\\s' + cjk + ']+\\s*|\\s+', 'g')) || [];
+        tokens.forEach(function (t) {
+            if (cur && /^[，。；：、）”」！？]/.test(t)) { cur += t; return; }
+            if (cur && ctx.measureText(cur + t).width > maxW) { lines.push(cur.replace(/\s+$/, '')); cur = t.replace(/^\s+/, ''); }
+            else cur += t;
+        });
+        if (cur) lines.push(cur);
+        return lines;
+    }
+    function paragraph(ctx, s, x, y, maxW, opt) {
+        opt = opt || {};
+        ctx.font = (opt.weight || 500) + ' ' + (opt.size || 12) + 'px ' + (opt.mono ? MONO : SANS);
+        var lines = wrapLines(ctx, s, maxW), lh = opt.lh || Math.round((opt.size || 12) * 1.5);
+        lines.slice(0, opt.max || 9).forEach(function (ln, i) { text(ctx, ln, x, y + i * lh, opt); });
+        return lines.length;
+    }
+    function seeded(seed) {                                // mulberry32: the same seed always gives the same numbers
+        return function () {
+            seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+            var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    function sup(n) { return String(n).replace('-', '⁻').replace(/\d/g, function (d) { return '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]; }); }
+
+    /* ── 1.1 · Backpropagation on three layers ─────────────────────────────────────────────
+     * Lesson: x → a → b → L. First ∂L/∂b (the last layer, directly), then ∂L/∂a = ∂L/∂b × ∂b/∂a;
+     * at each layer the parameter's gradient is "upstream gradient × local derivative", and for
+     * b = W × a that local derivative is a: the value saved in the forward pass. The clumsy way
+     * nudges one parameter and runs the forward again; both give the same number. */
+    registry.backprop = function (figure) {
+        var p = new Panel(figure, { title: '反向传播：从后往前，每一步用后一层算好的结果', note: 'a = w₁·x，b = w₂·a，L = ½(b − t)²；x = 1.5，目标 t = 0.5，都是随手取的数', ratio: 0.4, minHeight: 230 });
+        var X = 1.5, T = 0.5, N = 7, step = still ? N - 1 : 0, auto = !still, clock = 0;
+        p.slider('w1', '权重 w₁', -2, 2, 0.1, 0.6, function (v) { return v.toFixed(1); }, null, 'launch');
+        p.slider('w2', '权重 w₂', -2, 2, 0.1, 1.2, function (v) { return v.toFixed(1); }, null, 'launch');
+        p.button('下一步', function () { auto = false; step = (step + 1) % N; });
+        p.button('自动播放', function () { auto = !still; clock = 0; step = still ? N - 1 : 0; }, 'ghost');
+        p.readout('L', '损失 L', 'ink');
+        p.readout('g', '∂L/∂w₁：反向传播算的', 'peers');
+        p.readout('fd', '∂L/∂w₁：笨办法（w₁ 挪一点，重算一遍前向）', 'ink');
+        function fwd(w1, w2) { var a = w1 * X, b = w2 * a; return { a: a, b: b, L: 0.5 * (b - T) * (b - T) }; }
+        function tick(dt) { if (!auto) return; clock += dt; if (clock > (step === N - 1 ? 3 : 1.5)) { clock = 0; step = (step + 1) % N; } }
+        p.draw = function () {
+            var narrow = p.w < 700;
+            p.fit(narrow ? 256 : 228);
+            var ctx = p.ctx, w = p.w, w1 = p.values.w1, w2 = p.values.w2, F = fwd(w1, w2);
+            var dLdb = F.b - T, dLda = dLdb * w2, dLdw2 = dLdb * F.a, dLdw1 = dLda * X;
+            p.clear();
+            var names = ['x', 'a', 'b', 'L'], vals = [X, F.a, F.b, F.L], grads = [null, dLda, dLdb, 1];
+            var known = [true, step >= 1, step >= 2, step >= 3], gknown = [false, step >= 5, step >= 4, step >= 3];
+            var pad = narrow ? 12 : 28, bw = narrow ? (w >= 480 ? 66 : 56) : 110, gap = (w - pad * 2 - bw * 4) / 3, y = 52, bh = 58;
+            function bx(i) { return pad + i * (bw + gap); }
+            text(ctx, narrow ? '框里依次是：名字、前向的值、梯度 ∂L/∂(它)' : '每个框：上面是前向算出的值，下面是损失对它的梯度', pad, 22, { size: 11, color: C.dim });
+            text(ctx, '第 ' + (step + 1) + ' / ' + N + ' 步', w - pad, 22, { size: 11, mono: true, align: 'right', color: C.dim });
+            var ops = narrow ? ['×w₁', '×w₂', '损失'] : ['× w₁', '× w₂', '½(b − t)²'];
+            for (var i = 0; i < 3; i++) {                     // forward arrows on top, backward arrows below
+                var x0 = bx(i) + bw, x1 = bx(i + 1), on = step >= i + 1, back = step >= 6 - i;
+                ctx.lineWidth = 1.6;
+                ctx.strokeStyle = on ? C.compute : C.faint; ctx.beginPath(); ctx.moveTo(x0 + 4, y + 17); ctx.lineTo(x1 - 5, y + 17); ctx.moveTo(x1 - 10, y + 13); ctx.lineTo(x1 - 5, y + 17); ctx.lineTo(x1 - 10, y + 21); ctx.stroke();
+                text(ctx, ops[i], (x0 + x1) / 2, y + 9, { size: 11, mono: true, align: 'center', color: on ? C.compute : C.dim });
+                ctx.strokeStyle = back ? C.peers : C.faint; ctx.beginPath(); ctx.moveTo(x1 - 4, y + bh - 15); ctx.lineTo(x0 + 5, y + bh - 15); ctx.moveTo(x0 + 10, y + bh - 19); ctx.lineTo(x0 + 5, y + bh - 15); ctx.lineTo(x0 + 10, y + bh - 11); ctx.stroke();
+            }
+            var used = step === 5 ? 1 : step === 6 ? 0 : -1;  // the forward value this backward step reaches back for
+            for (i = 0; i < 4; i++) {
+                var x = bx(i), hot = i === used;
+                ctx.save(); if (hot && !still) { ctx.shadowColor = C.data; ctx.shadowBlur = 16; }
+                round(ctx, x, y, bw, bh, 10); ctx.fillStyle = C.well; ctx.fill(); ctx.restore();
+                round(ctx, x, y, bw, bh, 10); ctx.strokeStyle = hot ? C.data : alpha(C.compute, known[i] ? 0.7 : 0.25); ctx.lineWidth = hot ? 2 : 1.2; ctx.stroke();
+                var g = i > 0 ? (gknown[i] ? grads[i].toFixed(2) : '?') : '';
+                if (narrow) {                                  // three short rows: name, value, gradient
+                    text(ctx, names[i], x + 7, y + 15, { size: 12, mono: true, weight: 600, color: C.ink });
+                    text(ctx, known[i] ? vals[i].toFixed(2) : '?', x + bw / 2, y + 33, { size: 12, mono: true, align: 'center', color: known[i] ? C.compute : C.dim });
+                    if (i > 0) text(ctx, g, x + bw / 2, y + 50, { size: 10.5, mono: true, align: 'center', color: gknown[i] ? C.peers : C.dim });
+                } else {
+                    text(ctx, names[i], x + 9, y + 21, { size: 13, mono: true, weight: 600, color: C.ink });
+                    text(ctx, known[i] ? vals[i].toFixed(2) : '?', x + bw - 9, y + 21, { size: 12.5, mono: true, align: 'right', color: known[i] ? C.compute : C.dim });
+                    if (i > 0) text(ctx, '∂L/∂' + names[i] + ' = ' + g, x + 9, y + bh - 10, { size: 10.5, mono: true, color: gknown[i] ? C.peers : C.dim });
+                }
+                if (hot) text(ctx, '前向时存下的', x + bw / 2, y - 7, { size: 11, align: 'center', color: C.data });
+            }
+            // the two weights, under the arrows they scale
+            [['w₁', w1, dLdw1, step >= 6, 0], ['w₂', w2, dLdw2, step >= 5, 1]].forEach(function (wt) {
+                var cx = (bx(wt[4]) + bw + bx(wt[4] + 1)) / 2, ww = narrow ? 76 : 112, wy = y + bh + 22;
+                round(ctx, cx - ww / 2, wy, ww, 40, 8); ctx.fillStyle = C.well; ctx.fill();
+                ctx.strokeStyle = alpha(C.launch, wt[3] ? 0.9 : 0.35); ctx.lineWidth = wt[3] ? 1.6 : 1.1; ctx.stroke();
+                text(ctx, wt[0] + ' = ' + wt[1].toFixed(1), cx, wy + 16, { size: 11.5, mono: true, align: 'center', color: C.ink });
+                var g = wt[3] ? wt[2].toFixed(2) : '?';
+                text(ctx, (narrow ? 'g = ' : '∂L/∂' + wt[0] + ' = ') + g, cx, wy + 32, { size: 10.5, mono: true, align: 'center', color: wt[3] ? C.launch : C.dim });
+            });
+            var lines = [
+                '开始：只知道输入 x 和两个权重。',
+                '前向 1：a = w₁ × x = ' + w1.toFixed(1) + ' × 1.5 = ' + F.a.toFixed(2) + '，存下来。',
+                '前向 2：b = w₂ × a = ' + F.b.toFixed(2) + '，存下来。',
+                '前向 3：L = ½(b − t)² = ' + F.L.toFixed(3) + '。反向从这里出发：∂L/∂L = 1。',
+                '反向 1：∂L/∂b = b − t = ' + dLdb.toFixed(2) + '。最后一层，直接可得。',
+                '反向 2：∂L/∂a = ∂L/∂b × w₂ = ' + dLda.toFixed(2) + '；顺便 ∂L/∂w₂ = ∂L/∂b × a = ' + dLdw2.toFixed(2) + '，用到前向存下的 a。',
+                '反向 3：∂L/∂w₁ = ∂L/∂a × x = ' + dLdw1.toFixed(2) + '，用到存下的 x。全部梯度到手，每一层只算了一次。'
+            ];
+            paragraph(ctx, lines[step], pad, y + bh + 92, w - pad * 2, { size: 12.5, color: step >= 4 ? C.peers : step >= 1 ? C.compute : C.soft, lh: 19, max: 3 });
+            var eps = 1e-4, fd = (fwd(w1 + eps, w2).L - fwd(w1 - eps, w2).L) / (2 * eps);
+            p.set('L', F.L.toFixed(4));
+            p.set('g', step >= 6 ? dLdw1.toFixed(4) : '还没算到');
+            p.set('fd', fd.toFixed(4));
+        };
+        p.loop(tick);
+    };
+
+    /* ── 1.2 · Initialization: one factor per layer, raised to the depth ───────────────────
+     * Lesson: n inputs times a weight each, summed: the variance is n × Var(w) × the input's; ReLU
+     * zeroes half. So the factor per layer is n × Var(w) × ½. At 1.5, fifty layers give about
+     * 6 × 10⁸; at 0.7, about two in a hundred million. He initialization, Var(w) = 2/n, gives 1. */
+    registry['depth-scale'] = function (figure) {
+        var p = new Panel(figure, { title: '初始化：每层乘一个倍数，层数把它变成指数', note: 'ReLU 网络，一层有 n 个输入：倍数 = n × 权重的方差 × ½', ratio: 0.42, minHeight: 250 });
+        var input = p.slider('c', '每个权重的方差', 1, 3, 0.05, 3, function (v) { return v.toFixed(2) + ' / n' + (Math.abs(v - 2) < 1e-6 ? '（He）' : ''); }, null, 'data');
+        p.slider('L', '层数', 1, 100, 1, 50, function (v) { return v + ' 层'; }, null, 'compute');
+        function pick(v) { input.value = v; input.dispatchEvent(new Event('input')); }
+        p.button('倍数 1.5', function () { pick(3); }, 'ghost');
+        p.button('倍数 0.7', function () { pick(1.4); }, 'ghost');
+        p.button('He 初始化', function () { pick(2); }, 'ghost');
+        p.readout('m', '每层的倍数', 'ink');
+        p.readout('end', '穿过这些层之后，信号变成', 'ink');
+        p.readout('verdict', '结果', 'peers');
+        var clock = 0;
+        function tick(dt) { clock = (clock + dt / 3) % 1.3; }
+        function size(v) {
+            var e;
+            if (v >= 1e12 || v < 1e-9) { e = Math.floor(Math.log10(v)); return (v / Math.pow(10, e)).toFixed(1) + ' × 10' + sup(e); }
+            if (v >= 1e8) return '约 ' + (v / 1e8).toFixed(1) + ' 亿倍';
+            if (v >= 1e4) return '约 ' + (v / 1e4).toFixed(1) + ' 万倍';
+            if (v >= 0.01) return v.toFixed(v >= 100 ? 0 : 2) + ' 倍';
+            if (v >= 1e-7) return v.toPrecision(2) + ' 倍';
+            return '约一亿分之 ' + (v * 1e8).toFixed(1);
+        }
+        p.draw = function () {
+            var narrow = p.w < 560;
+            p.fit(narrow ? 256 : 280);
+            var ctx = p.ctx, w = p.w, h = p.h, m = p.values.c / 2, Ln = p.values.L;
+            p.clear();
+            var L = narrow ? 46 : 58, R = w - 16, T = 34, B = h - 34, lo = -30, hi = 20;
+            var X = function (k) { return L + k / 100 * (R - L); }, Y = function (lg) { return B - (Math.max(lo, Math.min(hi, lg)) - lo) / (hi - lo) * (B - T); };
+            ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+            [-30, -20, -10, 0, 10, 20].forEach(function (e) {
+                ctx.beginPath(); ctx.moveTo(L, Y(e)); ctx.lineTo(R, Y(e)); ctx.stroke();
+                text(ctx, e === 0 ? '1' : '10' + sup(e), L - 6, Y(e) + 4, { size: 10.5, mono: true, align: 'right', color: C.dim });
+            });
+            [0, 25, 50, 75, 100].forEach(function (k) { text(ctx, String(k), X(k), B + 16, { size: 10.5, mono: true, align: 'center', color: C.dim }); });
+            text(ctx, '第几层', R, B + 30, { size: 10.5, align: 'right', color: C.dim });
+            text(ctx, '信号的大小（对数刻度）', L, 20, { size: 10.5, color: C.dim });
+            text(ctx, '反向传梯度时，每层也乘这个倍数', R, 20, { size: 10.5, align: 'right', color: C.dim });
+            // the lesson's three cases, faint, for reference
+            [[1.5, '×1.5', 14], [1, '×1（He）', -6], [0.7, '×0.7', -6]].forEach(function (rc) {
+                var s = Math.log10(rc[0]);
+                ctx.setLineDash([4, 4]); ctx.strokeStyle = alpha(C.soft, 0.4); ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(100), Y(100 * s)); ctx.stroke(); ctx.setLineDash([]);
+                text(ctx, rc[1], X(100) - 4, Y(100 * s) + rc[2], { size: 10.5, align: 'right', color: C.dim });
+            });
+            var slope = Math.log10(m), flat = Math.abs(m - 1) < 1e-6, col = flat ? C.peers : m > 1 ? C.alert : C.launch;
+            ctx.save(); if (!still) { ctx.shadowColor = col; ctx.shadowBlur = 10; }
+            ctx.strokeStyle = col; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(Ln), Y(Ln * slope)); ctx.stroke(); ctx.restore();
+            var k = still ? Ln : Math.min(1, clock) * Ln;      // the signal travelling through the layers
+            ctx.beginPath(); ctx.arc(X(k), Y(k * slope), 5.5, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill();
+            ctx.setLineDash([2, 3]); ctx.strokeStyle = alpha(col, 0.6); ctx.beginPath(); ctx.moveTo(X(Ln), Y(Ln * slope)); ctx.lineTo(X(Ln), B); ctx.stroke(); ctx.setLineDash([]);
+            var end = Math.pow(m, Ln);
+            p.set('m', m.toFixed(2), flat ? 'peers' : m > 1 ? 'alert' : 'launch');
+            p.set('end', size(end));
+            p.set('verdict', end > 1e4 ? '爆炸：数值溢出' : end < 1e-4 ? '消失：几乎成了零' : '稳定地穿过', end > 1e4 ? 'alert' : end < 1e-4 ? 'launch' : 'peers');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 1.4 · Attention as a soft lookup ──────────────────────────────────────────────────
+     * Lesson: a position's Q dotted with every K gives scores; softmax turns them into weights
+     * that add up to 1; the output is the weighted sum of the V's: a mixture, not only the best
+     * match. Every position does this against every position: N × N scores. The vectors here are
+     * drawn in two dimensions and picked by hand so that "它" finds "小猫". */
+    registry.attention = function (figure) {
+        var p = new Panel(figure, { title: '注意力是一次“软查表”', note: 'Q、K 画成平面上的箭头（真实的有几十上百维）；箭头的方向是挑过的，好让“它”找到“小猫”', ratio: 0.5, minHeight: 320 });
+        var W = ['小猫', '追', '毛线球', '因为', '它', '很', '好奇'];
+        var KA = [35, 140, 90, 230, 110, 190, 300], QA = [300, 60, 140, 110, 40, 300, 110], QLEN = 3.5;
+        var PAL = [C.data, C.compute, C.peers, C.launch, '#FF9F7A', '#7FD3FF', '#C6D0DB'];
+        p.toggle('q', W.map(function (wd, i) { return [i, wd]; }), 4);
+        p.readout('top', '它最关注的位置', 'data');
+        p.readout('wt', '那个位置拿到的权重', 'ink');
+        p.readout('sum', '所有权重加起来', 'peers');
+        p.readout('nn', '整句要算的分数', 'ink');
+        var shownAngle = QA[4], shownW = null;
+        function weights(qi) {
+            var qa = QA[qi] * Math.PI / 180, sc = KA.map(function (ka) { return QLEN * Math.cos(qa - ka * Math.PI / 180); });
+            var mx = Math.max.apply(null, sc), ex = sc.map(function (s) { return Math.exp(s - mx); }), sum = ex.reduce(function (a, b) { return a + b; }, 0);
+            return { scores: sc, w: ex.map(function (e) { return e / sum; }) };
+        }
+        function tick(dt) {
+            var target = QA[p.values.q], d = ((target - shownAngle + 540) % 360) - 180, tw = weights(p.values.q).w;
+            shownAngle += d * Math.min(1, dt * 6);
+            if (!shownW) shownW = tw.slice();
+            for (var i = 0; i < tw.length; i++) shownW[i] += (tw[i] - shownW[i]) * Math.min(1, dt * 6);
+        }
+        p.draw = function () {
+            var narrow = p.w < 600, w = p.w, qi = p.values.q, R = weights(qi);
+            var cr = narrow ? 84 : 96, cx = narrow ? w / 2 : 34 + cr + 26, cy = narrow ? 34 + cr : 150;
+            var tx = narrow ? 16 : cx + cr + 64, ty = narrow ? cy + cr + 74 : 32, rowH = 25, oy = ty + 12 + W.length * rowH + 16;
+            p.fit(narrow ? oy + 38 : 330);
+            var ctx = p.ctx;
+            if (!shownW || still) { shownW = R.w.slice(); shownAngle = QA[qi]; }
+            p.clear();
+            // left: the vectors
+            ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
+            KA.forEach(function (ka, i) {
+                var a = ka * Math.PI / 180;
+                ctx.strokeStyle = alpha(PAL[i], 0.75); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * cr, cy - Math.sin(a) * cr); ctx.stroke();
+                text(ctx, W[i], cx + Math.cos(a) * (cr + 17), cy - Math.sin(a) * (cr + 17) + 4, { size: 11, align: 'center', color: PAL[i] });
+            });
+            var qa = shownAngle * Math.PI / 180;
+            ctx.save(); if (!still) { ctx.shadowColor = C.ink; ctx.shadowBlur = 12; }
+            ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(qa) * cr * 0.9, cy - Math.sin(qa) * cr * 0.9); ctx.stroke(); ctx.restore();
+            text(ctx, '白色：“' + W[qi] + '”的 Q（它在找什么）', cx, cy + cr + 34, { size: 11.5, align: 'center', color: C.ink });
+            text(ctx, '彩色：每个位置的 K（它有什么）', cx, cy + cr + 50, { size: 10.5, align: 'center', color: C.dim });
+            // right: scores, weights, and the mixture of V's
+            var tw = w - tx - 16, lab = 52, barX = tx + lab + 58, barW = tw - lab - 58 - 46;
+            text(ctx, 'Q·K', tx + lab + 30, ty, { size: 11, mono: true, align: 'right', color: C.dim });
+            text(ctx, 'softmax 之后的权重', barX, ty, { size: 11, color: C.dim });
+            W.forEach(function (wd, i) {
+                var y = ty + 12 + i * rowH, wt = shownW[i];
+                text(ctx, wd, tx + lab - 8, y + 15, { size: 12, align: 'right', color: PAL[i] });
+                text(ctx, R.scores[i].toFixed(1), tx + lab + 30, y + 15, { size: 11, mono: true, align: 'right', color: C.soft });
+                round(ctx, barX, y + 6, barW, 12, 4); ctx.fillStyle = C.faint; ctx.fill();
+                round(ctx, barX, y + 6, Math.max(2, barW * wt), 12, 4); ctx.fillStyle = PAL[i]; ctx.fill();
+                text(ctx, fmt(wt * 100) + '%', barX + barW + 6, y + 16, { size: 11, mono: true, color: C.ink });
+            });
+            text(ctx, '输出：按这组权重，把每个位置的 V 混在一起', tx, oy, { size: 11.5, color: C.soft });
+            var ox = tx;
+            W.forEach(function (wd, i) { var sw = tw * shownW[i]; if (sw < 0.5) return; ctx.fillStyle = PAL[i]; ctx.fillRect(ox, oy + 8, sw, 16); ox += sw; });
+            var best = R.w.indexOf(Math.max.apply(null, R.w));
+            p.set('top', '“' + W[best] + '”', 'data');
+            p.set('wt', fmt(R.w[best] * 100) + '%');
+            p.set('sum', R.w.reduce(function (a, b) { return a + b; }, 0).toFixed(2));
+            p.set('nn', W.length + ' × ' + W.length + ' = ' + W.length * W.length + ' 个');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 2.1 · A tensor = a storage + how to read it ───────────────────────────────────────
+     * Lesson: x = arange(6).reshape(2, 3): shape (2, 3), stride (3, 1), offset 0, x[1, 2] at
+     * 0 + 3 + 2 = 5. x[1]: (3,), (1,), offset 3. x.t(): (3, 2), (1, 3), the storage untouched,
+     * [2, 1] at 2 × 1 + 1 × 3 = 5; read in order it goes 0 3 1 4 2 5, so it is not contiguous:
+     * view refuses, reshape quietly copies. .contiguous() copies into a storage that reads straight. */
+    registry['tensor-views'] = function (figure) {
+        var p = new Panel(figure, { title: '张量 = 一块存储 + 一张“怎么读它”的说明', note: '亮点按逻辑顺序（最后一维变得最快）走一遍：看它在存储里是挨着走，还是跳着走', ratio: 0.5, minHeight: 280 });
+        var OPS = {
+            x: { name: 'x', shape: [2, 3], stride: [3, 1], off: 0 },
+            row: { name: 'x[1]', shape: [3], stride: [1], off: 3 },
+            t: { name: 'x.t()', shape: [3, 2], stride: [1, 3], off: 0 },
+            tc: { name: 'x.t().contiguous()', shape: [3, 2], stride: [2, 1], off: 0, copy: true }
+        };
+        var clock = 0, STORE = [0, 1, 2, 3, 4, 5], COPY = [0, 3, 1, 4, 2, 5];
+        p.toggle('op', [['x', 'x'], ['row', 'x[1] 切片'], ['t', 'x.t() 转置'], ['tc', '.contiguous() 拷贝']], 't', function () { clock = 0; });
+        p.readout('shape', '形状', 'ink');
+        p.readout('stride', '步长', 'data');
+        p.readout('off', '偏移', 'ink');
+        p.readout('cont', '连续吗', 'peers');
+        function elements(o) {
+            var out = [], s = o.shape;
+            if (s.length === 1) for (var i = 0; i < s[0]; i++) out.push({ idx: [i], pos: o.off + i * o.stride[0] });
+            else for (i = 0; i < s[0]; i++) for (var j = 0; j < s[1]; j++) out.push({ idx: [i, j], pos: o.off + i * o.stride[0] + j * o.stride[1] });
+            return out;
+        }
+        function tick(dt) { clock += dt; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 640, pad = 16, o = OPS[p.values.op], E = elements(o), store = o.copy ? COPY : STORE;
+            var cw = Math.min(56, (w - pad * 2) / 6 - 6), sx = (w - 6 * (cw + 6) + 6) / 2, sy = 40, gw = Math.min(54, cw), gh = Math.round(gw * 0.72), gy = sy + 100;
+            var ix = narrow ? pad : w / 2 + 24, iy = narrow ? gy + 3 * (gh + 6) + 24 : gy + 4;
+            p.fit(narrow ? iy + 84 : gy + 3 * (gh + 6) + 22);
+            var ctx = p.ctx;
+            p.clear();
+            var cur = still ? E.length - 1 : Math.floor(clock / 0.8) % (E.length + 2), now = cur >= 0 && cur < E.length ? E[cur] : null;
+            text(ctx, o.copy ? '新拷贝出的一块存储（原来那块还在，没变）' : '存储：一维，一个挨一个；格子下面的小字是位置', sx, 24, { size: 12, weight: 600, color: o.copy ? C.data : C.ink });
+            for (var k = 0; k < 6; k++) {
+                var hit = now && now.pos === k, used = E.some(function (e) { return e.pos === k; }), cxk = sx + k * (cw + 6);
+                ctx.save(); if (hit && !still) { ctx.shadowColor = C.data; ctx.shadowBlur = 14; }
+                round(ctx, cxk, sy, cw, 40, 7); ctx.fillStyle = hit ? C.data : used ? alpha(C.data, 0.22) : alpha(C.faint, 0.5); ctx.fill(); ctx.restore();
+                text(ctx, String(store[k]), cxk + cw / 2, sy + 26, { size: 15, mono: true, weight: 600, align: 'center', color: hit ? C.panel : used ? C.ink : C.dim });
+                text(ctx, String(k), cxk + cw / 2, sy + 56, { size: 10, mono: true, align: 'center', color: C.dim });
+            }
+            // the tensor as it reads
+            var gx = narrow ? pad + 4 : Math.max(pad + 4, w / 2 - 24 - 3 * (gw + 6));
+            text(ctx, o.name + ' 读出来的样子', gx, gy - 12, { size: 12, weight: 600, color: C.compute });
+            E.forEach(function (e) {
+                var r = e.idx.length === 1 ? 0 : e.idx[0], c = e.idx.length === 1 ? e.idx[0] : e.idx[1], x = gx + c * (gw + 6), y = gy + r * (gh + 6), on = now === e;
+                round(ctx, x, y, gw, gh, 7); ctx.fillStyle = on ? C.compute : alpha(C.compute, 0.18); ctx.fill();
+                text(ctx, String(store[e.pos]), x + gw / 2, y + gh / 2 + 5, { size: 14, mono: true, weight: 600, align: 'center', color: on ? C.panel : C.ink });
+                if (on && !still) {                           // the storage cell this element reads
+                    ctx.strokeStyle = alpha(C.data, 0.7); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x + gw / 2, y); ctx.lineTo(sx + e.pos * (cw + 6) + cw / 2, sy + 40); ctx.stroke();
+                }
+            });
+            // the reading order, and whether it walks the storage straight
+            var jumps = E.slice(1).some(function (e, n) { return e.pos !== E[n].pos + 1; });
+            var why = jumps ? 'view 会报错，reshape 会悄悄拷贝一份' : o.copy ? '这是新拷贝的，和 x 不再共用存储' : p.values.op === 'row' ? '和 x 共用存储：改了 x[1]，x 也跟着变' : 'view、reshape 都只改说明，不搬数据';
+            text(ctx, '按顺序读：' + E.map(function (e) { return store[e.pos]; }).join(' '), ix, iy, { size: 12, mono: true, color: C.ink });
+            text(ctx, jumps ? '在存储里来回跳：不连续' : '在存储里从前往后挨着读：连续', ix, iy + 20, { size: 12, color: jumps ? C.alert : C.peers });
+            text(ctx, why, ix, iy + 40, { size: 11.5, color: C.soft });
+            if (now) {
+                var f = o.off + (now.idx.length === 1 ? ' + ' + now.idx[0] + ' × ' + o.stride[0] : ' + ' + now.idx[0] + ' × ' + o.stride[0] + ' + ' + now.idx[1] + ' × ' + o.stride[1]);
+                text(ctx, '[' + now.idx.join(', ') + '] 在位置 ' + f + ' = ' + now.pos, ix, iy + 62, { size: 12, mono: true, color: C.data });
+            } else text(ctx, '位置 = 偏移 + 每一维的下标 × 步长', ix, iy + 62, { size: 12, color: C.dim });
+            p.set('shape', '(' + o.shape.join(', ') + (o.shape.length === 1 ? ',' : '') + ')');
+            p.set('stride', '(' + o.stride.join(', ') + (o.stride.length === 1 ? ',' : '') + ')');
+            p.set('off', String(o.off));
+            p.set('cont', jumps ? '不连续' : '连续', jumps ? 'alert' : 'peers');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 3.1 · Python only places orders; the GPU works asynchronously ─────────────────────
+     * Lesson: `y = x @ w` puts a task on the GPU's queue and returns at once; the CPU waits only when
+     * it needs a number (print, .item(), .cpu()). So timing without synchronize measures the order,
+     * not the work. And with many tiny tasks the CPU cannot hand them out as fast as the GPU does
+     * them: the GPU waits. Durations are illustrative: a launch takes 5 µs here. */
+    registry['async-queue'] = function (figure) {
+        var p = new Panel(figure, { title: 'Python 只是在下单，GPU 在后面异步地做', note: '时间是示意值：发一个任务 5 微秒，一步里别的 Python 代码 40 微秒', ratio: 0.4, minHeight: 214 });
+        var LAUNCH = 5, PY = 40, plan = null, now = 0;
+        function reset() { plan = null; now = 0; }
+        p.toggle('mode', [['run', '一步接一步地训练'], ['item', '每步都 loss.item()'], ['time', '给一次运算计时']], 'run', reset);
+        p.toggle('size', [['big', '大任务：大矩阵乘法'], ['small', '小任务：一串小加法']], 'big', reset);
+        p.readout('real', '真正用了多久', 'compute');
+        p.readout('meas', '不同步时，time.time() 量到的', 'ink');
+        p.readout('gpu', 'GPU 在干活的时间占比', 'compute');
+        function build() {
+            var big = p.values.size === 'big', mode = p.values.mode, cpu = [], gpu = [], launchEnd = [], starts = [];
+            if (mode === 'time') {                         // t0 = time.time(); y = x @ w; print(time.time() - t0)
+                var dur = big ? 300 : 2;
+                cpu.push(['py', 0, 10], ['launch', 10, 10 + LAUNCH], ['py', 10 + LAUNCH, 30]);
+                gpu.push(['run', 10 + LAUNCH, 10 + LAUNCH + dur]); launchEnd.push(10 + LAUNCH); starts.push(10 + LAUNCH);
+                return { cpu: cpu, gpu: gpu, launchEnd: launchEnd, starts: starts, t0: 10, t1: 10 + LAUNCH, done: 10 + LAUNCH + dur, real: LAUNCH + dur, meas: LAUNCH, busy: dur / (LAUNCH + dur), win: big ? 400 : 40 };
+            }
+            var n = big ? 6 : 30, d = big ? 30 : 2, c = 0, g = 0, cS = [], gE = [];
+            for (var s = 0; s < 300; s++) {
+                cS.push(c);
+                for (var i = 0; i < n; i++) {
+                    cpu.push(['launch', c, c + LAUNCH]); c += LAUNCH; launchEnd.push(c);
+                    var st = Math.max(g, c); gpu.push(['run', st, st + d]); starts.push(st); g = st + d;
+                }
+                gE.push(g);
+                if (mode === 'item' && g > c) { cpu.push(['sync', c, g]); c = g; }
+                cpu.push(['py', c, c + PY]); c += PY;
+            }
+            var a = 100, b = 200, real = (gE[b] - gE[a]) / (b - a), meas = (cS[b] - cS[a]) / (b - a);
+            return { cpu: cpu, gpu: gpu, launchEnd: launchEnd, starts: starts, real: real, meas: meas, busy: n * d / real, end: Math.min(c, g), win: big ? 600 : 240 };
+        }
+        function count(arr, t) { var lo = 0, hi = arr.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (arr[mid] <= t) lo = mid + 1; else hi = mid; } return lo; }
+        function tick(dt) { if (!plan || plan.t0 != null) return; now += dt * plan.win / 3; if (now > plan.end - plan.win * 2) now = 0; }
+        p.draw = function () {
+            if (!plan) plan = build();
+            var narrow = p.w < 560;
+            p.fit(narrow ? 226 : 214);
+            var ctx = p.ctx, w = p.w, timing = plan.t0 != null, WIN = plan.win, t0 = timing ? 0 : still ? 20 * WIN : now, t1 = t0 + WIN;
+            p.clear();
+            var L = narrow ? 44 : 60, R = w - 14, X = function (t) { return L + (t - t0) / WIN * (R - L); }, cy = 74, gy = 136, lh = 28;
+            [['CPU', cy], ['GPU', gy]].forEach(function (ln) { text(ctx, ln[0], L - 10, ln[1] + 19, { size: 12.5, weight: 600, align: 'right', color: C.ink }); ctx.fillStyle = alpha(C.faint, 0.35); ctx.fillRect(L, ln[1], R - L, lh); });
+            ctx.save(); ctx.beginPath(); ctx.rect(L, 0, R - L, p.h); ctx.clip();
+            function bar(seg, y, col) { var a = Math.max(seg[1], t0), b = Math.min(seg[2], t1); if (b <= a) return; var xa = X(a), xb = X(b); ctx.fillStyle = col; ctx.fillRect(xa, y, Math.max(1, xb - xa - (xb - xa > 3 ? 0.8 : 0)), lh); }
+            var COL = { launch: C.launch, py: alpha(C.soft, 0.45), sync: alpha(C.alert, 0.6), run: C.compute };
+            for (var k = count(plan.launchEnd, t0 - 1e-9), kEnd = count(plan.launchEnd, t1); k < kEnd; k++) {   // each order, and the moment its work begins
+                if (plan.starts[k] > t1) continue;
+                ctx.strokeStyle = alpha(C.launch, 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(plan.launchEnd[k]), cy + lh); ctx.lineTo(X(plan.starts[k]), gy); ctx.stroke();
+            }
+            plan.cpu.forEach(function (s) { if (s[2] >= t0 && s[1] <= t1) bar(s, cy, COL[s[0]]); });
+            plan.gpu.forEach(function (s) { if (s[2] >= t0 && s[1] <= t1) bar(s, gy, COL.run); });
+            ctx.restore();
+            var lineA;
+            if (timing) {                                    // the two measurements of the same operation
+                var xa = X(plan.t0), xb = X(plan.t1), xd = X(plan.done), long = plan.real >= 100;
+                ctx.strokeStyle = C.alert; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xa, 40); ctx.lineTo(xb, 40); ctx.moveTo(xa, 35); ctx.lineTo(xa, 45); ctx.moveTo(xb, 35); ctx.lineTo(xb, 45); ctx.stroke();
+                text(ctx, '不同步：量到 ' + plan.meas + ' 微秒', xb + 8, 44, { size: 11.5, color: C.alert });
+                ctx.strokeStyle = C.peers; ctx.beginPath(); ctx.moveTo(xa, 62); ctx.lineTo(xd, 62); ctx.moveTo(xa, 57); ctx.lineTo(xa, 67); ctx.moveTo(xd, 57); ctx.lineTo(xd, 67); ctx.stroke();
+                var lb = '前后都 synchronize：' + plan.real + ' 微秒';
+                if (long) text(ctx, lb, narrow ? xa + 8 : (xa + xd) / 2, 57, { size: 11.5, align: narrow ? 'left' : 'center', color: C.peers });
+                else text(ctx, lb, xd + 8, 66, { size: 11.5, color: C.peers });
+                lineA = 'y = x @ w 立刻返回，GPU 这时才刚开始算';
+            } else {
+                var queued = count(plan.launchEnd, t1) - count(plan.starts, t1);
+                lineA = p.values.mode === 'item' ? '每步 .item()：CPU 停下来等，GPU 每步之间空一段'
+                    : p.values.size === 'small' ? '任务太小：GPU 做得比 CPU 发得快，常在等下一个'
+                    : 'CPU 跑在前面下单；GPU 一直有活干';
+                if (p.values.mode === 'run' && p.values.size === 'big') text(ctx, '此刻队列里排着 ' + queued + ' 个任务', narrow ? 14 : L, 50, { size: 11.5, color: C.dim });
+            }
+            paragraph(ctx, lineA, narrow ? 14 : L, 22, R - (narrow ? 14 : L), { size: 12, color: C.soft, max: 1 });
+            // a scale bar and the legend
+            var unit = WIN >= 400 ? 100 : WIN >= 200 ? 50 : 10, sy = gy + lh + 20, ux = R - (R - L) * unit / WIN;
+            ctx.strokeStyle = C.dim; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(ux, sy); ctx.lineTo(R, sy); ctx.moveTo(ux, sy - 4); ctx.lineTo(ux, sy + 4); ctx.moveTo(R, sy - 4); ctx.lineTo(R, sy + 4); ctx.stroke();
+            text(ctx, unit + ' 微秒', ux - 6, sy + 4, { size: 10.5, mono: true, align: 'right', color: C.dim });
+            var lx = narrow ? 14 : L, ly = p.h - 12;
+            [[C.launch, '发任务'], [alpha(C.soft, 0.45), '别的 Python'], [alpha(C.alert, 0.6), '等 GPU'], [C.compute, 'GPU 在算']].forEach(function (it) {
+                ctx.font = '500 11px ' + SANS;
+                ctx.fillStyle = it[0]; round(ctx, lx, ly - 9, 10, 10, 2.5); ctx.fill(); text(ctx, it[1], lx + 15, ly, { size: 11, color: C.soft });
+                lx += ctx.measureText(it[1]).width + (narrow ? 24 : 34);
+            });
+            p.set('real', fmt(plan.real) + ' 微秒' + (timing ? '' : ' / 步'));
+            p.set('meas', fmt(plan.meas) + ' 微秒' + (timing ? '' : ' / 步'), plan.meas < plan.real * 0.9 ? 'alert' : 'peers');
+            p.set('gpu', fmt(plan.busy * 100) + '%', plan.busy < 0.6 ? 'alert' : 'compute');
+        };
+        p.loop(tick);
+    };
+
+    // The most lines any of a demo's sentences takes at this width: the panel is sized for the
+    // longest, so it keeps one height whichever sentence is showing.
+    function most(ctx, texts, maxW) {
+        ctx.font = '500 12px ' + SANS;
+        var n = 1; for (var k in texts) n = Math.max(n, wrapLines(ctx, texts[k], maxW).length);
+        return n;
+    }
+
+    /* ── 3.5 · A reduction as a tournament ─────────────────────────────────────────────────
+     * Lesson: one after another, n numbers take n − 1 dependent steps. Re-bracketed as a tree,
+     * each round's additions are independent: 8 numbers take 4, 2 and 1 additions in 3 rounds;
+     * n numbers take log₂ n rounds (a million: 20); the count of additions is still n − 1. It needs
+     * associativity: +, ×, max and min have it; − and ÷ do not. Both sides start together here. */
+    registry['reduction-tree'] = function (figure) {
+        var p = new Panel(figure, { title: '归约：同样 n − 1 次运算，排成一棵树只要 log₂n 轮', note: '两边同时开始；每过一格，是做一次运算的时间', ratio: 0.5, minHeight: 280 });
+        var BASE = [3, 1, 4, 1, 5, 9, 2, 6], clock = 0;
+        p.toggle('n', [[4, '4 个数'], [8, '8 个数'], [16, '16 个数'], [32, '32 个数']], 8, function () { clock = 0; });
+        p.toggle('op', [['+', '求和'], ['max', '求最大值'], ['-', '换成减法']], '+', function () { clock = 0; });
+        p.readout('serial', '一个接一个：要几步', 'launch');
+        p.readout('tree', '排成树：要几轮', 'peers');
+        p.readout('adds', '运算一共几次（两边一样）', 'ink');
+        p.readout('result', '两边的结果', 'peers');
+        function f(a, b) { var op = p.values.op; return op === '+' ? a + b : op === '-' ? a - b : Math.max(a, b); }
+        function sym() { return p.values.op === 'max' ? 'max' : p.values.op === '-' ? '−' : '+'; }
+        function tick(dt) { clock += dt / 0.6; }
+        function num(v) { return v < 0 ? '−' + (-v) : String(v); }
+        p.draw = function () {
+            var w = p.w, narrow = w < 640, n = p.values.n, R = Math.round(Math.log2(n)), vals = [], i;
+            for (i = 0; i < n; i++) vals.push(BASE[i % 8]);
+            var ser = [vals[0]];                             // ser[j]: the running result after j operations
+            for (i = 1; i < n; i++) ser.push(f(ser[i - 1], vals[i]));
+            var lev = [vals];
+            while (lev[lev.length - 1].length > 1) { var prev = lev[lev.length - 1], nx = []; for (i = 0; i < prev.length; i += 2) nx.push(f(prev[i], prev[i + 1])); lev.push(nx); }
+            var pad = 16, ph = narrow ? 176 : 206, gapX = 28, pw = narrow ? w - pad * 2 : (w - pad * 2 - gapX) / 2;
+            var FOOT = { '-': '减法不满足结合律：(a − b) − c 不等于 a − (b − c)，换一种加括号的方式，结果就变了。',
+                max: '最大值也满足结合律，同样能排成树；乘法、最小值也一样。', '+': '100 万个数：一个接一个约 100 万步，排成树只要 20 轮。' }, foot = FOOT[p.values.op];
+            var top2 = narrow ? 38 + ph + 44 : 38, footY = (narrow ? top2 + ph : 38 + ph) + 30;
+            p.fit(footY + 18 * (most(p.ctx, FOOT, w - pad * 2) - 1) + 16);
+            var ctx = p.ctx, t = still ? n : clock % (n - 1 + 4);
+            p.clear();
+            var r = n <= 8 ? 13 : n <= 16 ? 9 : 4.5, showV = n <= 16;
+            function node(x, y, v, done, live, tone, rr) {
+                rr = rr || r;
+                ctx.save(); if (live && !still) { ctx.shadowColor = tone; ctx.shadowBlur = 12; }
+                ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2);
+                ctx.fillStyle = done ? tone : C.well; ctx.fill(); ctx.restore();
+                ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.strokeStyle = done ? tone : alpha(tone, 0.4); ctx.lineWidth = 1.2; ctx.stroke();
+                if (showV && rr >= 9) text(ctx, done ? num(v) : sym() === 'max' ? '' : sym(), x, y + (rr > 10 ? 4.5 : 3.5), { size: rr > 10 ? 11.5 : 9, mono: true, weight: 600, align: 'center', color: done ? C.panel : C.dim });
+            }
+            function edge(x0, y0, x1, y1, state, tone, u) {      // state: 0 waiting, 1 under way, 2 done
+                ctx.strokeStyle = state === 2 ? alpha(tone, 0.8) : state === 1 ? tone : C.faint; ctx.lineWidth = state ? 1.6 : 1;
+                ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+                if (state === 1 && !still) { ctx.beginPath(); ctx.arc(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 3, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill(); }
+            }
+            function leaves(px, py) {
+                var xs = [], ly = py + ph - r - 4;
+                for (var k = 0; k < n; k++) xs.push(px + (k + 0.5) * pw / n);
+                return { xs: xs, y: ly };
+            }
+            function header(px, py, title, status, tone) {
+                text(ctx, title, px, py - 10, { size: 12, weight: 600, color: tone });
+                text(ctx, status, px + pw, py - 10, { size: 11, mono: false, align: 'right', color: C.dim });
+            }
+            // the tree
+            var tp = narrow ? { x: pad, y: 38 } : { x: pad + pw + gapX, y: 38 }, Lf = leaves(tp.x, tp.y), dy = (ph - 2 * r - 30) / R, pos = [Lf.xs];
+            var roundsDone = Math.min(R, Math.floor(t));
+            header(tp.x, tp.y, '排成树：' + R + ' 轮，每轮内部同时做', t >= R ? '完成，用了 ' + R + ' 轮' : '第 ' + (roundsDone + 1) + ' 轮', C.peers);
+            for (var l = 1; l <= R; l++) {
+                var xs = [], ly = Lf.y - l * dy, py = Lf.y - (l - 1) * dy, state = t >= l ? 2 : t > l - 1 ? 1 : 0, u = t - (l - 1);
+                for (i = 0; i < pos[l - 1].length; i += 2) {
+                    var x = (pos[l - 1][i] + pos[l - 1][i + 1]) / 2; xs.push(x);
+                    edge(pos[l - 1][i], py, x, ly, state, C.peers, u); edge(pos[l - 1][i + 1], py, x, ly, state, C.peers, u);
+                }
+                pos.push(xs);
+            }
+            for (l = 0; l <= R; l++) pos[l].forEach(function (x, k) { node(x, Lf.y - l * dy, lev[l][k], l === 0 || t >= l, l > 0 && t > l - 1 && t < l, l === 0 ? C.soft : C.peers); });
+            if (!showV && t >= R) text(ctx, '= ' + num(lev[R][0]), pos[R][0] + 10, Lf.y - R * dy + 4, { size: 12, mono: true, weight: 600, color: C.peers });
+            // one after another
+            var sp = narrow ? { x: pad, y: top2 } : { x: pad, y: 38 }, Ls = leaves(sp.x, sp.y), dyc = (ph - 2 * r - 30) / (n - 1), stepsDone = Math.min(n - 1, Math.floor(t));
+            header(sp.x, sp.y, '一个接一个：' + (n - 1) + ' 步，每步等上一步', t >= n - 1 ? '完成，用了 ' + (n - 1) + ' 步' : '第 ' + (stepsDone + 1) + ' 步', C.launch);
+            var rc = Math.min(r, Math.max(3, dyc / 2 - 0.5));
+            for (var j = 1; j < n; j++) {
+                var nxp = Ls.xs[j], nyp = Ls.y - j * dyc, st = t >= j ? 2 : t > j - 1 ? 1 : 0, uu = t - (j - 1);
+                var fx = j === 1 ? Ls.xs[0] : Ls.xs[j - 1], fy = j === 1 ? Ls.y : Ls.y - (j - 1) * dyc;
+                edge(fx, fy, nxp, nyp, st, C.launch, uu); edge(Ls.xs[j], Ls.y, nxp, nyp, st, C.launch, uu);
+            }
+            Ls.xs.forEach(function (x, k) { node(x, Ls.y, vals[k], true, false, C.soft); });
+            for (j = 1; j < n; j++) node(Ls.xs[j], Ls.y - j * dyc, ser[j], t >= j, t > j - 1 && t < j, C.launch, rc);
+            if ((!showV || rc < 9) && t >= n - 1) text(ctx, '= ' + num(ser[n - 1]), Ls.xs[n - 1] - rc - 6, Ls.y - (n - 1) * dyc + 4, { size: 12, mono: true, weight: 600, align: 'right', color: C.launch });
+            paragraph(ctx, foot, pad, footY, w - pad * 2, { size: 12, color: p.values.op === '-' ? C.alert : C.soft, lh: 18 });
+            var same = ser[n - 1] === lev[R][0];
+            p.set('serial', (n - 1) + ' 步');
+            p.set('tree', R + ' 轮');
+            p.set('adds', (n - 1) + ' 次');
+            p.set('result', same ? '都是 ' + num(ser[n - 1]) : num(ser[n - 1]) + ' 和 ' + num(lev[R][0]) + '：对不上', same ? 'peers' : 'alert');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 4.4 · Online softmax: read the scores block by block ──────────────────────────────
+     * Lesson: keep only the running maximum m and the running sum l = Σ exp(s − m). When a block
+     * raises the maximum, the sum so far was taken against the old base; multiplying it by
+     * exp(m_old − m_new) moves it to the new base without looking at those scores again. The
+     * weighted sum of the values is rescaled by the same factor and divided by l at the end. The
+     * result equals the softmax done in one go; drop the rescaling and it does not. */
+    registry['online-softmax'] = function (figure) {
+        var p = new Panel(figure, { title: '在线 softmax：一块一块地读，最大值变了就换基准', note: '一行 12 个分数 s 和它们的值 v 是随手取的', ratio: 0.5, minHeight: 300 });
+        var S = [1.0, 2.2, 0.5, 1.6, 3.1, 0.2, 2.7, 1.1, 4.0, 0.8, 2.0, 3.5];
+        var V = [0.5, -1.0, 2.0, 0.3, 1.2, -0.4, 0.8, 1.5, -0.6, 1.0, 0.2, -1.1];
+        var clock = 0;
+        function reset() { clock = 0; }
+        p.toggle('b', [[1, '每块 1 个'], [3, '每块 3 个'], [4, '每块 4 个'], [6, '每块 6 个'], [12, '一次读完']], 4, reset);
+        p.toggle('fix', [[true, '换基准：乘上 exp(m旧 − m新)'], [false, '去掉换基准']], true, reset);
+        p.readout('m', '当前最大值 m', 'data');
+        p.readout('l', '当前指数和 l', 'compute');
+        p.readout('out', '在线算出的 O ÷ l', 'peers');
+        p.readout('ref', '一次算完的结果', 'ink');
+        var mx = Math.max.apply(null, S), ex = S.map(function (s) { return Math.exp(s - mx); }), den = ex.reduce(function (a, b) { return a + b; }, 0);
+        var REF = ex.reduce(function (a, e, j) { return a + e / den * V[j]; }, 0);
+        function states() {                                // the state after each block, and the base each score was last put on
+            var b = p.values.b, fix = p.values.fix, m = -Infinity, l = 0, o = 0, out = [];
+            for (var k = 0; k * b < S.length; k++) {
+                var blk = S.slice(k * b, k * b + b), mn = Math.max(m, Math.max.apply(null, blk)), scale = fix && isFinite(m) ? Math.exp(m - mn) : 1;
+                l *= scale; o *= scale;
+                blk.forEach(function (s, q) { var e = Math.exp(s - mn); l += e; o += e * V[k * b + q]; });
+                out.push({ from: k * b, to: k * b + blk.length, mOld: m, m: mn, scale: scale, l: l, o: o, raised: isFinite(m) && mn > m });
+                m = mn;
+            }
+            return out;
+        }
+        var LONGEST = ['读完了：O ÷ l = −0.1644；一次算完是 −0.1644。对不上：前后几块的指数是按不同的基准加起来的。',
+            '最大值从 2.2 变成 3.1：已经加好的 l 和 O 统一乘 exp(2.2 − 3.1) = 0.41，不用回头看前面的分数。'];
+        function tick(dt) { clock += dt; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 600, pad = 16, ST = states(), nb = ST.length, fix = p.values.fix;
+            var per = Math.max(0.9, Math.min(2.1, 7 / nb)), total = nb * per + 3, t = still ? total : clock % total;
+            var k = Math.min(nb - 1, Math.floor(t / per)), ph = still || t >= nb * per ? 1 : (t - k * per) / per, finished = still || t >= nb * per;
+            var cur = ST[k], prevM = k > 0 ? ST[k - 1].m : -Infinity;
+            var rescaleU = finished ? 1 : Math.max(0, Math.min(1, (ph - 0.3) / 0.35)), growU = finished ? 1 : Math.max(0, Math.min(1, (ph - 0.65) / 0.3));
+            var cw = (w - pad * 2) / S.length, bw = Math.min(26, cw * 0.62), y1 = 120, sH = 21, y2 = 236, eH = 68;
+            p.fit(y2 + 42 + 18 * (most(p.ctx, LONGEST, w - pad * 2) - 1) + 14);
+            var ctx = p.ctx;
+            p.clear();
+            function cx(j) { return pad + (j + 0.5) * cw; }
+            text(ctx, '分数 s：竖线把一行分成块，亮的是正在读的块', pad, 20, { size: 11.5, color: C.dim });
+            for (var q = 1; q < nb; q++) { var bx = pad + ST[q].from * cw; ctx.setLineDash([3, 4]); ctx.strokeStyle = alpha(C.soft, 0.5); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, 30); ctx.lineTo(bx, y2 + 4); ctx.stroke(); ctx.setLineDash([]); }
+            if (!finished) { ctx.fillStyle = alpha(C.data, 0.08); ctx.fillRect(pad + cur.from * cw, 28, (cur.to - cur.from) * cw, y2 - 24); }
+            S.forEach(function (s, j) {
+                var inBlk = j >= cur.from && j < cur.to && !finished, seen = j < cur.to || finished;
+                ctx.fillStyle = inBlk ? C.data : seen ? alpha(C.data, 0.55) : alpha(C.data, 0.18);
+                round(ctx, cx(j) - bw / 2, y1 - s * sH, bw, s * sH, 3); ctx.fill();
+                text(ctx, s.toFixed(1), cx(j), y1 + 14, { size: 10, mono: true, align: 'center', color: seen ? C.soft : C.dim });
+            });
+            // the running maximum: the base everything is measured against
+            var mNow = finished ? ST[nb - 1].m : (rescaleU > 0 || !isFinite(prevM)) ? cur.m : prevM, upto = finished ? S.length : cur.to;
+            if (isFinite(mNow)) {
+                var my = y1 - mNow * sH;
+                ctx.strokeStyle = C.ink; ctx.lineWidth = 1.4; ctx.setLineDash([5, 3]); ctx.beginPath(); ctx.moveTo(pad, my); ctx.lineTo(pad + upto * cw, my); ctx.stroke(); ctx.setLineDash([]);
+                text(ctx, 'm = ' + mNow.toFixed(1), pad + 2, my - 5, { size: 11, mono: true, color: C.ink });
+            }
+            // exp(s − m) under the base each part was put on
+            text(ctx, fix ? 'exp(s − m)：都按当前的 m 算，加起来就是 l' : 'exp(s − m)：前面的还是按旧的 m 算的', pad, y1 + 42, { size: 11.5, color: fix ? C.dim : C.alert });
+            var lShown = 0;
+            S.forEach(function (s, j) {
+                var blk = -1; for (var b = 0; b < nb; b++) if (j >= ST[b].from && j < ST[b].to) blk = b;
+                if (!finished && blk > k) return;
+                var hgt;
+                if (finished || blk < k) {
+                    var base = fix ? (finished ? ST[nb - 1].m : (blk < k ? (rescaleU >= 1 ? cur.m : prevM) : cur.m)) : ST[blk].m;
+                    hgt = Math.exp(s - base);
+                    if (fix && !finished && blk < k && rescaleU > 0 && rescaleU < 1) hgt = Math.exp(s - prevM) * (1 + (cur.scale - 1) * rescaleU);
+                } else hgt = Math.exp(s - cur.m) * growU;
+                lShown += hgt;
+                ctx.fillStyle = blk === k && !finished ? C.compute : alpha(C.compute, 0.7);
+                round(ctx, cx(j) - bw / 2, y2 - hgt * eH, bw, Math.max(0.5, hgt * eH), 3); ctx.fill();
+            });
+            ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, y2 + 0.5); ctx.lineTo(w - pad, y2 + 0.5); ctx.stroke();
+            V.forEach(function (v, j) { text(ctx, (v < 0 ? '−' : '') + Math.abs(v).toFixed(1), cx(j), y2 + 14, { size: 9.5, mono: true, align: 'center', color: C.dim }); });
+            text(ctx, 'v', pad - 4, y2 + 14, { size: 9.5, mono: true, align: 'right', color: C.dim });
+            // what just happened
+            var said, S2 = finished ? ST[nb - 1] : cur;
+            if (finished) said = '读完了：O ÷ l = ' + (S2.o / S2.l).toFixed(4) + '；一次算完是 ' + REF.toFixed(4) + (Math.abs(S2.o / S2.l - REF) < 1e-9 ? '。一模一样。' : '。对不上：前后几块的指数是按不同的基准加起来的。');
+            else if (cur.raised && fix) said = '最大值从 ' + cur.mOld.toFixed(1) + ' 变成 ' + cur.m.toFixed(1) + '：已经加好的 l 和 O 统一乘 exp(' + cur.mOld.toFixed(1) + ' − ' + cur.m.toFixed(1) + ') = ' + cur.scale.toFixed(2) + '，不用回头看前面的分数。';
+            else if (cur.raised) said = '最大值从 ' + cur.mOld.toFixed(1) + ' 变成 ' + cur.m.toFixed(1) + '，可前面的部分没有换基准，直接加了上去。';
+            else if (k === 0) said = '第一块：记下它的最大值 m 和指数和 l = Σ exp(s − m)。';
+            else said = '这一块没有更大的分数，基准不变，直接加上去。';
+            paragraph(ctx, said, pad, y2 + 42, w - pad * 2, { size: 12, color: finished ? (Math.abs(S2.o / S2.l - REF) < 1e-9 ? C.peers : C.alert) : C.soft, lh: 18, max: 3 });
+            var shownM = finished ? S2.m : mNow;
+            p.set('m', isFinite(shownM) ? shownM.toFixed(2) : '—');
+            p.set('l', (finished || growU >= 1 ? S2.l : lShown).toFixed(3));
+            p.set('out', finished || k === nb - 1 && growU >= 1 ? (S2.o / S2.l).toFixed(4) : '还没读完', Math.abs(S2.o / S2.l - REF) < 1e-9 ? 'peers' : 'alert');
+            p.set('ref', REF.toFixed(4));
+        };
+        p.loop(tick);
+    };
+
+    /* ── 5.3 · Hashing a few big flows onto equal-cost links ───────────────────────────────
+     * Lesson: 16 large flows hashed onto 16 links: one each is almost impossible; some links get two
+     * or three while others sit idle, and since the flows repeat every step, so does the jam. More
+     * QPs per connection make more flows; adaptive routing picks by load. Each flow here is the same
+     * size, so a link that carries k flows takes k times as long; the step waits for the slowest. */
+    registry['ecmp-collision'] = function (figure) {
+        var p = new Panel(figure, { title: '按哈希选路：16 条大流分到 16 条等价链路', note: '每条流一样大；一条链路上挤了 k 条，就要 k 倍的时间才传得完', ratio: 0.5, minHeight: 300 });
+        var seed = 7, clock = 0, stepNo = 1;
+        p.toggle('mode', [['hash', 'ECMP：按哈希'], ['qp', '每条连接拆成 4 个 QP'], ['ar', '按实时负载选路']], 'hash', function () { clock = 0; stepNo = 1; });
+        p.button('换一批端口，重新哈希', function () { seed += 1; clock = 0; stepNo = 1; }, 'ghost');
+        p.readout('max', '最挤的那条链路', 'alert');
+        p.readout('idle', '闲着的链路', 'ink');
+        p.readout('time', '这一步的通信用时', 'alert');
+        function hue(f) { return 'hsl(' + Math.round(f * 360 / 16) + ', 70%, 64%)'; }
+        function assign() {
+            var mode = p.values.mode, r = seeded(seed), lanes = [], i;
+            for (i = 0; i < 16; i++) lanes.push({ load: 0, parts: [] });
+            if (mode === 'ar') { for (i = 0; i < 16; i++) { lanes[i].parts.push({ f: i, size: 1 }); lanes[i].load = 1; } return lanes; }
+            var k = mode === 'qp' ? 4 : 1;
+            for (var f = 0; f < 16; f++) for (var q = 0; q < k; q++) { var l = Math.floor(r() * 16); lanes[l].parts.push({ f: f, size: 1 / k }); lanes[l].load += 1 / k; }
+            lanes.forEach(function (ln) { ln.parts.sort(function (a, b) { return a.f - b.f; }); });
+            return lanes;
+        }
+        var span = 1.4;
+        function tick(dt) { clock += dt / span; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 560, pad = 14, lanes = assign(), maxL = Math.max.apply(null, lanes.map(function (l) { return l.load; }));
+            var idle = lanes.filter(function (l) { return l.load === 0; }).length, top = 50, rh = narrow ? 14 : 15;
+            var mode = p.values.mode, FOOT = { hash: '流太少，随机分不匀；被撞上的链路要承载两三倍的流量，而且每一步都是同一批链路被撞。',
+                qp: 'NCCL_IB_QPS_PER_CONNECTION：一条连接拆到多个 QP 上，端口不同，在网络看来就是更多条流，哈希分得更开。',
+                ar: '自适应路由：按每条路的实时拥挤程度选路，分得最匀；代价是包可能乱序到达，要网卡和协议配合。' }, foot = FOOT[mode];
+            var footY = top + 16 * rh + 54;
+            p.fit(footY + 18 * most(p.ctx, FOOT, w - pad * 2) + 2);
+            var ctx = p.ctx, L = pad + (narrow ? 22 : 52), Rr = w - pad - (narrow ? 58 : 74), scale = Math.max(4.4, maxL + 0.4), U = (Rr - L) / scale;
+            var cycle = maxL + 1.4, t = still ? maxL : clock % cycle;
+            if (!still && clock >= cycle) { stepNo = 1 + Math.floor(clock / cycle); }
+            p.clear();
+            var again = mode === 'ar' ? '同样的 16 条流，还是一条链路一条' : '流还是这 16 条，哈希的结果也还是这样';
+            text(ctx, '第 ' + stepNo + ' 步：' + (stepNo > 1 ? again : '所有卡同时开始发'), pad, 22, { size: 12, color: stepNo > 1 && mode !== 'ar' ? C.alert : C.soft });
+            text(ctx, narrow ? '链路' : '链路', pad, top - 6, { size: 10.5, color: C.dim });
+            for (var x = 0; x <= Math.floor(scale); x++) {        // time, in units of "one flow over one link"
+                var gx = L + x * U;
+                ctx.strokeStyle = x === 1 ? alpha(C.peers, 0.5) : C.grid; ctx.lineWidth = 1; ctx.setLineDash(x === 1 ? [4, 3] : []);
+                ctx.beginPath(); ctx.moveTo(gx, top - 2); ctx.lineTo(gx, top + 16 * rh + 2); ctx.stroke(); ctx.setLineDash([]);
+                text(ctx, x === 0 ? '0' : x + ' 倍', gx, top + 16 * rh + 16, { size: 10, mono: true, align: 'center', color: x === 1 ? C.peers : C.dim });
+            }
+            text(ctx, '理想：每条链路一条流', L + U + 4, top - 6, { size: 10.5, color: C.peers });
+            lanes.forEach(function (ln, i) {
+                var y = top + i * rh, bx = L;
+                text(ctx, String(i + 1), L - 8, y + rh - 4, { size: 10, mono: true, align: 'right', color: ln.load ? C.soft : C.dim });
+                ctx.fillStyle = alpha(C.faint, 0.3); ctx.fillRect(L, y + 1, Rr - L, rh - 3);
+                ln.parts.forEach(function (pt) {                 // each flow's share of the link, in the order it is sent
+                    var wd = pt.size * U, sent = Math.max(0, Math.min(wd, t * U - (bx - L)));
+                    ctx.fillStyle = hue(pt.f); ctx.globalAlpha = 0.28; ctx.fillRect(bx, y + 1, wd - 0.8, rh - 3);
+                    ctx.globalAlpha = 1; if (sent > 0) ctx.fillRect(bx, y + 1, Math.max(0, sent - 0.8), rh - 3);
+                    bx += wd;
+                });
+                var k = ln.load, lab = k === 0 ? '闲着' : mode === 'qp' ? fmt(k, 2) + ' 条' : fmt(k) + ' 条';
+                text(ctx, lab, w - pad, y + rh - 4, { size: 10.5, align: 'right', color: k === 0 ? C.dim : k >= 1.99 ? C.alert : C.peers });
+            });
+            // the clock: everyone waits for the slowest link
+            var cxp = L + Math.min(t, maxL) * U;
+            ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cxp, top - 2); ctx.lineTo(cxp, top + 16 * rh + 2); ctx.stroke();
+            if (t >= maxL) text(ctx, '这一步传完', Math.min(cxp + 4, Rr - 60), top + 16 * rh + 30, { size: 11, color: C.ink });
+            paragraph(ctx, foot, pad, footY, w - pad * 2, { size: 12, color: C.soft, lh: 18 });
+            p.set('max', mode === 'qp' ? fmt(maxL, 2) + ' 条流的量' : fmt(maxL) + ' 条流', maxL >= 1.99 ? 'alert' : 'peers');
+            p.set('idle', idle + ' 条');
+            p.set('time', maxL === 1 ? '1 倍：最理想' : '理想的 ' + fmt(maxL, mode === 'qp' ? 2 : 0) + ' 倍', maxL >= 1.99 ? 'alert' : 'peers');
+        };
+        p.loop(tick);
+    };
+
+    /* ── 6.1 · Five collective operations on four cards ────────────────────────────────────
+     * Lesson: broadcast copies one card's data to all; reduce merges element-wise onto one card;
+     * all-reduce merges and every card gets the result; all-gather joins each card's piece into the
+     * whole on every card; reduce-scatter merges, then each card keeps only its own piece. DDP uses
+     * all-reduce; FSDP all-gather before a layer and reduce-scatter after; tensor parallelism
+     * all-reduce inside every layer. The numbers in the cells are made up to be easy to add. */
+    registry.collectives = function (figure) {
+        var p = new Panel(figure, { title: '四张卡上的五种集合通信', note: '每张卡上的数据分成 4 段；格子的颜色表示它来自哪张卡，几种颜色并排是加起来的', ratio: 0.42, minHeight: 262 });
+        var TONE = [C.compute, C.peers, C.data, C.launch], clock = 0;
+        p.toggle('op', [['broadcast', 'broadcast'], ['reduce', 'reduce'], ['allreduce', 'all-reduce'], ['allgather', 'all-gather'], ['reducescatter', 'reduce-scatter']], 'allreduce', function () { clock = 0; });
+        p.readout('before', '每张卡之前有', 'ink');
+        p.readout('after', '每张卡之后有', 'peers');
+        p.readout('where', '结果在', 'peers');
+        function val(i, j) { return (i + 1) * (j + 1); }
+        function col(j) { return 10 * (j + 1); }
+        var INFO = {
+            broadcast: ['GPU 0 的 4 段', '和 GPU 0 一样的 4 段', '4 张卡都有', '用途：训练开始时，让所有卡拿到同样的初始参数。'],
+            reduce: ['各自的 4 段', '4 张卡按元素的总和', '只在 GPU 0', '把所有卡的数据按元素加起来，结果只放在一张卡上（这里是 GPU 0）；别的卡上没有结果。'],
+            allreduce: ['各自的 4 段', '4 张卡按元素的总和', '4 张卡都有', '用途：数据并行 DDP 每步把各卡的梯度加起来，每张卡都用这个总和更新参数；张量并行每一层内部也用它。'],
+            allgather: ['各自的 1 段', '拼完整的 4 段', '4 张卡都有', '用途：FSDP 里每张卡只存参数的一段，算某一层之前，把这一层的参数拼完整。'],
+            reducescatter: ['各自的 4 段', '总和里属于自己的 1 段', '每张卡一段', '用途：FSDP 反向之后把梯度加起来，每张卡只留下自己负责的那一段参数的梯度。']
+        };
+        function plan(op) {                                // before[i][j], after[i][j] = {v, from: [[i, j]…]} or null
+            var before = [], after = [], i, j;
+            for (i = 0; i < 4; i++) { before.push([]); after.push([]); for (j = 0; j < 4; j++) {
+                var mine = op === 'broadcast' ? i === 0 : op === 'allgather' ? i === j : true;
+                before[i].push(mine ? { v: op === 'allgather' ? val(i, i) : val(i, j), owner: i } : null);
+                var all = [[0, j], [1, j], [2, j], [3, j]], cell = null;
+                if (op === 'broadcast') cell = { v: val(0, j), owner: 0, from: [[0, j]] };
+                else if (op === 'allgather') cell = { v: val(j, j), owner: j, from: [[j, j]] };
+                else if (op === 'allreduce' || (op === 'reduce' && i === 0) || (op === 'reducescatter' && i === j)) cell = { v: col(j), mix: true, from: all };
+                else if (op === 'reduce') cell = { v: val(i, j), owner: i, stale: true, from: [] };
+                after[i].push(cell);
+            } }
+            return { before: before, after: after };
+        }
+        function tick(dt) { clock = (clock + dt) % 5; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 600, pad = 14, gap = narrow ? 8 : 14, op = p.values.op, P = plan(op), info = INFO[op];
+            var cbw = (w - pad * 2 - gap * 3) / 4, cellW = (cbw - 12 - 9) / 4, cellH = 24, by = 32, ay = 158, boxH = 54, footY = ay + boxH + 28;
+            var notes = {}; for (var key in INFO) notes[key] = INFO[key][3];
+            p.fit(footY + 18 * (most(p.ctx, notes, w - pad * 2) - 1) + 14);
+            var ctx = p.ctx, t = still ? 5 : clock, fly = Math.max(0, Math.min(1, (t - 0.9) / 1.4));
+            p.clear();
+            function cellXY(i, j, y) { return [pad + i * (cbw + gap) + 6 + j * (cellW + 3), y + 22]; }
+            function card(i, y, cells, label) {
+                var x = pad + i * (cbw + gap);
+                round(ctx, x, y, cbw, boxH, 9); ctx.fillStyle = C.well; ctx.fill(); ctx.strokeStyle = alpha(TONE[i], 0.55); ctx.lineWidth = 1.2; ctx.stroke();
+                text(ctx, 'GPU ' + i, x + 7, y + 15, { size: 10.5, mono: true, weight: 600, color: TONE[i] });
+                cells.forEach(function (c, j) {
+                    var xy = cellXY(i, j, y), shown = label === 'before' || (c && (fly >= 1 || (fly > 0 && c.from.length === 0)));
+                    round(ctx, xy[0], xy[1], cellW, cellH, 4);
+                    if (!c || !shown) { ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); return; }
+                    if (c.mix) {                               // a sum: one stripe for each card that went into it
+                        ctx.save(); ctx.clip();
+                        for (var s = 0; s < 4; s++) { ctx.fillStyle = TONE[s]; ctx.fillRect(xy[0] + s * cellW / 4, xy[1], cellW / 4 + 0.5, cellH); }
+                        ctx.restore();
+                    } else { ctx.fillStyle = c.stale ? alpha(TONE[c.owner], 0.18) : TONE[c.owner]; ctx.fill(); }
+                    text(ctx, String(c.v), xy[0] + cellW / 2, xy[1] + 16, { size: cellW < 22 ? 10 : 12, mono: true, weight: 600, align: 'center', color: c.stale ? C.dim : C.panel });
+                });
+            }
+            text(ctx, '之前', pad, by - 10, { size: 11.5, weight: 600, color: C.soft });
+            text(ctx, '之后', pad, ay - 10, { size: 11.5, weight: 600, color: C.soft });
+            if (op === 'reduce') text(ctx, '其余卡上没有结果（灰的是它们原来的数据）', w - pad, ay - 10, { size: 10.5, align: 'right', color: C.dim });
+            for (var i = 0; i < 4; i++) { card(i, by, P.before[i], 'before'); card(i, ay, P.after[i], 'after'); }
+            // the pieces in flight
+            if (fly > 0 && fly < 1) {
+                var e = fly < 0.5 ? 2 * fly * fly : 1 - Math.pow(-2 * fly + 2, 2) / 2;
+                for (i = 0; i < 4; i++) P.after[i].forEach(function (c, j) {
+                    if (!c) return;
+                    c.from.forEach(function (src) {
+                        var a = cellXY(src[0], src[1], by), b = cellXY(i, j, ay), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2 + 10;
+                        var x = (1 - e) * (1 - e) * a[0] + 2 * (1 - e) * e * mx + e * e * b[0], y = (1 - e) * (1 - e) * (a[1] + cellH) + 2 * (1 - e) * e * my + e * e * b[1];
+                        ctx.fillStyle = TONE[src[0]]; round(ctx, x + cellW / 2 - 4, y - 4, 8, 8, 2); ctx.fill();
+                    });
+                });
+            }
+            paragraph(ctx, info[3], pad, footY, w - pad * 2, { size: 12, color: C.soft, lh: 18 });
+            p.set('before', info[0]);
+            p.set('after', info[1]);
+            p.set('where', info[2]);
+        };
+        p.loop(tick);
+    };
+
+    /* ── 8.2 · Gang scheduling: all or nothing ─────────────────────────────────────────────
+     * Lesson: two jobs, A and B, each need 8 nodes; 10 are free. Placing one Pod at a time can give
+     * A 5 and B 5: neither can start, all 10 nodes are held and nothing trains, a deadlock. Placing a
+     * job only when all of it fits gives A 8 nodes and it runs; B waits as a whole. */
+    registry['gang-scheduling'] = function (figure) {
+        var p = new Panel(figure, { title: '10 个空闲节点，作业 A 和 B 各要 8 个', note: '一个方块是一个节点；一个作业的每个 Pod 占一个节点，8 个到齐才能开始训练', ratio: 0.42, minHeight: 250 });
+        var clock = 0, CYCLE = 9;
+        p.toggle('mode', [['pod', '默认调度：一个 Pod 一个 Pod 地放'], ['gang', '成组调度：放得下全部才放行']], 'pod', function () { clock = 0; });
+        p.readout('held', '被占着的节点', 'ink');
+        p.readout('train', '正在训练的作业', 'peers');
+        p.readout('idle', '占着却在空等的节点', 'alert');
+        var STATUS = {
+            podGo: '调度器一次只看一个 Pod：哪里有空节点，就先放上去……',
+            pod: '死锁：A、B 各拿到 5 个，都凑不齐 8 个，都在等；10 个节点全被占着，没有任何训练在进行。',
+            gangGo: '先确认放得下整个作业，才一起放行。',
+            gang: 'A 得到 8 个节点开始训练，B 整体等待；剩下 2 个节点空着，别的小作业还能用。'
+        };
+        function plan(mode) {                              // when each Pod lands on which node (−1: never)
+            var moves = [], k;
+            if (mode === 'pod') for (k = 0; k < 16; k++) moves.push({ job: k % 2 ? 'B' : 'A', idx: k >> 1, node: k < 10 ? k : -1, at: 0.4 + k * 0.32 });
+            else {
+                for (k = 0; k < 8; k++) moves.push({ job: 'A', idx: k, node: k, at: 0.7 + k * 0.06 });
+                for (k = 0; k < 8; k++) moves.push({ job: 'B', idx: k, node: -1, at: 0 });
+            }
+            return moves;
+        }
+        function tick(dt) { clock = (clock + dt) % CYCLE; }
+        p.draw = function () {
+            var w = p.w, narrow = w < 640, pad = 14, mode = p.values.mode, M = plan(mode), t = still ? CYCLE - 0.5 : clock;
+            var chip = narrow ? 24 : 28, cg = 4, qy = [34, 62], cols = w >= 880 ? 10 : 5, nodeGap = 8, nw = (w - pad * 2 - nodeGap * (cols - 1)) / cols, nh = 46;
+            var ny = narrow ? 126 : 112, statusY = ny + (10 / cols) * (nh + nodeGap) + 16;
+            p.fit(statusY + 18 * (most(p.ctx, STATUS, w - pad * 2) - 1) + 12);
+            var ctx = p.ctx, TONE = { A: C.compute, B: C.data };
+            p.clear();
+            function slot(job, idx) { return [pad + 62 + idx * (chip + cg), qy[job === 'A' ? 0 : 1] - 13]; }
+            function nodeXY(n) { return [pad + (n % cols) * (nw + nodeGap), ny + Math.floor(n / cols) * (nh + nodeGap)]; }
+            ['A', 'B'].forEach(function (job) {
+                text(ctx, '作业 ' + job, pad, qy[job === 'A' ? 0 : 1] + 1, { size: 12, weight: 600, color: TONE[job] });
+                for (var i = 0; i < 8; i++) { var s = slot(job, i); round(ctx, s[0], s[1], chip, 18, 4); ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); }
+            });
+            text(ctx, '节点', pad, ny - 10, { size: 11.5, weight: 600, color: C.soft });
+            var placed = { A: 0, B: 0 }, node = [];
+            M.forEach(function (m) { if (m.node >= 0 && t >= m.at + 0.3) { placed[m.job]++; node[m.node] = m; } });
+            var running = mode === 'gang' && placed.A === 8, done = mode === 'pod' ? t >= M[9].at + 0.7 : t >= 1.5;
+            for (var n = 0; n < 10; n++) {
+                var xy = nodeXY(n), m = node[n];
+                round(ctx, xy[0], xy[1], nw, nh, 8); ctx.fillStyle = C.well; ctx.fill(); ctx.strokeStyle = m ? alpha(TONE[m.job], 0.7) : C.faint; ctx.lineWidth = 1.2; ctx.stroke();
+                if (!m) { text(ctx, mode === 'gang' && done ? '空着' : '空闲', xy[0] + nw / 2, xy[1] + nh / 2 + 4, { size: 11, align: 'center', color: mode === 'gang' && done ? C.peers : C.dim }); continue; }
+                if (running) {                               // training: A's steps going round
+                    var u = still ? 0.6 : ((t - 1.5) / 1.2) % 1;
+                    ctx.fillStyle = alpha(C.peers, 0.25); ctx.fillRect(xy[0] + 6, xy[1] + nh - 11, nw - 12, 5);
+                    ctx.fillStyle = C.peers; ctx.fillRect(xy[0] + 6, xy[1] + nh - 11, (nw - 12) * Math.max(0, u), 5);
+                }
+                text(ctx, m.job + (m.idx + 1), xy[0] + 8, xy[1] + 18, { size: 12, mono: true, weight: 600, color: TONE[m.job] });
+                var dots = still ? '' : '...'.slice(0, 1 + Math.floor(t * 2) % 3);
+                text(ctx, running ? '训练中' : (nw >= 92 ? '等其余 Pod' : '在等') + dots, xy[0] + 8, xy[1] + 34, { size: 10.5, color: running ? C.peers : C.alert });
+            }
+            // Pods still in the queue, and the ones on their way to a node
+            M.forEach(function (m) {
+                var s = slot(m.job, m.idx), x = s[0], y = s[1];
+                if (m.node >= 0 && t >= m.at) {
+                    if (t >= m.at + 0.3) return;
+                    var e = (t - m.at) / 0.3, d = nodeXY(m.node); e = e * e * (3 - 2 * e);
+                    x += (d[0] + 6 - x) * e; y += (d[1] + 6 - y) * e;
+                }
+                round(ctx, x, y, chip, 18, 4); ctx.fillStyle = TONE[m.job]; ctx.fill();
+                text(ctx, m.job + (m.idx + 1), x + chip / 2, y + 13, { size: 9.5, mono: true, weight: 600, align: 'center', color: C.panel });
+            });
+            var noteA = '', noteB = '';
+            if (mode === 'pod' && done) { noteA = noteB = '剩下的没地方放了'; }
+            if (mode === 'gang') { noteA = t < 1.5 ? '8 个都放得下：一起放行' : ''; noteB = '整体排队：只剩 2 个节点'; }
+            if (narrow) {
+                var q = mode === 'pod' ? (done ? 'A、B 剩下的 Pod 都没地方放了' : '') : (t < 1.5 ? 'A 的 8 个都放得下，一起放行；' : '') + 'B 整体排队：只剩 2 个节点';
+                if (q) text(ctx, q, pad, 92, { size: 11, color: mode === 'pod' ? C.alert : C.data });
+            } else {
+                var qEnd = pad + 62 + 8 * (chip + cg) + 6;
+                if (noteA) text(ctx, noteA, qEnd, qy[0] + 1, { size: 11, color: mode === 'pod' ? C.alert : C.peers });
+                if (noteB) text(ctx, noteB, qEnd, qy[1] + 1, { size: 11, color: mode === 'pod' ? C.alert : C.data });
+            }
+            var status = STATUS[mode + (done ? '' : 'Go')];
+            paragraph(ctx, status, pad, statusY, w - pad * 2, { size: 12, color: !done ? C.soft : mode === 'pod' ? C.alert : C.peers, lh: 18 });
+            var held = placed.A + placed.B;
+            p.set('held', held + ' 个');
+            p.set('train', running ? '作业 A' : '没有', running ? 'peers' : 'alert');
+            p.set('idle', (running ? 0 : held) + ' 个', running || held === 0 ? 'peers' : 'alert');
+        };
+        p.loop(tick);
+    };
+
     function upgrade(root) {
         (root || document).querySelectorAll('figure.fig').forEach(function (figure) {
             if (figure.classList.contains('has-demo')) return;
