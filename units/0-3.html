@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -74,6 +74,14 @@
 <li class="icard" id="c-p0-3-process"><h3><span class="i-num">5</span>进程、线程与 GIL：为什么数据加载要开多个进程</h3>
 <p class="i-essence">线程共享同一块内存，切换便宜；进程各有各的内存，互相隔离。Python 有一把全局解释器锁（GIL）：同一时刻只有一个线程能执行 Python 代码。所以要让多个 CPU 核同时跑 Python 写的数据预处理，只能开多个进程。</p>
 <div class="i-detail"><p>先回顾两个概念。<strong>进程</strong>是操作系统分配资源的单位，每个进程有独立的内存空间；<strong>线程</strong>是进程内部的执行流，同一进程的线程共享内存。线程之间交换数据很方便（直接读同一块内存），进程之间则需要专门的机制。</p><p>在 C++ 里，多线程能充分利用多核。但 Python（标准的 CPython 解释器）有 GIL：为了保护解释器内部的数据结构，它规定同一时刻只有一个线程能执行 Python 字节码。于是用 Python 写的计算，开再多线程也只能用上一个核。</p><p>有两种情况不受 GIL 限制：</p><ul><li>线程在等 IO（读文件、等网络）时会释放 GIL；</li><li>调用 C/C++ 实现的函数时，如果它内部主动释放了 GIL（PyTorch 的大部分张量运算都这样做）。</li></ul><p>数据预处理恰恰常常是纯 Python 代码：解析样本、分词、各种变换。所以 DataLoader 选择了多进程：<mark>每个 worker 是一个独立的进程，有自己的解释器和自己的 GIL，可以真正并行</mark>。</p><p>多进程的代价有三个：</p><ul><li><strong>传递数据要花力气</strong>：worker 准备好的 batch 要交给主进程。PyTorch 用共享内存来传张量，避免了大块数据的序列化，但仍然有开销。</li><li><strong>占内存</strong>：每个进程都有自己的一份解释器和导入的库；如果数据集对象很大，还可能被复制多份。</li><li><strong>启动慢</strong>：每个 epoch 开始时创建进程要花时间（可以用 <code>persistent_workers=True</code> 让它们一直活着）。</li></ul><p>所以 num_workers 的选择是一个权衡：太少，CPU 没用满，GPU 等数据；太多，进程互相抢 CPU 和内存，反而变慢。通常的做法是从 0 开始逐步加大，画出吞吐曲线，找到不再上升的那个点。</p><p>（新版本的 Python 开始提供没有 GIL 的构建，这个局面将来可能会变，但目前主流环境仍然如此。）</p></div>
+<details class="i-more"><summary>选读：共享内存省掉了什么，还剩下哪些开销</summary><div class="i-detail"><p><strong class="h">不共享时要做什么。</strong> 两个进程的内存互相看不见。要把 worker 拼好的 batch 交给主进程，最直接的办法是序列化：把张量变成一串字节（pickle），写进两个进程之间的管道，主进程读出来，再还原成张量。<br>以 64 张 224×224 的彩色图为例，float32 的 batch 有 38.5 MB。这 38.5 MB 要拷好几次：变成字节串，写进内核的管道缓冲区，从管道读出，还原成新的张量。管道一次只过几十 KB，两边还要各读写几百次。</p><p><strong class="h">共享以后。</strong> worker 直接在一块共享内存里拼 batch（默认的 collate 在 worker 里就是这么做的），队列里传的只是这块内存的“句柄”，加上形状、类型这些元数据。可以看一下两者的大小：</p><pre>import pickle, torch
+import torch.multiprocessing              # 让张量在进程间按句柄传递
+from multiprocessing.reduction import ForkingPickler
+
+x = torch.rand(64, 3, 224, 224)           # 38.5 MB
+print(len(pickle.dumps(x)))               # 约 3850 万字节：数据本身
+x.share_memory_()                         # 搬进共享内存
+print(len(ForkingPickler.dumps(x)))       # 几百字节：句柄和形状</pre><p>38.5 MB 变成几百字节，这就是“避免了大块数据的序列化”。</p><p><strong class="h">还剩下的开销。</strong> 数据不再经过管道，但下面这些照样要付：</p><ul><li><em>每个 batch 一块新的共享内存。</em> worker 每拼一个 batch，都要向操作系统新要一块：在 /dev/shm 下建一个文件，定好大小，映射进自己的地址空间。新要来的内存，每一页第一次被写时都会触发一次缺页，由内核分配一页并清零。38.5 MB 是 9408 个 4 KB 的页。普通内存释放后会被分配器留着重用，页早就在了；共享内存每个 batch 都是新的，这笔账每次都要重算。</li><li><em>拼 batch 的那次拷贝还在。</em> 把一个个样本拷进这块内存，本来就是拼 batch 的工作，省不掉。到了主进程，开了 <code>pin_memory</code> 的话，还要再拷一次到锁页内存（本单元第 2 张卡的源码导读）。省掉的是“经过管道”的那几次。</li><li><em>递交句柄。</em> Linux 上默认的方式（file_descriptor）里，句柄是一个文件描述符。描述符不能写进字节流，要专门递交：主进程按句柄里的地址连回 worker，通过 Unix 套接字收下描述符，再把这块内存映射进来。第一次读的时候也有缺页，不过不用清零，便宜得多。这一套每个张量做一次：一个 batch 如果是几十个零散的张量（比如没有补齐成一个大张量的变长序列），就要做几十次。</li><li><em>回收。</em> 主进程用完一个 batch，要解除映射、关闭描述符；两边都放手以后，这块内存才还给系统。</li><li><em>不是张量的部分照样序列化。</em> batch 里的字符串、文件名列表、字典里的 Python 对象，还是变成字节一路拷过去。</li></ul><p>在一台 2 核的云上虚拟机上量了一下（示意，换一台机器数字会不同）：把这 38.5 MB 拷进一块重用的普通内存约 5 毫秒；拷进一块新的共享内存要 20–30 毫秒，多出来的主要是那 9408 次缺页。worker 和主进程同时跑起来，按共享内存传，每个 batch 约 25 毫秒；序列化后经管道传，约 65 毫秒。</p><p><strong class="h">这些开销大多花在 worker 里。</strong> 它们和数据预处理一样，由 worker 进程并行地付，不直接占训练循环的时间；但会吃掉 worker 的 CPU。worker 不够多时，它就显成 GPU 在等数据（2.4）。</p><p><strong class="h">两个常见的坑。</strong></p><ul><li><em>容器里的 /dev/shm 太小。</em> Docker 默认只给 64 MB。大一点的 batch，几个 worker，每个 worker 默认预取两个 batch，很快就超了，worker 会因为 Bus error 退出，PyTorch 会提示 <code>This might be caused by insufficient shared memory (shm)</code>。启动容器时加 <code>--shm-size=8g</code>（或 <code>--ipc=host</code>）；Kubernetes 里给 /dev/shm 挂一个放在内存里的 emptyDir（8.1 的作业 YAML 里就有）。</li><li><em>文件描述符用完。</em> 每个还活着的共享张量占着一个描述符，攒多了会报 <code>Too many open files</code>。可以调高 <code>ulimit -n</code>，或者改成按文件名共享：<code>torch.multiprocessing.set_sharing_strategy('file_system')</code>。</li></ul><p><strong class="h">能做的。</strong></p><ul><li>让一个 batch 由少数几个大张量组成，别是几十个小张量。</li><li>在 worker 里保留 uint8 的原图，转成浮点和归一化放到 GPU 上做：要传的字节只剩四分之一。</li><li>返回的东西里别带大的 Python 对象。</li></ul></div></details>
 <p class="i-analogy"><b>打个比方</b>一间厨房只有一把菜刀（GIL）：请再多厨师，同一时刻也只有一个人能切菜。想同时切，只能多开几间厨房（进程），代价是做好的菜要端来端去。</p>
 <p class="i-impl">所以 DataLoader 的 num_workers 指的是进程数。进程多了，CPU 用得上了，但进程之间传递数据有成本，也更占内存。worker 数不是越多越好，要实测找拐点。</p>
 <div class="i-builds">承接 <a href="0-3.html#c-p0-3-pinned">内存里的数据会被操作系统挪动，交给设备之前要先“钉住”</a><a href="0-1.html#c-p0-1-pipeline">训练的一步是一条串联的管道，最慢的一段决定速度</a></div>
@@ -88,13 +96,13 @@
 <a class="next" href="1-1.html"><small>下一单元</small>1.1 神经网络与反向传播</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

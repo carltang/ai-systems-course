@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -35,7 +35,7 @@
 <div class="essence-head"><h2>讲解</h2></div><ol class="icards">
 <li class="icard" id="c-p2-6-autocast"><h3><span class="i-num">1</span>autocast：算子调用的路上多了一站，按算子的类型决定用什么精度</h3>
 <p class="i-essence">打开自动混合精度后，每次算子调用在到达后端之前先经过一站“autocast”。这一站查一张名单：矩阵乘法、卷积这类算子，把输入转成 16 位再算；求和、指数、损失函数这类对精度敏感的算子，把输入转回 32 位再算；其余的算子保持输入原来的类型。</p>
-<div class="i-detail"><p>1.5 讲过为什么要用低精度：矩阵乘法能用上 Tensor Core，显存的读写量减半。这里讲它在框架里是怎么实现的。</p><p><strong class="h">它是 dispatcher 上的一站。</strong> 2.3 讲过，一次算子调用按优先级经过若干“功能”。进入 <code>with torch.autocast(device_type="cuda", dtype=torch.bfloat16):</code> 之后，当前线程多打开了一个分发键。于是每次调用的路线变成：自动求导 → autocast → CUDA 后端。</p><p><strong class="h">这一站做什么。</strong> 它把算子分成三类：</p><ul><li>*转成 16 位的。* 矩阵乘法、线性层、卷积、注意力这些计算量大、对精度不太敏感的。<mark>autocast 把输入转换成 16 位，再往下分发</mark>。</li><li>*转成 32 位的。* 对数值范围或舍入误差敏感的：指数和对数、幂运算、大范围的求和、归一化里的某些步骤、各种损失函数。即使输入是 16 位的，也先转成 32 位再算。</li><li>*不管的。* 其余的算子，输入是什么类型就按什么类型算。如果几个输入的类型不一样，按最宽的那个来。</li></ul><p>完整的名单在官方文档的 Automatic Mixed Precision 一页里。</p><p><strong class="h">参数本身还是 32 位。</strong> autocast 不改变模型参数的类型。线性层的权重是 32 位存着的，每次前向时被转换成 16 位的一份临时副本参与计算。反向时梯度流回 32 位的权重，优化器在 32 位上更新。7.2 的“16 字节”里，2 字节的 16 位参数和 4 字节的 32 位主副本，说的就是这两份。</p><p><strong class="h">反向不需要包在 autocast 里。</strong> 前向时每个算子用什么精度，已经记在反向节点里了；反向时每个节点按前向对应算子的精度来算。所以只把前向和损失计算包起来，<code>loss.backward()</code> 放在外面。</p><p><strong class="h">bf16 和 fp16 的选择。</strong> 两者都是 16 位，分法不同（1.5）。bf16 的数值范围和 32 位一样大，不容易溢出，新一些的 GPU 都支持，是现在的首选；fp16 的范围小，需要下一节讲的损失缩放来防止梯度下溢。</p><p><strong class="h">排查数值问题。</strong> 打开混合精度后损失变成 NaN，先确认是不是它引起的（关掉再跑）。是的话，常见原因是某个自己写的运算在 16 位下溢出了，比如对一个很大的数做平方或指数。把那一小段单独放回 32 位：</p><pre>with torch.autocast(device_type="cuda", enabled=False):
+<div class="i-detail"><p>1.5 讲过为什么要用低精度：矩阵乘法能用上 Tensor Core，显存的读写量减半。这里讲它在框架里是怎么实现的。</p><p><strong class="h">它是 dispatcher 上的一站。</strong> 2.3 讲过，一次算子调用按优先级经过若干“功能”。进入 <code>with torch.autocast(device_type="cuda", dtype=torch.bfloat16):</code> 之后，当前线程多打开了一个分发键。于是每次调用的路线变成：自动求导 → autocast → CUDA 后端。</p><p><strong class="h">这一站做什么。</strong> 它把算子分成三类：</p><ul><li><em>转成 16 位的。</em> 矩阵乘法、线性层、卷积、注意力这些计算量大、对精度不太敏感的。<mark>autocast 把输入转换成 16 位，再往下分发</mark>。</li><li><em>转成 32 位的。</em> 对数值范围或舍入误差敏感的：指数和对数、幂运算、大范围的求和、归一化里的某些步骤、各种损失函数。即使输入是 16 位的，也先转成 32 位再算。</li><li><em>不管的。</em> 其余的算子，输入是什么类型就按什么类型算。如果几个输入的类型不一样，按最宽的那个来。</li></ul><p>完整的名单在官方文档的 Automatic Mixed Precision 一页里。</p><p><strong class="h">参数本身还是 32 位。</strong> autocast 不改变模型参数的类型。线性层的权重是 32 位存着的，每次前向时被转换成 16 位的一份临时副本参与计算。反向时梯度流回 32 位的权重，优化器在 32 位上更新。7.2 的“16 字节”里，2 字节的 16 位参数和 4 字节的 32 位主副本，说的就是这两份。</p><p><strong class="h">反向不需要包在 autocast 里。</strong> 前向时每个算子用什么精度，已经记在反向节点里了；反向时每个节点按前向对应算子的精度来算。所以只把前向和损失计算包起来，<code>loss.backward()</code> 放在外面。</p><p><strong class="h">bf16 和 fp16 的选择。</strong> 两者都是 16 位，分法不同（1.5）。bf16 的数值范围和 32 位一样大，不容易溢出，新一些的 GPU 都支持，是现在的首选；fp16 的范围小，需要下一节讲的损失缩放来防止梯度下溢。</p><p><strong class="h">排查数值问题。</strong> 打开混合精度后损失变成 NaN，先确认是不是它引起的（关掉再跑）。是的话，常见原因是某个自己写的运算在 16 位下溢出了，比如对一个很大的数做平方或指数。把那一小段单独放回 32 位：</p><pre>with torch.autocast(device_type="cuda", enabled=False):
     y = risky_op(x.float())</pre></div>
 <p class="i-analogy"><b>打个比方</b>像工厂里的质检分流：大批量的常规件走快速通道（16 位），精密件走慢而稳的通道（32 位）。分流的规则是按零件种类事先定好的，工人不用逐件判断。</p>
 <p class="i-impl">所以用混合精度不需要改模型代码，只要把前向包在 autocast 里。但也因此，哪些运算实际跑在 16 位上是由这张名单决定的，自己写的特殊运算如果对精度敏感，要主动把它放回 32 位。</p>
@@ -65,7 +65,7 @@
 <li class="i-lead">到这里为止，所有的办法都是“让同样的计算跑得更快”。最后一类思路不同：让要做的计算变少。</li>
 <li class="icard" id="c-4-1-less-work"><h3><span class="i-num">4</span>最快的计算，是不用做的计算</h3>
 <p class="i-essence">剪枝去掉不重要的权重，压缩让模型变小，蒸馏让小模型学大模型。但要注意：零散地把权重置零（非结构化稀疏）通常不会让 GPU 变快，只有按块、按通道去掉，或者硬件支持的稀疏格式，才真正减少计算。</p>
-<div class="i-detail"><p><strong class="h">几种“变小”的办法。</strong></p><ul><li>*剪枝*：把不重要的权重去掉（置为零）。</li><li>*蒸馏*：训练一个小模型去模仿大模型的输出。</li><li>*低秩分解*：把一个大矩阵近似成两个小矩阵的乘积。</li><li>*量化*：用更少的位数表示每个数（9.2 专门讲）。</li></ul><p><strong class="h">关键的判断：它减少的是参数个数，还是实际的计算和读写。</strong> 这两者不是一回事。</p><p>以剪枝为例。把一个权重矩阵里 90% 的元素零散地置为零（非结构化剪枝），参数的“有效个数”少了十倍。但矩阵还是那么大，存储没变；矩阵乘法的 kernel 仍然对每个元素做乘加，其中九成是在乘以零。GPU 上的时间一点没少。</p><p>要真的省，零得是“成片”的：</p><ul><li>*结构化剪枝*：整行、整列、整个注意力头、整层地去掉。去掉之后矩阵真的变小了，计算量和读写量随之下降。</li><li>*硬件支持的稀疏格式*：某些 GPU 的 Tensor Core 支持一种固定模式的稀疏（每 4 个元素里保留 2 个），配合专门的库能有实际的加速。</li></ul><p>零散的稀疏在 GPU 上为什么难利用？因为 GPU 靠的是规整：一组线程同时对一块连续的数据做同样的操作（第 3 部分）。稀疏矩阵要按索引跳着访问，访存无法合并，线程之间的工作量不均匀，除非稀疏到只剩百分之几，否则还不如直接算稠密的。</p><p><strong class="h">用第 0 部分的语言来检验任何一种“简化”。</strong> 问三件事：</p><ul><li>浮点运算的次数少了吗？（算力）</li><li>要从显存读写的字节数少了吗？（带宽）</li><li>kernel 的个数少了吗？（开销）</li></ul><p><mark>三样都没变，速度就不会变，不管参数个数少了多少</mark>。蒸馏出的小模型三样都少了，所以确实快；量化减少的主要是第二样（9.2）；低秩分解把一个大矩阵乘法换成两个小的，第一、二样少了，第三样多了一点。</p><p>这类方法通常用在推理部署，而不是训练加速：它们大多需要先有一个训练好的模型。放在这一单元，是为了把“提速”的手段列全，并且给出判断它们的标准。</p></div>
+<div class="i-detail"><p><strong class="h">几种“变小”的办法。</strong></p><ul><li><em>剪枝</em>：把不重要的权重去掉（置为零）。</li><li><em>蒸馏</em>：训练一个小模型去模仿大模型的输出。</li><li><em>低秩分解</em>：把一个大矩阵近似成两个小矩阵的乘积。</li><li><em>量化</em>：用更少的位数表示每个数（9.2 专门讲）。</li></ul><p><strong class="h">关键的判断：它减少的是参数个数，还是实际的计算和读写。</strong> 这两者不是一回事。</p><p>以剪枝为例。把一个权重矩阵里 90% 的元素零散地置为零（非结构化剪枝），参数的“有效个数”少了十倍。但矩阵还是那么大，存储没变；矩阵乘法的 kernel 仍然对每个元素做乘加，其中九成是在乘以零。GPU 上的时间一点没少。</p><p>要真的省，零得是“成片”的：</p><ul><li><em>结构化剪枝</em>：整行、整列、整个注意力头、整层地去掉。去掉之后矩阵真的变小了，计算量和读写量随之下降。</li><li><em>硬件支持的稀疏格式</em>：某些 GPU 的 Tensor Core 支持一种固定模式的稀疏（每 4 个元素里保留 2 个），配合专门的库能有实际的加速。</li></ul><p>零散的稀疏在 GPU 上为什么难利用？因为 GPU 靠的是规整：一组线程同时对一块连续的数据做同样的操作（第 3 部分）。稀疏矩阵要按索引跳着访问，访存无法合并，线程之间的工作量不均匀，除非稀疏到只剩百分之几，否则还不如直接算稠密的。</p><p><strong class="h">用第 0 部分的语言来检验任何一种“简化”。</strong> 问三件事：</p><ul><li>浮点运算的次数少了吗？（算力）</li><li>要从显存读写的字节数少了吗？（带宽）</li><li>kernel 的个数少了吗？（开销）</li></ul><p><mark>三样都没变，速度就不会变，不管参数个数少了多少</mark>。蒸馏出的小模型三样都少了，所以确实快；量化减少的主要是第二样（9.2）；低秩分解把一个大矩阵乘法换成两个小的，第一、二样少了，第三样多了一点。</p><p>这类方法通常用在推理部署，而不是训练加速：它们大多需要先有一个训练好的模型。放在这一单元，是为了把“提速”的手段列全，并且给出判断它们的标准。</p></div>
 <p class="i-analogy"><b>打个比方</b>像精简流程：删掉一个步骤才省时间，只把每个步骤里的几个字划掉，流程还是一样长。</p>
 <p class="i-impl">所以评估一种“简化模型”的方法，要看它在 GPU 上减少的是不是真实的计算和读写，而不只是参数个数。</p>
 <div class="i-builds">承接 <a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a></div>
@@ -80,13 +80,13 @@
 <a class="next" href="3-1.html"><small>下一单元</small>3.1 GPU 环境与第一次性能分析</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

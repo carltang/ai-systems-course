@@ -6,7 +6,7 @@
 
 页面由课程的源文件生成，不要直接改这里的 HTML；来历和需要留心的地方见 `about.html`。
 
-现在是 1.12 版（2026-11-28），历次更新见 `CHANGELOG.md`。
+现在是 1.13 版（2026-11-28），历次更新见 `CHANGELOG.md`。
 
 Zongyao Tang、Claude 编著。© 2026 Zongyao Tang，以 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 许可分享：须署名、不得商用、改编后以同样的许可分享。
 
@@ -16,6 +16,6 @@ A course that explains the principles: what one training step actually goes thro
 
 The English edition is in `en/`: the same 45 units, drawings and demos, translated by AI (Anthropic's Claude) from the Chinese edition, which is the reference. The pages are generated from the course's sources; please do not edit the HTML here. See `en/about.html` for how the course came about.
 
-This is version 1.12 (2026-11-28); `CHANGELOG.md` lists every update.
+This is version 1.13 (2026-11-28); `CHANGELOG.md` lists every update.
 
 By Zongyao Tang & Claude. © 2026 Zongyao Tang, shared under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): attribution, non-commercial, share alike.

@@ -24,7 +24,9 @@
     // The English edition: its pages say lang="en" and load demos-en.js first, which puts the English
     // for every Chinese string the demos show in window.KA_EN. A string with numbers in it is found by
     // its shape, the numbers turned into # (or {0}, {1}… where the English puts them in another order).
-    var EN = /^en/i.test(document.documentElement.getAttribute('lang') || ''), WORDS = window.KA_EN || {};
+    // (The app's unit page marks its English edition with data-edition="en" on the page.)
+    var EN = /^en/i.test(document.documentElement.getAttribute('lang') || '') || document.documentElement.getAttribute('data-edition') === 'en',
+        WORDS = window.KA_EN || {};
     // The same Chinese can need different English in two demos (段 is a stage in one, a piece in
     // another): an entry "demo|中文" is tried first while that demo is being built or drawn.
     var HAN = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/, NUM = /-?\d[\d,]*(?:\.\d+)?/g, SCOPE = null;

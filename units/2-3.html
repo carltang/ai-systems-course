@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -56,7 +56,7 @@
 <li class="i-lead">这五层加起来要花多少时间？对大多数模型可以忽略，但有一类情况它是主角。</li>
 <li class="icard" id="c-p2-3-overhead"><h3><span class="i-num">3</span>这条路每次要花若干微秒；模型小、算子碎时，它就成了瓶颈</h3>
 <p class="i-essence">前四层都在 CPU 上、单线程执行，每个算子大约花几微秒到几十微秒，和张量多大无关。如果 GPU 执行这个算子只需要几微秒，那么时间主要花在了 CPU 的“发令”上，GPU 大部分时间在等下一个任务。</p>
-<div class="i-detail"><p><strong class="h">算一笔账。</strong> 一个 GPU 上的算子，时间分两部分：</p><ul><li>CPU 一侧：走完前四层，把 kernel 放进队列。量级是几微秒到几十微秒，取决于经过了几站、算子本身的准备工作多复杂。</li><li>GPU 一侧：kernel 实际执行的时间，取决于数据量。</li></ul><p>一个中等大小的 Transformer，一步前向加反向大约是几千次算子调用。按每次 20 微秒算，CPU 一侧就要几十毫秒。</p><ul><li>如果 GPU 上每个算子要算几百微秒（大矩阵乘法），CPU 发令比 GPU 执行快得多，队列里总有任务在排队，GPU 一直在忙。开销可以忽略。</li><li>如果每个算子在 GPU 上只要几微秒（小模型、小 batch、大量逐元素的小运算），GPU 每做完一个都要等 CPU 发下一个。<mark>这时整体速度由 CPU 上那个单线程决定</mark>，GPU 利用率可能只有百分之二三十。这就是 0.1 里的“等发令”，3.1 的三面墙里叫“开销受限”。</li></ul><p><strong class="h">怎么判断。</strong></p><ul><li>*加倍 batch。* 把 batch 加倍，如果一步的时间几乎不变（吞吐接近翻倍），说明时间主要是和数据量无关的固定开销。如果时间也接近翻倍，说明 GPU 的计算才是主体。这是 Horace He 那篇文章给的办法，最简单也最可靠。</li><li>*看 profiler。* 比较每个算子的 CPU 时间和 CUDA 时间。CPU 时间的总和接近一步的总时间、而 CUDA 时间的总和小得多，就是开销受限。时间线上会看到 GPU 那一行是稀疏的小块，中间有空隙。</li><li>*看 GPU 利用率的形状。* 0.2 讲过：长期稳定在中等水平，是这种情况的典型曲线。</li></ul><p><strong class="h">怎么解决</strong>，都是 0.1 里“成批处理，摊薄固定成本”的不同做法：</p><ul><li>加大 batch：同样的发令次数，每次让 GPU 多干活。</li><li>减少算子个数：把循环改成向量化的写法；用一个现成的大算子代替一串小算子（比如用 <code>F.scaled_dot_product_attention</code> 代替手写的注意力）。</li><li>torch.compile（2.5）：把一整段计算编译成少数几个 kernel，还省掉了 Python 和 dispatcher 这几层。</li><li>CUDA Graph（3.6）：连“启动 kernel”这一步的开销也一起省掉。</li><li>2.6 的 fused 优化器：把几百个参数张量的更新合成一次。</li></ul><p><strong class="h">反向也一样。</strong> 反向时不经过 Python，但引擎每执行一个节点，同样要走 dispatcher 和后端实现。所以算子碎的模型，前向和反向都受这个限制。</p></div>
+<div class="i-detail"><p><strong class="h">算一笔账。</strong> 一个 GPU 上的算子，时间分两部分：</p><ul><li>CPU 一侧：走完前四层，把 kernel 放进队列。量级是几微秒到几十微秒，取决于经过了几站、算子本身的准备工作多复杂。</li><li>GPU 一侧：kernel 实际执行的时间，取决于数据量。</li></ul><p>一个中等大小的 Transformer，一步前向加反向大约是几千次算子调用。按每次 20 微秒算，CPU 一侧就要几十毫秒。</p><ul><li>如果 GPU 上每个算子要算几百微秒（大矩阵乘法），CPU 发令比 GPU 执行快得多，队列里总有任务在排队，GPU 一直在忙。开销可以忽略。</li><li>如果每个算子在 GPU 上只要几微秒（小模型、小 batch、大量逐元素的小运算），GPU 每做完一个都要等 CPU 发下一个。<mark>这时整体速度由 CPU 上那个单线程决定</mark>，GPU 利用率可能只有百分之二三十。这就是 0.1 里的“等发令”，3.1 的三面墙里叫“开销受限”。</li></ul><p><strong class="h">怎么判断。</strong></p><ul><li><em>加倍 batch。</em> 把 batch 加倍，如果一步的时间几乎不变（吞吐接近翻倍），说明时间主要是和数据量无关的固定开销。如果时间也接近翻倍，说明 GPU 的计算才是主体。这是 Horace He 那篇文章给的办法，最简单也最可靠。</li><li><em>看 profiler。</em> 比较每个算子的 CPU 时间和 CUDA 时间。CPU 时间的总和接近一步的总时间、而 CUDA 时间的总和小得多，就是开销受限。时间线上会看到 GPU 那一行是稀疏的小块，中间有空隙。</li><li><em>看 GPU 利用率的形状。</em> 0.2 讲过：长期稳定在中等水平，是这种情况的典型曲线。</li></ul><p><strong class="h">怎么解决</strong>，都是 0.1 里“成批处理，摊薄固定成本”的不同做法：</p><ul><li>加大 batch：同样的发令次数，每次让 GPU 多干活。</li><li>减少算子个数：把循环改成向量化的写法；用一个现成的大算子代替一串小算子（比如用 <code>F.scaled_dot_product_attention</code> 代替手写的注意力）。</li><li>torch.compile（2.5）：把一整段计算编译成少数几个 kernel，还省掉了 Python 和 dispatcher 这几层。</li><li>CUDA Graph（3.6）：连“启动 kernel”这一步的开销也一起省掉。</li><li>2.6 的 fused 优化器：把几百个参数张量的更新合成一次。</li></ul><p><strong class="h">反向也一样。</strong> 反向时不经过 Python，但引擎每执行一个节点，同样要走 dispatcher 和后端实现。所以算子碎的模型，前向和反向都受这个限制。</p></div>
 <details class="i-more"><summary>排查：用 profiler 判断瓶颈是不是框架开销</summary><div class="i-detail"><pre>from torch.profiler import profile, ProfilerActivity
 
 with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
@@ -98,13 +98,13 @@ print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=20))</p
 <a class="next" href="2-4.html"><small>下一单元</small>2.4 数据供给</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

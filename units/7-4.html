@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -55,7 +55,7 @@
 <li class="i-lead">知道了要存什么。接下来是一个很实际的问题：多久存一次。</li>
 <li class="icard" id="c-p7-4-interval"><h3><span class="i-num">3</span>多久存一次：存的代价和丢的代价之间的平衡</h3>
 <p class="i-essence">存得越勤，每次故障丢掉的进度越少，但花在存档上的时间越多。存得越稀，正相反。总的浪费最小的间隔，大约是“2 × 存一次的时间 × 平均故障间隔”的平方根。存一次要 1 分钟、平均 10 小时出一次故障时，大约每半小时存一次。</p>
-<div class="i-detail"><p><strong class="h">两种浪费。</strong> 设每隔 T 时间存一次，存一次要花 c 时间，作业平均每 M 时间出一次故障。</p><ul><li>*存档的开销。* 每 T 时间里有 c 用来存档（假设存档时训练要停）。浪费的比例是 c ÷ T。T 越大，这一项越小。</li><li>*故障的损失。* 故障发生时，上次存档之后的工作全部作废。平均而言故障发生在两次存档的正中间，所以每次损失 T ÷ 2。每 M 时间一次，浪费的比例是 T ÷ (2M)。T 越大，这一项越大。</li></ul><p>总浪费 = c/T + T/(2M)。<mark>一项随 T 减小，一项随 T 增大</mark>。两项相等时总和最小，解出来：</p><p>T = √(2 × c × M)</p><p>这是高性能计算领域一个很老的结论。此时的总浪费比例约为 √(2c/M)。</p><figure class="fig"><img src="../assets/figures/checkpoint-interval.svg" alt="存得太勤和存得太疏都浪费" loading="lazy"><figcaption>存得太勤和存得太疏都浪费</figcaption></figure><p><strong class="h">代入几组数。</strong></p><table><thead><tr><th>存一次 c</th><th>平均故障间隔 M</th><th>最优间隔 T</th><th>总浪费</th></tr></thead><tbody><tr><td>1 分钟</td><td>40 小时</td><td>约 70 分钟</td><td>约 3%</td></tr><tr><td>1 分钟</td><td>4 小时</td><td>约 22 分钟</td><td>约 9%</td></tr><tr><td>5 分钟</td><td>4 小时</td><td>约 49 分钟</td><td>约 20%</td></tr><tr><td>10 秒</td><td>4 小时</td><td>约 9 分钟</td><td>约 4%</td></tr></tbody></table><p><strong class="h">从表里读出的三件事。</strong></p><ul><li>规模扩大十倍，M 缩小到十分之一（上一节），间隔应该缩短到原来的三分之一左右，而不是十分之一。</li><li>故障频繁时，存档的速度变得非常关键。第三行：存一次 5 分钟，五分之一的时间被浪费掉。第四行：把存档压到 10 秒，浪费回到 4%。所以大规模训练会在“让检查点更快”上花很多工程力气（下一节）。</li><li>只要 c 远小于 M，浪费就是可控的。这是 Epoch AI 那篇文章的核心论点：硬件故障不会成为规模的硬上限，前提是检查点够快。</li></ul><p><strong class="h">公式里没有的因素。</strong></p><ul><li>恢复的时间。故障后要重新调度、启动进程、加载检查点、重新编译模型（2.5）、NCCL 重新初始化（6.2），可能要十几分钟。这是每次故障的固定损失，和间隔无关，但要算进总账。</li><li>如果存档不阻塞训练（异步，下一节），c 就接近于零，可以存得很勤。</li><li>被抢占通常会提前收到通知（第 8 部分）。收到通知时立刻存一次档，这一类“故障”几乎不丢进度。</li></ul><p><strong class="h">实际怎么做。</strong> 量出你的 c（存一次要多久）；向管理集群的人了解 M 的量级，或者从自己作业的历史里统计；按公式算一个起点。间隔通常按步数设置，把时间换算成步数即可。</p></div>
+<div class="i-detail"><p><strong class="h">两种浪费。</strong> 设每隔 T 时间存一次，存一次要花 c 时间，作业平均每 M 时间出一次故障。</p><ul><li><em>存档的开销。</em> 每 T 时间里有 c 用来存档（假设存档时训练要停）。浪费的比例是 c ÷ T。T 越大，这一项越小。</li><li><em>故障的损失。</em> 故障发生时，上次存档之后的工作全部作废。平均而言故障发生在两次存档的正中间，所以每次损失 T ÷ 2。每 M 时间一次，浪费的比例是 T ÷ (2M)。T 越大，这一项越大。</li></ul><p>总浪费 = c/T + T/(2M)。<mark>一项随 T 减小，一项随 T 增大</mark>。两项相等时总和最小，解出来：</p><p>T = √(2 × c × M)</p><p>这是高性能计算领域一个很老的结论。此时的总浪费比例约为 √(2c/M)。</p><figure class="fig"><img src="../assets/figures/checkpoint-interval.svg" alt="存得太勤和存得太疏都浪费" loading="lazy"><figcaption>存得太勤和存得太疏都浪费</figcaption></figure><p><strong class="h">代入几组数。</strong></p><table><thead><tr><th>存一次 c</th><th>平均故障间隔 M</th><th>最优间隔 T</th><th>总浪费</th></tr></thead><tbody><tr><td>1 分钟</td><td>40 小时</td><td>约 70 分钟</td><td>约 3%</td></tr><tr><td>1 分钟</td><td>4 小时</td><td>约 22 分钟</td><td>约 9%</td></tr><tr><td>5 分钟</td><td>4 小时</td><td>约 49 分钟</td><td>约 20%</td></tr><tr><td>10 秒</td><td>4 小时</td><td>约 9 分钟</td><td>约 4%</td></tr></tbody></table><p><strong class="h">从表里读出的三件事。</strong></p><ul><li>规模扩大十倍，M 缩小到十分之一（上一节），间隔应该缩短到原来的三分之一左右，而不是十分之一。</li><li>故障频繁时，存档的速度变得非常关键。第三行：存一次 5 分钟，五分之一的时间被浪费掉。第四行：把存档压到 10 秒，浪费回到 4%。所以大规模训练会在“让检查点更快”上花很多工程力气（下一节）。</li><li>只要 c 远小于 M，浪费就是可控的。这是 Epoch AI 那篇文章的核心论点：硬件故障不会成为规模的硬上限，前提是检查点够快。</li></ul><p><strong class="h">公式里没有的因素。</strong></p><ul><li>恢复的时间。故障后要重新调度、启动进程、加载检查点、重新编译模型（2.5）、NCCL 重新初始化（6.2），可能要十几分钟。这是每次故障的固定损失，和间隔无关，但要算进总账。</li><li>如果存档不阻塞训练（异步，下一节），c 就接近于零，可以存得很勤。</li><li>被抢占通常会提前收到通知（第 8 部分）。收到通知时立刻存一次档，这一类“故障”几乎不丢进度。</li></ul><p><strong class="h">实际怎么做。</strong> 量出你的 c（存一次要多久）；向管理集群的人了解 M 的量级，或者从自己作业的历史里统计；按公式算一个起点。间隔通常按步数设置，把时间换算成步数即可。</p></div>
 <p class="i-analogy"><b>打个比方</b>像写长文档时按保存键：每打一个字就存一次，时间都花在存盘上；写一整天才存一次，一停电全没了。合适的频率取决于存一次有多麻烦、以及多久停一次电。</p>
 <p class="i-impl">所以检查点的间隔不该是一个随手写的数。它取决于两个可以量出来的量。规模变大后故障更频繁，间隔就要缩短；而要缩短间隔又不浪费，就得让存档本身更快。</p>
 <div class="i-builds">承接 <a href="7-4.html#c-p7-4-contents">检查点里要存四样：模型、优化器、进度、随机状态</a><a href="0-2.html#c-p0-2-attribution">把一步的时间拆开：每一段各占多少</a></div>
@@ -91,13 +91,13 @@
 <a class="next" href="8-1.html"><small>下一单元</small>8.1 Kubernetes 的核心对象</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -35,7 +35,7 @@
 <div class="essence-head"><h2>讲解</h2></div><ol class="icards">
 <li class="icard" id="c-p10-3-generate"><h3><span class="i-num">1</span>数据不是读出来的，是和环境交互“跑”出来的</h3>
 <p class="i-essence">大模型训练的数据躺在硬盘上，管道的第一步是“读”。强化学习的数据要靠运行来产生：每一步都要让策略网络做一次推理选出动作，再让环境的仿真程序向前推进一步。训练的大部分时间常常花在这上面，而不是花在反向传播上。</p>
-<div class="i-detail"><p><strong class="h">回顾 0.1 的管道。</strong> 大模型训练的一步：读数据 → 预处理 → 拷上 GPU → 前向反向 → 同步梯度 → 更新参数。数据是现成的，第一步只是 IO。</p><p><strong class="h">强化学习的一步。</strong> 以 PPO 为例（10.2）：</p><ul><li><strong>采集。</strong> 重复几百到几千次：策略网络看当前的状态，推理出动作；环境执行动作，算出下一个状态和奖励。把这些记下来。</li><li><strong>学习。</strong> 用刚采集的数据算优势，做几轮前向反向，更新策略和评论家。</li><li>扔掉数据，用新策略重新采集。</li></ul><p>采集阶段替代了“读数据”，而它本身包含大量的计算。</p><p><strong class="h">采集阶段有两种计算，性格完全不同。</strong></p><ul><li>*环境的仿真。* 物理引擎计算碰撞和受力、游戏模拟器执行一帧、或者（在语言模型的场景）运行一段代码来检查答案。传统上这些是 CPU 上的程序，逻辑复杂、分支多，每个环境实例是串行的。</li><li>*策略的推理。* 一次神经网络的前向。强化学习里的网络通常很小（几层的 MLP 或小的卷积网络），单次推理的计算量很小。</li></ul><p>两者是交替进行的：推理一次，仿真一步，再推理一次。它们之间有严格的先后依赖，和 1.4 讲的自回归生成一样，无法把一条轨迹内部并行化。</p><p><strong class="h">时间花在哪。</strong> 很多强化学习的任务里，仿真占了大头。网络小，反向传播很快；而要学会一个任务可能需要几亿甚至几十亿步的交互。于是典型的画面是：几十上百个 CPU 核满负荷地跑仿真，GPU 的利用率只有百分之十几。按 0.2 的说法，这不代表系统有毛病，而是瓶颈根本不在 GPU 上。</p><p><strong class="h">并行的方向。</strong> 一条轨迹内部不能并行，但可以同时跑很多条：开 N 个环境的副本，每一步让策略网络对 N 个状态做一次批量的推理，得到 N 个动作，再让 N 个环境各走一步。这叫向量化环境。它把策略推理变成了有 batch 的运算（9.1 讲的批处理的好处在这里同样成立），仿真则分给多个 CPU 核。后面三节都是这个思路的不同实现。</p><p><strong class="h">衡量的指标。</strong> 强化学习系统的吞吐通常用“每秒环境步数”来衡量。<mark>一个好的实现和一个朴素的实现，可以差出几个数量级</mark>。</p></div>
+<div class="i-detail"><p><strong class="h">回顾 0.1 的管道。</strong> 大模型训练的一步：读数据 → 预处理 → 拷上 GPU → 前向反向 → 同步梯度 → 更新参数。数据是现成的，第一步只是 IO。</p><p><strong class="h">强化学习的一步。</strong> 以 PPO 为例（10.2）：</p><ul><li><strong>采集。</strong> 重复几百到几千次：策略网络看当前的状态，推理出动作；环境执行动作，算出下一个状态和奖励。把这些记下来。</li><li><strong>学习。</strong> 用刚采集的数据算优势，做几轮前向反向，更新策略和评论家。</li><li>扔掉数据，用新策略重新采集。</li></ul><p>采集阶段替代了“读数据”，而它本身包含大量的计算。</p><p><strong class="h">采集阶段有两种计算，性格完全不同。</strong></p><ul><li><em>环境的仿真。</em> 物理引擎计算碰撞和受力、游戏模拟器执行一帧、或者（在语言模型的场景）运行一段代码来检查答案。传统上这些是 CPU 上的程序，逻辑复杂、分支多，每个环境实例是串行的。</li><li><em>策略的推理。</em> 一次神经网络的前向。强化学习里的网络通常很小（几层的 MLP 或小的卷积网络），单次推理的计算量很小。</li></ul><p>两者是交替进行的：推理一次，仿真一步，再推理一次。它们之间有严格的先后依赖，和 1.4 讲的自回归生成一样，无法把一条轨迹内部并行化。</p><p><strong class="h">时间花在哪。</strong> 很多强化学习的任务里，仿真占了大头。网络小，反向传播很快；而要学会一个任务可能需要几亿甚至几十亿步的交互。于是典型的画面是：几十上百个 CPU 核满负荷地跑仿真，GPU 的利用率只有百分之十几。按 0.2 的说法，这不代表系统有毛病，而是瓶颈根本不在 GPU 上。</p><p><strong class="h">并行的方向。</strong> 一条轨迹内部不能并行，但可以同时跑很多条：开 N 个环境的副本，每一步让策略网络对 N 个状态做一次批量的推理，得到 N 个动作，再让 N 个环境各走一步。这叫向量化环境。它把策略推理变成了有 batch 的运算（9.1 讲的批处理的好处在这里同样成立），仿真则分给多个 CPU 核。后面三节都是这个思路的不同实现。</p><p><strong class="h">衡量的指标。</strong> 强化学习系统的吞吐通常用“每秒环境步数”来衡量。<mark>一个好的实现和一个朴素的实现，可以差出几个数量级</mark>。</p></div>
 <p class="i-analogy"><b>打个比方</b>大模型训练像一家有现成原料仓库的工厂，只管加工。强化学习像一家自己有农场的餐厅：先得种菜，而且种什么菜、怎么种，取决于厨师最近的手艺。厨房再快，菜没长出来也只能等。</p>
 <p class="i-impl">所以强化学习系统设计的核心问题是“怎样更快地产生数据”。评价它的吞吐，看的是每秒产生多少步环境交互，而不只是每秒训练多少个样本。</p>
 <div class="i-builds">承接 <a href="10-2.html#c-p10-2-ppo">PPO：每次只把策略改一小步</a><a href="0-1.html#c-p0-1-pipeline">训练的一步是一条串联的管道，最慢的一段决定速度</a><a href="1-4.html#c-1-3-causal">因果掩码：训练时整段并行，生成时一词一词</a></div>
@@ -65,7 +65,7 @@
 <li class="i-lead">前两节都在让数据产生得更快。另一个方向是让每条数据多发挥几次作用。</li>
 <li class="icard" id="c-p10-3-replay"><h3><span class="i-num">4</span>经验回放：把数据存起来，反复用</h3>
 <p class="i-essence">产生数据很贵，那就别用一次就扔。经验回放把智能体经历过的每一步存进一个大缓冲区，训练时从中反复抽样。每条数据平均能被用上很多次，需要的环境交互次数因此少得多。它只适用于能使用旧数据的算法，也就是 10.2 讲的异策略方法。</p>
-<div class="i-detail"><p><strong class="h">两种效率。</strong></p><ul><li>*样本效率*：学会一个任务需要多少步环境交互。</li><li>*计算效率（墙上时间）*：学会一个任务需要多长时间、多少算力。</li></ul><p>它们不是一回事。一个算法可能需要十倍的样本，但如果每个样本的产生和处理都快一百倍，它反而更早学会。</p><p><strong class="h">回放缓冲区。</strong> 一个容量很大的存储（比如一百万步），存着最近的经验：（状态，动作，奖励，下一个状态）。新数据进来，最老的被挤出去。训练时每次从中随机抽一个 batch。</p><p>10.2 讲 DQN 时说过它的两个作用：打破相邻样本之间的相关性；让每条数据被多次使用。这里关心的是后者。带回放的方法，每采集一步数据可以做好几次梯度更新；PPO 每条数据只用几轮就扔。</p><p><strong class="h">为什么只能是异策略。</strong> 缓冲区里的数据是过去很多个不同版本的策略产生的。10.2 讲过：</p><ul><li>Q-learning 类的方法只需要“环境里真实发生过的一步转移”，不在乎是哪个策略产生的。可以直接用。</li><li>策略梯度类的方法要求数据来自当前策略。旧数据不能直接用（上上节的 V-trace 那样的修正只能处理“稍微旧一点”的数据）。</li></ul><p>所以有回放的系统，核心算法通常是价值路线，或者是为了能用旧数据而专门设计的 actor-critic 变体。</p><p><strong class="h">不是所有的经验都一样有用。</strong> 均匀地随机抽样，大部分抽到的是早就学会了的平凡经验。优先回放的做法是：TD 误差大的经验（“这一步的结果出乎我的意料”）被抽中的概率更高。上上节的 Ape-X 就是分布式的优先回放。</p><p><strong class="h">怎么选。</strong></p><table><thead><tr><th></th><th>用完即扔（PPO 类）</th><th>带回放（DQN 类、异策略 actor-critic）</th></tr></thead><tbody><tr><td>每条数据用几次</td><td>几次</td><td>很多次</td></tr><tr><td>样本效率</td><td>低</td><td>高</td></tr><tr><td>稳定性、调参</td><td>容易</td><td>较难（10.2 的致命三角）</td></tr><tr><td>适合</td><td>仿真极便宜，可以大规模并行</td><td>每步交互都很贵</td></tr><tr><td>瓶颈常在</td><td>仿真的速度</td><td>学习的速度（GPU）</td></tr></tbody></table><p>有了上一节的 GPU 并行仿真之后，天平向左边倾斜了很多：<mark>数据便宜到几乎不用在乎样本效率，简单稳定的 PPO 就成了首选</mark>。而在真实的机器人上直接学习、或者奖励需要人来给的场景，样本效率仍然是第一位的。</p><p><strong class="h">回放缓冲区自己也是个系统问题。</strong> 存一百万步带图像的经验要几十 GB；从中随机抽样是随机访存（0.3）；分布式的时候它是一个被很多 actor 写、被 learner 读的共享服务。2.4 讲的数据加载的那些考虑，在这里换了一种形式又出现了。</p></div>
+<div class="i-detail"><p><strong class="h">两种效率。</strong></p><ul><li><em>样本效率</em>：学会一个任务需要多少步环境交互。</li><li><em>计算效率（墙上时间）</em>：学会一个任务需要多长时间、多少算力。</li></ul><p>它们不是一回事。一个算法可能需要十倍的样本，但如果每个样本的产生和处理都快一百倍，它反而更早学会。</p><p><strong class="h">回放缓冲区。</strong> 一个容量很大的存储（比如一百万步），存着最近的经验：（状态，动作，奖励，下一个状态）。新数据进来，最老的被挤出去。训练时每次从中随机抽一个 batch。</p><p>10.2 讲 DQN 时说过它的两个作用：打破相邻样本之间的相关性；让每条数据被多次使用。这里关心的是后者。带回放的方法，每采集一步数据可以做好几次梯度更新；PPO 每条数据只用几轮就扔。</p><p><strong class="h">为什么只能是异策略。</strong> 缓冲区里的数据是过去很多个不同版本的策略产生的。10.2 讲过：</p><ul><li>Q-learning 类的方法只需要“环境里真实发生过的一步转移”，不在乎是哪个策略产生的。可以直接用。</li><li>策略梯度类的方法要求数据来自当前策略。旧数据不能直接用（上上节的 V-trace 那样的修正只能处理“稍微旧一点”的数据）。</li></ul><p>所以有回放的系统，核心算法通常是价值路线，或者是为了能用旧数据而专门设计的 actor-critic 变体。</p><p><strong class="h">不是所有的经验都一样有用。</strong> 均匀地随机抽样，大部分抽到的是早就学会了的平凡经验。优先回放的做法是：TD 误差大的经验（“这一步的结果出乎我的意料”）被抽中的概率更高。上上节的 Ape-X 就是分布式的优先回放。</p><p><strong class="h">怎么选。</strong></p><table><thead><tr><th></th><th>用完即扔（PPO 类）</th><th>带回放（DQN 类、异策略 actor-critic）</th></tr></thead><tbody><tr><td>每条数据用几次</td><td>几次</td><td>很多次</td></tr><tr><td>样本效率</td><td>低</td><td>高</td></tr><tr><td>稳定性、调参</td><td>容易</td><td>较难（10.2 的致命三角）</td></tr><tr><td>适合</td><td>仿真极便宜，可以大规模并行</td><td>每步交互都很贵</td></tr><tr><td>瓶颈常在</td><td>仿真的速度</td><td>学习的速度（GPU）</td></tr></tbody></table><p>有了上一节的 GPU 并行仿真之后，天平向左边倾斜了很多：<mark>数据便宜到几乎不用在乎样本效率，简单稳定的 PPO 就成了首选</mark>。而在真实的机器人上直接学习、或者奖励需要人来给的场景，样本效率仍然是第一位的。</p><p><strong class="h">回放缓冲区自己也是个系统问题。</strong> 存一百万步带图像的经验要几十 GB；从中随机抽样是随机访存（0.3）；分布式的时候它是一个被很多 actor 写、被 learner 读的共享服务。2.4 讲的数据加载的那些考虑，在这里换了一种形式又出现了。</p></div>
 <p class="i-analogy"><b>打个比方</b>像做题：一本习题集只做一遍就扔，要学会得买很多本。把做过的题整理成错题本，隔一阵拿出来重做，同样的题目能学到更多。</p>
 <p class="i-impl">所以算法的选择和系统的形态是连在一起的：仿真便宜时，用 PPO 这类“用完即扔”的方法，靠并行堆数量；每条数据都很贵时（真机、需要人参与），用带回放的方法，靠反复使用提高效率。</p>
 <div class="i-builds">承接 <a href="10-3.html#c-p10-3-gpu-sim">把环境搬上 GPU：成千上万个仿真同时跑</a><a href="10-2.html#c-p10-2-value">价值路线：学会给每个动作打分，再挑分数最高的</a><a href="0-3.html#c-p0-3-latency">存储层次：数据每远一层，就慢一到三个数量级</a></div>
@@ -90,13 +90,13 @@
 <a class="next" href="10-4.html"><small>下一单元</small>10.4 业界怎么用强化学习</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

@@ -118,6 +118,7 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .essence .i-detail p { margin: 0 0 1.05em; }
 .essence .i-detail strong, .essence .story strong, .essence .recap strong { font-weight: 600; color: var(--term); }
 .essence strong.h { color: var(--ink); }              /* a paragraph's run-in heading stays in ink */
+.essence em { font-style: normal; font-weight: 600; color: var(--ink); }   /* *a list item's lead*: set off by weight, as Chinese has no italic */
 .essence .i-detail ul { list-style: disc; }
 .essence mark { background: linear-gradient(transparent 60%, var(--k-mark) 60%, var(--k-mark) 92%, transparent 92%); color: var(--ink); font-weight: 500; padding: 0 1px; }
 .essence mark strong { color: inherit; }
@@ -144,7 +145,7 @@ a.src:hover { border-color: var(--accent); color: var(--accent); }
 .essence .i-detail table, .essence .recap table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1.5em 0; font-size: 14.5px; line-height: 1.7; }
 .essence .i-detail th { text-align: left; font-size: 12.5px; font-weight: 600; color: var(--ink-faint); padding: 8px 18px 8px 0; border-bottom: 1.5px solid var(--ink); white-space: nowrap; }
 .essence .i-detail td { padding: 10px 18px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.essence .i-detail td:first-child { color: var(--ink); font-weight: 500; }
+.essence .i-detail td:first-child { color: var(--ink); font-weight: 500; word-break: keep-all; }   /* a row's name wraps at a space or a comma, not between two characters */
 .essence .i-detail tr:last-child td { border-bottom: none; }
 .essence .i-detail hr { border: none; border-top: 1px solid var(--rule); margin: 1.6em 0; }
 .fig { margin: 34px 0; text-align: center; }

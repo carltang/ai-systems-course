@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -45,7 +45,7 @@
 <li class="i-lead">decode 时算力闲着、带宽吃紧。这种不平衡正好可以利用。</li>
 <li class="icard" id="c-6-1-batching"><h3><span class="i-num">2</span>批处理：读一次权重，服务一批请求</h3>
 <p class="i-essence">decode 时权重读一遍只用来算一个 token，太浪费。把 B 个请求放在一起，读一次权重就能为 B 个请求各算一个 token，算术强度提高 B 倍。continuous batching 更进一步：每生成一步，就让已结束的请求离开、新请求加入。</p>
-<div class="i-detail"><p><strong class="h">单个请求的浪费。</strong> decode 一步，把 14 GB 的权重从显存搬出来，每个权重只做了一次乘加，算出一个 token。GPU 的运算单元大部分时间在等数据。</p><p><strong class="h">批处理。</strong> 把 B 个用户的请求放在一起，每一步同时为每个请求算一个新 token。每一层的运算从“权重矩阵 × 1 个向量”变成“权重矩阵 × B 个向量”。</p><ul><li>权重还是只读一遍。</li><li>每个权重现在做了 B 次乘加。</li><li><mark>这一步的时间几乎不变（瓶颈是读权重，而读的量没变），却产出了 B 个 token</mark>。</li></ul><p>用 3.3 的话说，算术强度提高了 B 倍，运算单元从“闲着”变成“有活干”。这是 0.1 里“成批处理，摊薄固定成本”最直接的例子：读一遍权重是固定成本，分摊给了 B 个请求。</p><p><strong class="h">能涨到多高。</strong> 吞吐随 B 近似线性上升，直到碰到下面三个上限之一：</p><ul><li>*算力。* B 大到运算单元忙不过来，瓶颈从带宽变成算力。之后再加大 B，每一步的时间开始成比例变长，吞吐不再增加。这个转折点大约在“B × 每个位置的运算量 ÷ 峰值算力 ≈ 读一遍权重的时间”处，对常见的模型是几十到几百。</li><li>*KV cache 的显存。* 每个请求都有自己的一份缓存（下一节）。常常在算力用满之前，显存先放不下了。</li><li>*延迟。* B 越大，每一步越慢（即使在带宽受限的区间，KV cache 的读写也随 B 增加），每个用户的每 token 延迟变差。服务有延迟要求时，B 不能无限大（9.3）。</li></ul><p><strong class="h">这解释了一个常见的现象。</strong> 在自己电脑上跑一个模型，每秒几十个 token；云上的服务同一个模型，一张卡每秒能产出几千个 token。差别主要不在硬件，而在云上同时服务着上百个请求。单个用户感受到的速度差不多，但每个 token 分摊的成本低了两个数量级。</p><p><strong class="h">实际的批处理要处理的麻烦。</strong> 训练时一个 batch 里的序列可以补齐到一样长。推理时请求陆续到达，各自处于不同的进度，各自的 KV cache 长度不同，结束的时间也不同。怎样让请求随时加入、随时离开，是 9.3 讲的连续批处理。</p></div>
+<div class="i-detail"><p><strong class="h">单个请求的浪费。</strong> decode 一步，把 14 GB 的权重从显存搬出来，每个权重只做了一次乘加，算出一个 token。GPU 的运算单元大部分时间在等数据。</p><p><strong class="h">批处理。</strong> 把 B 个用户的请求放在一起，每一步同时为每个请求算一个新 token。每一层的运算从“权重矩阵 × 1 个向量”变成“权重矩阵 × B 个向量”。</p><ul><li>权重还是只读一遍。</li><li>每个权重现在做了 B 次乘加。</li><li><mark>这一步的时间几乎不变（瓶颈是读权重，而读的量没变），却产出了 B 个 token</mark>。</li></ul><p>用 3.3 的话说，算术强度提高了 B 倍，运算单元从“闲着”变成“有活干”。这是 0.1 里“成批处理，摊薄固定成本”最直接的例子：读一遍权重是固定成本，分摊给了 B 个请求。</p><p><strong class="h">能涨到多高。</strong> 吞吐随 B 近似线性上升，直到碰到下面三个上限之一：</p><ul><li><em>算力。</em> B 大到运算单元忙不过来，瓶颈从带宽变成算力。之后再加大 B，每一步的时间开始成比例变长，吞吐不再增加。这个转折点大约在“B × 每个位置的运算量 ÷ 峰值算力 ≈ 读一遍权重的时间”处，对常见的模型是几十到几百。</li><li><em>KV cache 的显存。</em> 每个请求都有自己的一份缓存（下一节）。常常在算力用满之前，显存先放不下了。</li><li><em>延迟。</em> B 越大，每一步越慢（即使在带宽受限的区间，KV cache 的读写也随 B 增加），每个用户的每 token 延迟变差。服务有延迟要求时，B 不能无限大（9.3）。</li></ul><p><strong class="h">这解释了一个常见的现象。</strong> 在自己电脑上跑一个模型，每秒几十个 token；云上的服务同一个模型，一张卡每秒能产出几千个 token。差别主要不在硬件，而在云上同时服务着上百个请求。单个用户感受到的速度差不多，但每个 token 分摊的成本低了两个数量级。</p><p><strong class="h">实际的批处理要处理的麻烦。</strong> 训练时一个 batch 里的序列可以补齐到一样长。推理时请求陆续到达，各自处于不同的进度，各自的 KV cache 长度不同，结束的时间也不同。怎样让请求随时加入、随时离开，是 9.3 讲的连续批处理。</p></div>
 <p class="i-analogy"><b>打个比方</b>公交车又回来了：一趟车的成本几乎固定，多拉一个人几乎不增加成本；而且每到一站都可以有人上下车。</p>
 <p class="i-impl">所以吞吐几乎随并发线性增长，直到变成算力受限或者 KV cache 放不下；服务端推理比单机聊天高效得多，原因就在这里。</p>
 <div class="i-builds">承接 <a href="9-1.html#c-6-1-prefill-decode">prefill 受算力限制，decode 受带宽限制</a><a href="3-3.html#c-2-3-intensity">算术强度：每搬 1 字节，能做几次运算</a><a href="0-1.html#c-p0-1-themes">五个思想会在每一层反复出现</a></div>
@@ -55,7 +55,7 @@
 <li class="i-lead">批处理的三个上限里，最先碰到的通常是显存。</li>
 <li class="icard" id="c-6-1-kv-memory"><h3><span class="i-num">3</span>KV cache 是推理显存的大头</h3>
 <p class="i-essence">每个请求的 KV cache 大小 = 2（K 和 V）× 层数 × 隐藏维度 × 序列长度 × 每个数的字节数。长上下文、高并发时，它比模型权重还大。</p>
-<div class="i-detail"><p>4.1 讲过 KV cache 是什么：每一层把已经算过的 K 和 V 存下来，避免重复计算。这里算它有多大。</p><p><strong class="h">公式。</strong> 一个请求的缓存 = 2（K 和 V）× 层数 × 序列长度 × 隐藏维度 × 每个数的字节数。</p><p>（隐藏维度 = 头数 × 每个头的维度。用了后面说的 GQA 时，要把它换成“K、V 的头数 × 每个头的维度”。）</p><p><strong class="h">代入一个中等的模型。</strong> 32 层，隐藏维度 4096，16 位存储：</p><ul><li>每个 token：2 × 32 × 4096 × 2 字节 ≈ 0.5 MB。</li><li>一个 4000 token 的对话：约 2 GB。</li><li>一个 10 万 token 的长文档：约 50 GB，超过了模型权重本身。</li></ul><figure class="fig"><img src="../assets/figures/kv-memory.svg" alt="上面几个数字放在一起看" loading="lazy"><figcaption>上面几个数字放在一起看</figcaption></figure><p><strong class="h">一张卡能放多少请求。</strong> 80 GB 的卡，模型权重占 14 GB，剩下约 60 GB 给 KV cache。平均每个请求 4000 token 的话，只能同时放 30 个左右。上一节说吞吐随并发线性增长，而并发在这里被卡在了 30。算力还远远没有用满。</p><p>所以推理的容量规划，第一步算的是显存而不是算力：能同时放下多少请求的上下文。</p><p><strong class="h">缩小它的办法。</strong></p><ul><li>*让几个头共用一组 K、V。* 标准的多头注意力每个头有自己的 K 和 V（1.4）。分组查询注意力（GQA）让若干个头共用一组，比如 32 个查询头只配 8 组 K、V，缓存直接缩小到四分之一。极端的情况是所有头共用一组（MQA）。这是模型结构上的改动，要在训练时就定下来。现在的大模型大多采用了 GQA。</li><li>*用更少的位数存。* 把缓存量化到 8 位（9.2）。</li><li>*不为没用到的部分预留。* 下一节的 PagedAttention。</li><li>*跨请求共享相同的部分。* 9.3 的前缀缓存。</li><li>*挪到别处。* 把暂时不活跃的请求的缓存移到主内存甚至硬盘，需要时再搬回来。搬运的速度受 PCIe 带宽限制（5.1）。</li></ul><p><strong class="h">它也影响 decode 的速度。</strong> 每一步的注意力要把这个请求的整个缓存读一遍。上下文很长时，“读缓存”会成为每一步里和“读权重”同样重要的开销。所以<mark>长上下文的请求不只占显存，每个 token 也更慢</mark>。</p><p>回到 2.1 的显存账本：训练时最大的一笔是为反向保存的激活值；推理没有反向，取而代之的最大一笔就是 KV cache。两者都随序列长度和并发（batch）增长。</p></div>
+<div class="i-detail"><p>4.1 讲过 KV cache 是什么：每一层把已经算过的 K 和 V 存下来，避免重复计算。这里算它有多大。</p><p><strong class="h">公式。</strong> 一个请求的缓存 = 2（K 和 V）× 层数 × 序列长度 × 隐藏维度 × 每个数的字节数。</p><p>（隐藏维度 = 头数 × 每个头的维度。用了后面说的 GQA 时，要把它换成“K、V 的头数 × 每个头的维度”。）</p><p><strong class="h">代入一个中等的模型。</strong> 32 层，隐藏维度 4096，16 位存储：</p><ul><li>每个 token：2 × 32 × 4096 × 2 字节 ≈ 0.5 MB。</li><li>一个 4000 token 的对话：约 2 GB。</li><li>一个 10 万 token 的长文档：约 50 GB，超过了模型权重本身。</li></ul><figure class="fig"><img src="../assets/figures/kv-memory.svg" alt="上面几个数字放在一起看" loading="lazy"><figcaption>上面几个数字放在一起看</figcaption></figure><p><strong class="h">一张卡能放多少请求。</strong> 80 GB 的卡，模型权重占 14 GB，剩下约 60 GB 给 KV cache。平均每个请求 4000 token 的话，只能同时放 30 个左右。上一节说吞吐随并发线性增长，而并发在这里被卡在了 30。算力还远远没有用满。</p><p>所以推理的容量规划，第一步算的是显存而不是算力：能同时放下多少请求的上下文。</p><p><strong class="h">缩小它的办法。</strong></p><ul><li><em>让几个头共用一组 K、V。</em> 标准的多头注意力每个头有自己的 K 和 V（1.4）。分组查询注意力（GQA）让若干个头共用一组，比如 32 个查询头只配 8 组 K、V，缓存直接缩小到四分之一。极端的情况是所有头共用一组（MQA）。这是模型结构上的改动，要在训练时就定下来。现在的大模型大多采用了 GQA。</li><li><em>用更少的位数存。</em> 把缓存量化到 8 位（9.2）。</li><li><em>不为没用到的部分预留。</em> 下一节的 PagedAttention。</li><li><em>跨请求共享相同的部分。</em> 9.3 的前缀缓存。</li><li><em>挪到别处。</em> 把暂时不活跃的请求的缓存移到主内存甚至硬盘，需要时再搬回来。搬运的速度受 PCIe 带宽限制（5.1）。</li></ul><p><strong class="h">它也影响 decode 的速度。</strong> 每一步的注意力要把这个请求的整个缓存读一遍。上下文很长时，“读缓存”会成为每一步里和“读权重”同样重要的开销。所以<mark>长上下文的请求不只占显存，每个 token 也更慢</mark>。</p><p>回到 2.1 的显存账本：训练时最大的一笔是为反向保存的激活值；推理没有反向，取而代之的最大一笔就是 KV cache。两者都随序列长度和并发（batch）增长。</p></div>
 <p class="i-analogy"><b>打个比方</b>像餐厅：厨房（模型权重）大小固定，真正限制接待人数的是餐桌（每位客人的 KV cache）有多少张。</p>
 <p class="i-impl">所以一张卡能同时服务多少请求，往往取决于 KV cache 放不放得下；GQA/MQA（多个头共用 K、V）、KV cache 量化，都是在缩小它。</p>
 <div class="i-builds">承接 <a href="4-1.html#c-3-1-kv-cache">KV cache：算过的不再算</a></div>
@@ -81,13 +81,13 @@
 <a class="next" href="9-2.html"><small>下一单元</small>9.2 量化与低精度</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

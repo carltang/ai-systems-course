@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -35,7 +35,7 @@
 <div class="essence-head"><h2>讲解</h2></div><ol class="icards">
 <li class="icard" id="c-4-1-feed"><h3><span class="i-num">1</span>GPU 在等数据：先查数据管线</h3>
 <p class="i-essence">每一步训练前，CPU 要读数据、解码、做增强、拷到 GPU。只要这一串比 GPU 计算慢，GPU 就只能干等，profiler 时间线上会出现一段段空白。</p>
-<div class="i-detail"><p>0.1 讲过，训练的一步是一条串联的管道，前三步（读数据、预处理、拷上 GPU）由 CPU 完成。只要这三步合起来比 GPU 的计算慢，GPU 就会周期性地空下来。</p><p><strong class="h">三个层次的证据，从粗到细。</strong></p><ul><li>*利用率曲线。* 每秒采样一次 GPU 利用率，呈锯齿状：一会儿接近 100%，一会儿掉到很低，周期和一步训练的时间吻合（0.2）。同时看 CPU：负责数据加载的那些进程把核占满了。</li><li>*打点计时。* 在循环里量“取下一个 batch 花了多久”。供给充足时，这个时间接近零（batch 早就准备好了，只是从队列里拿出来）；供给不足时，它是几十上百毫秒，这段时间里训练循环在干等。</li><li>*时间线。* profiler 导出的时间线上，GPU 那一行有规律地出现空白。空白对应的时间段里，主线程停在 DataLoader 的取数据调用上。</li></ul><p><strong class="h">最干净的验证。</strong> <mark>把同一个 batch 反复喂给模型，完全不读新数据</mark>。吞吐如果大幅上升，差的那部分就是数据供给的代价。这一单元最后的“排查”给出了完整的步骤。</p><p><strong class="h">为什么它这么常见。</strong> 两个趋势叠在一起：GPU 一代比一代快，一步计算的时间越来越短；而数据预处理是 CPU 上的 Python，速度几乎没变。于是同样的数据管线，换了新卡之后就可能从“够用”变成“瓶颈”。多卡时更明显：GPU 的数量翻了几倍，CPU 的核数没有跟着翻。</p><p><strong class="h">哪类任务容易中招。</strong> 输入需要在 CPU 上做重计算的：图像（解码 JPEG、增强）、视频、音频。语言模型的输入通常是提前分好词的整数，数据加载极轻，一般不是瓶颈；如果是，多半是把分词放在了训练时做（这一单元最后一节）。</p></div>
+<div class="i-detail"><p>0.1 讲过，训练的一步是一条串联的管道，前三步（读数据、预处理、拷上 GPU）由 CPU 完成。只要这三步合起来比 GPU 的计算慢，GPU 就会周期性地空下来。</p><p><strong class="h">三个层次的证据，从粗到细。</strong></p><ul><li><em>利用率曲线。</em> 每秒采样一次 GPU 利用率，呈锯齿状：一会儿接近 100%，一会儿掉到很低，周期和一步训练的时间吻合（0.2）。同时看 CPU：负责数据加载的那些进程把核占满了。</li><li><em>打点计时。</em> 在循环里量“取下一个 batch 花了多久”。供给充足时，这个时间接近零（batch 早就准备好了，只是从队列里拿出来）；供给不足时，它是几十上百毫秒，这段时间里训练循环在干等。</li><li><em>时间线。</em> profiler 导出的时间线上，GPU 那一行有规律地出现空白。空白对应的时间段里，主线程停在 DataLoader 的取数据调用上。</li></ul><p><strong class="h">最干净的验证。</strong> <mark>把同一个 batch 反复喂给模型，完全不读新数据</mark>。吞吐如果大幅上升，差的那部分就是数据供给的代价。这一单元最后的“排查”给出了完整的步骤。</p><p><strong class="h">为什么它这么常见。</strong> 两个趋势叠在一起：GPU 一代比一代快，一步计算的时间越来越短；而数据预处理是 CPU 上的 Python，速度几乎没变。于是同样的数据管线，换了新卡之后就可能从“够用”变成“瓶颈”。多卡时更明显：GPU 的数量翻了几倍，CPU 的核数没有跟着翻。</p><p><strong class="h">哪类任务容易中招。</strong> 输入需要在 CPU 上做重计算的：图像（解码 JPEG、增强）、视频、音频。语言模型的输入通常是提前分好词的整数，数据加载极轻，一般不是瓶颈；如果是，多半是把分词放在了训练时做（这一单元最后一节）。</p></div>
 <p class="i-analogy"><b>打个比方</b>像高速公路只开了一个收费口：路再宽，车也过不去。</p>
 <p class="i-impl">所以 GPU 利用率忽高忽低时，先查数据加载：多开 DataLoader worker、用 pinned memory、提前预取，让数据准备和计算重叠起来。</p>
 <div class="i-builds">承接 <a href="0-1.html#c-p0-1-waits">管道上的“慢”只有四种：等数据、等计算、等发令、等别的卡</a><a href="0-2.html#c-p0-2-attribution">把一步的时间拆开：每一段各占多少</a><a href="0-3.html#c-p0-3-pinned">内存里的数据会被操作系统挪动，交给设备之前要先“钉住”</a><a href="0-3.html#c-p0-3-process">进程、线程与 GIL：为什么数据加载要开多个进程</a></div>
@@ -99,13 +99,13 @@ print(n / (time.perf_counter() - t0), "样本/秒")</pre><p>这个数要明显�
 <a class="next" href="2-5.html"><small>下一单元</small>2.5 torch.compile 的三层栈</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

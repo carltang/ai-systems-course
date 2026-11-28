@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -35,7 +35,7 @@
 <div class="essence-head"><h2>讲解</h2></div><ol class="icards">
 <li class="icard" id="c-3-2-tensor-core"><h3><span class="i-num">1</span>Tensor Core 一条指令算完一个小矩阵乘</h3>
 <p class="i-essence">普通 CUDA core 一次做一个乘加；Tensor Core 由一个 warp 协同，一次完成一个小矩阵块（例如 16×8×16）的乘加，输入是 fp16、bf16、tf32、fp8 这类低精度格式，累加用 fp32。吞吐比普通核心高一个数量级。</p>
-<div class="i-detail"><p><strong class="h">普通的运算单元。</strong> 3.3 讲过 GPU 的计算由一组组线程（warp，32 个线程）执行。普通情况下，每个线程每条指令做一次标量运算：一次乘法，或者一次乘加。矩阵乘法 C = A × B 的每个输出元素是一行和一列的点积，要做很多次乘加，由线程们一次一次地做。</p><p><strong class="h">Tensor Core。</strong> 它是 SM 里专门为矩阵乘法设计的硬件单元。一条指令，由一整个 warp 协同，完成“一个小矩阵乘以另一个小矩阵，再加到第三个小矩阵上”。常见的一种形状是 16×16 的 A 小块、16×8 的 B 小块，结果累加到 16×8 的 C 小块上。这一条指令里包含的乘加次数，普通单元要做上千次。于是同样的时间里能完成的运算量高出一个量级。显卡规格里“Tensor Core 的半精度峰值”和“普通单精度峰值”那两个 TFLOPS 数字的差距，就来自这里。</p><p><strong class="h">使用条件。</strong></p><ul><li>*低精度。* 输入是 16 位（fp16、bf16）或更低（8 位整数、fp8）；32 位输入可以走一种内部降精度的模式（TF32）。结果通常用 32 位累加，以免误差累积。这就是 1.5 里“换成 bf16 或 TF32 才能用上 Tensor Core”的硬件原因。</li><li>*数据要按小块排好。* 指令的输入是“一个 warp 的各个线程手里合起来的一小块矩阵”。每个线程的寄存器里要放这一小块的哪几个元素，有固定的规定。所以在调用它之前，数据必须已经从显存经共享内存搬进了寄存器，并且位置摆对。</li><li>*尺寸要凑整。* 矩阵的维度最好是小块尺寸的整数倍，否则边角要单独处理。1.5 里“把维度凑成 64、128 的倍数”说的就是这件事。</li></ul><p><strong class="h">瓶颈随之转移。</strong> 没有 Tensor Core 时，矩阵乘法是算力受限的：运算单元忙不过来。有了它，运算快了一个量级，“把数据从显存搬到寄存器”的速度就跟不上了。同一个 kernel 从算力受限变成了带宽受限。这是 0.1 的第一个思想的典型表现：<mark>消除了一个瓶颈，下一个瓶颈就浮出来</mark>。后面两节讲的分块和流水线，都是为了把数据喂得够快。</p><p><strong class="h">你需要自己用它吗。</strong> 几乎不需要。cuBLAS、cuDNN 和 Triton 的编译器都会在条件满足时自动使用。你要做的是让条件满足：打开混合精度（2.6），维度凑整。想确认用上了没有，可以用 profiler 看矩阵乘法 kernel 的名字，或者直接比较开关混合精度前后的吞吐。</p></div>
+<div class="i-detail"><p><strong class="h">普通的运算单元。</strong> 3.3 讲过 GPU 的计算由一组组线程（warp，32 个线程）执行。普通情况下，每个线程每条指令做一次标量运算：一次乘法，或者一次乘加。矩阵乘法 C = A × B 的每个输出元素是一行和一列的点积，要做很多次乘加，由线程们一次一次地做。</p><p><strong class="h">Tensor Core。</strong> 它是 SM 里专门为矩阵乘法设计的硬件单元。一条指令，由一整个 warp 协同，完成“一个小矩阵乘以另一个小矩阵，再加到第三个小矩阵上”。常见的一种形状是 16×16 的 A 小块、16×8 的 B 小块，结果累加到 16×8 的 C 小块上。这一条指令里包含的乘加次数，普通单元要做上千次。于是同样的时间里能完成的运算量高出一个量级。显卡规格里“Tensor Core 的半精度峰值”和“普通单精度峰值”那两个 TFLOPS 数字的差距，就来自这里。</p><p><strong class="h">使用条件。</strong></p><ul><li><em>低精度。</em> 输入是 16 位（fp16、bf16）或更低（8 位整数、fp8）；32 位输入可以走一种内部降精度的模式（TF32）。结果通常用 32 位累加，以免误差累积。这就是 1.5 里“换成 bf16 或 TF32 才能用上 Tensor Core”的硬件原因。</li><li><em>数据要按小块排好。</em> 指令的输入是“一个 warp 的各个线程手里合起来的一小块矩阵”。每个线程的寄存器里要放这一小块的哪几个元素，有固定的规定。所以在调用它之前，数据必须已经从显存经共享内存搬进了寄存器，并且位置摆对。</li><li><em>尺寸要凑整。</em> 矩阵的维度最好是小块尺寸的整数倍，否则边角要单独处理。1.5 里“把维度凑成 64、128 的倍数”说的就是这件事。</li></ul><p><strong class="h">瓶颈随之转移。</strong> 没有 Tensor Core 时，矩阵乘法是算力受限的：运算单元忙不过来。有了它，运算快了一个量级，“把数据从显存搬到寄存器”的速度就跟不上了。同一个 kernel 从算力受限变成了带宽受限。这是 0.1 的第一个思想的典型表现：<mark>消除了一个瓶颈，下一个瓶颈就浮出来</mark>。后面两节讲的分块和流水线，都是为了把数据喂得够快。</p><p><strong class="h">你需要自己用它吗。</strong> 几乎不需要。cuBLAS、cuDNN 和 Triton 的编译器都会在条件满足时自动使用。你要做的是让条件满足：打开混合精度（2.6），维度凑整。想确认用上了没有，可以用 profiler 看矩阵乘法 kernel 的名字，或者直接比较开关混合精度前后的吞吐。</p></div>
 <p class="i-analogy"><b>打个比方</b>普通核心像一次只能拧一颗螺丝的工人，Tensor Core 像一次压出一整块零件的冲床。</p>
 <p class="i-impl">所以要用上 Tensor Core，数据必须是低精度格式、按小块排好；算力上限一下子高了很多，瓶颈又回到了“能不能把数据喂得够快”。</p>
 <div class="i-builds">承接 <a href="3-3.html#c-2-3-intensity">算术强度：每搬 1 字节，能做几次运算</a><a href="1-5.html#c-1-4-precision">少用几位数字，就少搬一半数据</a></div>
@@ -63,7 +63,7 @@
 <li class="i-lead">把这些技巧都用上之后，离专业的库还有多远？</li>
 <li class="icard" id="c-3-2-cublas"><h3><span class="i-num">4</span>追 cuBLAS：知道差在哪，比追平更重要</h3>
 <p class="i-essence">一步步优化矩阵乘法（合并访存 → 共享内存分块 → 寄存器分块 → 向量化 → Tensor Core），每一步都能用 3.4 的清单解释为什么变快。最后能到 cuBLAS 的八九成，已经很接近硬件极限。</p>
-<div class="i-detail"><p><strong class="h">一条典型的优化路线。</strong> 以一个固定大小的矩阵乘法为例，每一步解决的问题和对应的章节：</p><ul><li>*朴素版本*：一个线程算一个输出元素，从显存读一行一列。慢在访存：每个数只用一次，而且对其中一个矩阵是跳着读的。</li><li>*合并访存*（3.4）：调整线程和数据的对应关系，让相邻线程读相邻的地址。</li><li>*共享内存分块*（3.3）：一块数据搬进来用很多次。这一步通常提升最大。</li><li>*寄存器分块*（上上节）：每个线程算一小片输出，而不是一个元素。</li><li>*向量化读写*：一次读写 4 个数，而不是 1 个，减少访存指令的条数。</li><li>*双缓冲*（上一节）：搬和算重叠。</li><li>*Tensor Core*：换成专用硬件，同时换成低精度。</li></ul><p>siboehm 那篇广受好评的博客就是按这样的顺序，从朴素版本一步步优化到接近 cuBLAS，每一步都给出了测量结果。《CUDA for LLMs》第 6、7 章走的是相同的路线，最后达到 cuBLAS 的八成多。</p><p><strong class="h">每一步都能用 3.4 的清单解释。</strong> 这是走这条路线的真正价值：不是得到一个矩阵乘法，而是亲眼看到“算力受限、带宽受限、藏住延迟”这些概念各自值多少倍的性能。</p><p><strong class="h">剩下的差距在哪。</strong> 库的作者还做了更多：</p><ul><li>针对每一代 GPU、每一种矩阵形状和数据类型分别调优，运行时按实际情况选择不同的实现。</li><li>处理各种不规整的情况：不是块大小整数倍的尺寸、很扁或很窄的矩阵、不连续的内存布局。</li><li>用上最新硬件的专有特性，往往在公开文档之前。</li></ul><p>追平最后那一两成，需要的工作量比前面八成加起来还多，而且换一代硬件又要重来。</p><p><strong class="h">所以实际工程里的分工是：</strong></p><ul><li>标准的矩阵乘法、卷积：直接用 cuBLAS、cuDNN。PyTorch 的 <code>matmul</code>、<code>nn.Linear</code> 底下就是它们。</li><li>需要把矩阵乘法和别的运算融合在一起、库里没有现成的（Flash Attention 是最好的例子）：用 Triton 写，或者基于 CUTLASS 这样的模板库写。这时上面这些技巧才派上用场。</li></ul><p>0.2 讲过“<mark>离上限只差一两成时，就该换一个瓶颈去攻</mark>”。矩阵乘法是这句话最典型的应用场景。</p></div>
+<div class="i-detail"><p><strong class="h">一条典型的优化路线。</strong> 以一个固定大小的矩阵乘法为例，每一步解决的问题和对应的章节：</p><ul><li><em>朴素版本</em>：一个线程算一个输出元素，从显存读一行一列。慢在访存：每个数只用一次，而且对其中一个矩阵是跳着读的。</li><li><em>合并访存</em>（3.4）：调整线程和数据的对应关系，让相邻线程读相邻的地址。</li><li><em>共享内存分块</em>（3.3）：一块数据搬进来用很多次。这一步通常提升最大。</li><li><em>寄存器分块</em>（上上节）：每个线程算一小片输出，而不是一个元素。</li><li><em>向量化读写</em>：一次读写 4 个数，而不是 1 个，减少访存指令的条数。</li><li><em>双缓冲</em>（上一节）：搬和算重叠。</li><li><em>Tensor Core</em>：换成专用硬件，同时换成低精度。</li></ul><p>siboehm 那篇广受好评的博客就是按这样的顺序，从朴素版本一步步优化到接近 cuBLAS，每一步都给出了测量结果。《CUDA for LLMs》第 6、7 章走的是相同的路线，最后达到 cuBLAS 的八成多。</p><p><strong class="h">每一步都能用 3.4 的清单解释。</strong> 这是走这条路线的真正价值：不是得到一个矩阵乘法，而是亲眼看到“算力受限、带宽受限、藏住延迟”这些概念各自值多少倍的性能。</p><p><strong class="h">剩下的差距在哪。</strong> 库的作者还做了更多：</p><ul><li>针对每一代 GPU、每一种矩阵形状和数据类型分别调优，运行时按实际情况选择不同的实现。</li><li>处理各种不规整的情况：不是块大小整数倍的尺寸、很扁或很窄的矩阵、不连续的内存布局。</li><li>用上最新硬件的专有特性，往往在公开文档之前。</li></ul><p>追平最后那一两成，需要的工作量比前面八成加起来还多，而且换一代硬件又要重来。</p><p><strong class="h">所以实际工程里的分工是：</strong></p><ul><li>标准的矩阵乘法、卷积：直接用 cuBLAS、cuDNN。PyTorch 的 <code>matmul</code>、<code>nn.Linear</code> 底下就是它们。</li><li>需要把矩阵乘法和别的运算融合在一起、库里没有现成的（Flash Attention 是最好的例子）：用 Triton 写，或者基于 CUTLASS 这样的模板库写。这时上面这些技巧才派上用场。</li></ul><p>0.2 讲过“<mark>离上限只差一两成时，就该换一个瓶颈去攻</mark>”。矩阵乘法是这句话最典型的应用场景。</p></div>
 <p class="i-analogy"><b>打个比方</b>像学做菜对照名厨的版本：做不到一模一样没关系，关键是尝得出差在火候还是调料。</p>
 <p class="i-impl">所以实际工程里矩阵乘法直接用 cuBLAS 或 CUTLASS；自己写的意义在于看懂性能从哪里来，以及在库覆盖不到的融合算子里用上这些技巧。</p>
 <div class="i-builds">承接 <a href="3-4.html#c-2-4-checklist">优化清单的本质：让计算单元一直有活干</a></div>
@@ -78,13 +78,13 @@
 <a class="next" href="5-1.html"><small>下一单元</small>5.1 机内互联：PCIe、NVLink 与 NVSwitch</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

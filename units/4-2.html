@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -45,7 +45,7 @@
 <li class="i-lead">融合省的是中间结果的读写。那么，什么样的算子可以这样合在一起？</li>
 <li class="icard" id="c-p4-2-what-fuses"><h3><span class="i-num">2</span>哪些能融合：一串逐元素的运算，加上它们后面的归约</h3>
 <p class="i-essence">最容易融合的是逐元素的运算：每个输出元素只依赖各个输入里同一位置的元素。一串这样的运算可以合成一个 kernel，每个线程对一个位置把整串算完。紧跟在后面的归约（求和、求最大值）也能并进来。矩阵乘法、排序这类“每个输出依赖很多输入”的运算，通常是融合的边界。</p>
-<div class="i-detail"><p><strong class="h">按“输出依赖哪些输入”给算子分类。</strong></p><ul><li>*逐元素*：<code>add</code>、<code>mul</code>、<code>exp</code>、<code>gelu</code>、和标量的运算、类型转换。输出的第 i 个元素只看输入的第 i 个元素。广播也算（一个输入的元素被重复使用）。</li><li>*归约*：<code>sum</code>、<code>mean</code>、<code>max</code>、<code>norm</code>。很多输入元素合成一个输出。</li><li>*全局依赖*：矩阵乘法、卷积、排序、注意力。每个输出依赖一大片输入。</li></ul><p><strong class="h">逐元素的链。</strong> <code>y = gelu(x * w + b)</code> 是三步逐元素运算。融合后的 kernel 里，每个线程负责一个位置：读 <code>x[i]</code>、<code>w[i]</code>、<code>b[i]</code>，在寄存器里乘、加、算 gelu，写 <code>y[i]</code>。三步之间不需要任何线程间的配合，所以总是可以融合。</p><p><strong class="h">逐元素加归约。</strong> 层归一化（LayerNorm）是典型：先求均值（归约），减去它（逐元素），平方后求均值得到方差（逐元素加归约），再除、再乘缩放加偏置（逐元素）。一个设计得好的 kernel 可以让每一行数据只从显存读一遍：线程们把这一行读进来，用 3.5 讲的并行归约算出均值和方差，再各自算出结果写回去。分开执行则要把这一行读写五六遍。</p><p><strong class="h">边界在哪。</strong></p><ul><li>矩阵乘法：它有专门的、高度优化的实现（4.5），编译器不会把它拆开和别的运算混在一起。所以典型的图是“矩阵乘法 → 一串可融合的运算 → 矩阵乘法”，融合发生在两次矩阵乘法之间。</li><li>一个中间结果被好几处用到，而且其中一处在很后面：这个结果必须落地存着，融合在这里断开（或者重算一遍）。</li><li>形状变了、需要先知道全部结果才能继续的运算（比如按掩码筛选，输出大小取决于数据）。</li></ul><p><strong class="h">对着 4.1 的两类算子看。</strong> 4.1 把 Transformer 的算子分成算力受限的（矩阵乘法）和带宽受限的（其余）。<mark>融合对付的恰好是后一类</mark>。所以在一个大模型的训练里，融合能改善的是“矩阵乘法之外”的那部分时间；模型越小、这部分占比越高，融合的效果越明显。</p><p>Inductor 的做法大致也是这样：把图里的算子分解成基本运算，再把能合并的逐元素运算和归约尽量合进同一个循环，生成一个 Triton kernel。</p></div>
+<div class="i-detail"><p><strong class="h">按“输出依赖哪些输入”给算子分类。</strong></p><ul><li><em>逐元素</em>：<code>add</code>、<code>mul</code>、<code>exp</code>、<code>gelu</code>、和标量的运算、类型转换。输出的第 i 个元素只看输入的第 i 个元素。广播也算（一个输入的元素被重复使用）。</li><li><em>归约</em>：<code>sum</code>、<code>mean</code>、<code>max</code>、<code>norm</code>。很多输入元素合成一个输出。</li><li><em>全局依赖</em>：矩阵乘法、卷积、排序、注意力。每个输出依赖一大片输入。</li></ul><p><strong class="h">逐元素的链。</strong> <code>y = gelu(x * w + b)</code> 是三步逐元素运算。融合后的 kernel 里，每个线程负责一个位置：读 <code>x[i]</code>、<code>w[i]</code>、<code>b[i]</code>，在寄存器里乘、加、算 gelu，写 <code>y[i]</code>。三步之间不需要任何线程间的配合，所以总是可以融合。</p><p><strong class="h">逐元素加归约。</strong> 层归一化（LayerNorm）是典型：先求均值（归约），减去它（逐元素），平方后求均值得到方差（逐元素加归约），再除、再乘缩放加偏置（逐元素）。一个设计得好的 kernel 可以让每一行数据只从显存读一遍：线程们把这一行读进来，用 3.5 讲的并行归约算出均值和方差，再各自算出结果写回去。分开执行则要把这一行读写五六遍。</p><p><strong class="h">边界在哪。</strong></p><ul><li>矩阵乘法：它有专门的、高度优化的实现（4.5），编译器不会把它拆开和别的运算混在一起。所以典型的图是“矩阵乘法 → 一串可融合的运算 → 矩阵乘法”，融合发生在两次矩阵乘法之间。</li><li>一个中间结果被好几处用到，而且其中一处在很后面：这个结果必须落地存着，融合在这里断开（或者重算一遍）。</li><li>形状变了、需要先知道全部结果才能继续的运算（比如按掩码筛选，输出大小取决于数据）。</li></ul><p><strong class="h">对着 4.1 的两类算子看。</strong> 4.1 把 Transformer 的算子分成算力受限的（矩阵乘法）和带宽受限的（其余）。<mark>融合对付的恰好是后一类</mark>。所以在一个大模型的训练里，融合能改善的是“矩阵乘法之外”的那部分时间；模型越小、这部分占比越高，融合的效果越明显。</p><p>Inductor 的做法大致也是这样：把图里的算子分解成基本运算，再把能合并的逐元素运算和归约尽量合进同一个循环，生成一个 Triton kernel。</p></div>
 <p class="i-analogy"><b>打个比方</b>像流水线上的几道工序：如果每道工序都只处理手上这一个零件（拧螺丝、贴标签、检查），可以交给同一个工人一口气做完；如果某道工序要把一整批零件摆在一起比较（挑出最大的），就得先攒齐一批，前后的工序在这里断开。</p>
 <p class="i-impl">所以一个模型能从融合里得到多少好处，取决于它有多少“连成串”的逐元素运算。归一化、激活函数、残差相加、位置编码都属于这一类，它们正是带宽受限的那部分。</p>
 <div class="i-builds">承接 <a href="4-2.html#c-3-5-fusion">算子融合：中间结果不落地</a><a href="4-1.html#c-3-1-two-kinds">Transformer 的运算量几乎都在矩阵乘法里，时间却不全是</a><a href="3-5.html#c-2-5-tournament">归约就是淘汰赛：n 个数，log n 轮决出结果</a></div>
@@ -80,13 +80,13 @@
 <a class="next" href="4-3.html"><small>下一单元</small>4.3 Triton 入门</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

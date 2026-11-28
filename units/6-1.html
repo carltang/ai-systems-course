@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -64,7 +64,7 @@
 <li class="i-lead">知道了算法，最后需要一个能估算时间的简单模型。</li>
 <li class="icard" id="c-5-1-alpha-beta"><h3><span class="i-num">4</span>通信时间 = 固定延迟 + 数据量 ÷ 带宽</h3>
 <p class="i-essence">每次通信都有一段与数据量无关的启动延迟，再加上按数据量计算的传输时间。消息小时，延迟占了大头；消息大时，带宽决定一切。机器内部的 NVLink 和跨机器的网络，带宽可以差出十倍以上。</p>
-<div class="i-detail"><p>把一次点对点传输的时间写成两项：</p><p>时间 = 固定延迟 + 数据量 ÷ 带宽</p><ul><li><strong>固定延迟</strong>：不管数据多少都要付的部分。发起一次传输、双方同步状态、网络上的往返。量级是微秒到几十微秒。</li><li><strong>数据量 ÷ 带宽</strong>：真正搬数据的时间。带宽就是第 5 部分那些链路的宽度。</li></ul><p><strong class="h">分界点在哪。</strong> 两项相等时的数据量 = 固定延迟 × 带宽。比如延迟 10 微秒、带宽 50 GB/s，分界点是 500 KB。比它小得多的消息，时间几乎全是延迟，带宽再高也没用；比它大得多的消息，延迟可以忽略。</p><figure class="fig"><img src="../assets/figures/alpha-beta.svg" alt="分界点两边，决定时间的是不同的东西" loading="lazy"><figcaption>分界点两边，决定时间的是不同的东西</figcaption></figure><p><strong class="h">对集合通信。</strong> 一次 all-reduce 由很多步点对点传输组成。用环形算法、N 张卡、数据量 S：</p><p>时间 ≈ 2(N−1) × 每步的固定延迟 + 2(N−1)/N × S ÷ 带宽</p><p><mark>第一项随卡数线性增长，第二项几乎不变</mark>。所以大消息看带宽，小消息加多卡看延迟。</p><p><strong class="h">用它解释三件事。</strong></p><ul><li>*为什么小张量要攒起来发。* 一个模型有几百个参数张量，很多只有几 KB（偏置、归一化层的参数）。每个单独做一次 all-reduce，就要付几百次固定延迟。DDP 把它们攒进 25 MB 左右的桶里一起发（7.1），延迟只付几次。这是 0.1 里“成批处理，摊薄固定成本”的又一个例子。</li><li>*为什么测带宽要用大消息。* 用小消息测出来的“带宽”低得可怜，那量到的其实是延迟。6.3 会讲怎样看一条完整的曲线。</li><li>*为什么并行方式要按链路分层。* 机内 NVLink 的带宽比跨机的网络高一个量级（5.1）。同样大小的一次通信，放在机内和放在跨机，时间差十倍。所以最频繁的通信要留在机内（7.3）。</li></ul><p>这个模型很粗：它没有考虑拥塞、链路共享、通信和计算争抢 GPU。Demystifying NCCL 的作者也说，变量太多，他们放弃了给出精确的时间公式。但用来判断量级、判断该看延迟还是看带宽，它足够了。</p></div>
+<div class="i-detail"><p>把一次点对点传输的时间写成两项：</p><p>时间 = 固定延迟 + 数据量 ÷ 带宽</p><ul><li><strong>固定延迟</strong>：不管数据多少都要付的部分。发起一次传输、双方同步状态、网络上的往返。量级是微秒到几十微秒。</li><li><strong>数据量 ÷ 带宽</strong>：真正搬数据的时间。带宽就是第 5 部分那些链路的宽度。</li></ul><p><strong class="h">分界点在哪。</strong> 两项相等时的数据量 = 固定延迟 × 带宽。比如延迟 10 微秒、带宽 50 GB/s，分界点是 500 KB。比它小得多的消息，时间几乎全是延迟，带宽再高也没用；比它大得多的消息，延迟可以忽略。</p><figure class="fig"><img src="../assets/figures/alpha-beta.svg" alt="分界点两边，决定时间的是不同的东西" loading="lazy"><figcaption>分界点两边，决定时间的是不同的东西</figcaption></figure><p><strong class="h">对集合通信。</strong> 一次 all-reduce 由很多步点对点传输组成。用环形算法、N 张卡、数据量 S：</p><p>时间 ≈ 2(N−1) × 每步的固定延迟 + 2(N−1)/N × S ÷ 带宽</p><p><mark>第一项随卡数线性增长，第二项几乎不变</mark>。所以大消息看带宽，小消息加多卡看延迟。</p><p><strong class="h">用它解释三件事。</strong></p><ul><li><em>为什么小张量要攒起来发。</em> 一个模型有几百个参数张量，很多只有几 KB（偏置、归一化层的参数）。每个单独做一次 all-reduce，就要付几百次固定延迟。DDP 把它们攒进 25 MB 左右的桶里一起发（7.1），延迟只付几次。这是 0.1 里“成批处理，摊薄固定成本”的又一个例子。</li><li><em>为什么测带宽要用大消息。</em> 用小消息测出来的“带宽”低得可怜，那量到的其实是延迟。6.3 会讲怎样看一条完整的曲线。</li><li><em>为什么并行方式要按链路分层。</em> 机内 NVLink 的带宽比跨机的网络高一个量级（5.1）。同样大小的一次通信，放在机内和放在跨机，时间差十倍。所以最频繁的通信要留在机内（7.3）。</li></ul><p>这个模型很粗：它没有考虑拥塞、链路共享、通信和计算争抢 GPU。Demystifying NCCL 的作者也说，变量太多，他们放弃了给出精确的时间公式。但用来判断量级、判断该看延迟还是看带宽，它足够了。</p></div>
 <p class="i-analogy"><b>打个比方</b>像寄快递：每一单都有固定的手续时间，再加上按重量算的运输时间。寄一堆小件，时间几乎全花在手续上。</p>
 <p class="i-impl">所以小消息要攒成大块再发（DDP 的梯度分桶就是这么做的），测 all-reduce 带宽要用足够大的消息；规划并行方式时，最频繁的通信要放在最快的链路上（7.3）。</p>
 <div class="i-builds">承接 <a href="6-1.html#c-5-1-ring">Ring all-reduce：卡再多，每张卡的通信量也几乎不变</a></div>
@@ -80,13 +80,13 @@
 <a class="next" href="6-2.html"><small>下一单元</small>6.2 NCCL 内部：拓扑、通道与协议</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

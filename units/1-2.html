@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -63,7 +63,7 @@
 <li class="i-lead">损失在下降，说明模型在拟合训练数据。但这不是我们最终要的。</li>
 <li class="icard" id="c-1-2-generalize"><h3><span class="i-num">4</span>训练误差低不等于学会了：要看没见过的数据</h3>
 <p class="i-essence">模型可能把训练集记住，却没有学到规律。测试误差来自三部分：数据本身的噪声、模型太简单（偏差）、模型对训练样本过于敏感（方差）。现代大模型还会出现“双下降”：模型继续变大，测试误差反而又下降。</p>
-<div class="i-detail"><p><strong class="h">训练的目的。</strong> 我们要的不是模型在训练数据上表现好（把训练数据存下来查表就能做到），而是在没见过的新数据上表现好。这叫泛化。</p><p><strong class="h">所以要留出数据。</strong> 把数据分成训练集和验证集（有时再加一个测试集）。只用训练集更新参数；定期在验证集上算损失，看模型在“没见过的数据”上的表现。1.3 讲了怎样读这两条曲线。</p><p><strong class="h">测试误差的三个来源。</strong></p><ul><li>*噪声。* 数据本身的不确定性。同一段话后面可以接不同的词，任何模型都不可能次次猜对。这部分误差无法消除。</li><li>*偏差。* 模型太简单，表达不了真实的规律。用一条直线去拟合一条曲线，再怎么训练也有差距。表现是训练损失和验证损失都高（欠拟合）。</li><li>*方差。* 模型对训练数据的具体样本过于敏感：换一批训练数据，学到的函数就大不一样。它把训练数据里的偶然细节也当成了规律。表现是训练损失很低，验证损失高得多（过拟合）。</li></ul><p><strong class="h">传统的看法：两者此消彼长。</strong> 模型越大，偏差越小，但方差越大。于是存在一个最合适的大小，过大过小都不好。</p><p><strong class="h">现代的发现：双下降。</strong> 把模型继续加大，大到足以完全记住训练数据之后，测试误差并没有一路变差，而是在升到一个峰值后<strong>再次下降</strong>，最后比那个“最合适的大小”时还低。今天的大模型都处在这个区域：参数量远多于“记住训练数据”所需要的。</p><p>为什么会这样，还没有完全的理论解释。一个常见的说法是：能完全拟合训练数据的函数有很多个，模型越大，可选的越多；而训练算法（从小的初始值出发、用梯度下降）倾向于在其中找到比较平滑的那些，平滑的函数在新数据上表现也好。UDL 第 8 章有这个现象的实验图。</p><p><strong class="h">对实践的意义。</strong></p><ul><li>“模型大了就会过拟合”不是定律。数据足够、训练得当时，更大的模型通常更好。这是大家不断把模型做大的经验基础，也是这门课后面所有系统问题的来源：模型大了，才需要多卡、需要分片、需要高速互联。</li><li>但验证集不能省。无论处在曲线的哪一段，<mark>只有验证集上的表现能告诉你模型是不是真的在变好</mark>。</li></ul></div>
+<div class="i-detail"><p><strong class="h">训练的目的。</strong> 我们要的不是模型在训练数据上表现好（把训练数据存下来查表就能做到），而是在没见过的新数据上表现好。这叫泛化。</p><p><strong class="h">所以要留出数据。</strong> 把数据分成训练集和验证集（有时再加一个测试集）。只用训练集更新参数；定期在验证集上算损失，看模型在“没见过的数据”上的表现。1.3 讲了怎样读这两条曲线。</p><p><strong class="h">测试误差的三个来源。</strong></p><ul><li><em>噪声。</em> 数据本身的不确定性。同一段话后面可以接不同的词，任何模型都不可能次次猜对。这部分误差无法消除。</li><li><em>偏差。</em> 模型太简单，表达不了真实的规律。用一条直线去拟合一条曲线，再怎么训练也有差距。表现是训练损失和验证损失都高（欠拟合）。</li><li><em>方差。</em> 模型对训练数据的具体样本过于敏感：换一批训练数据，学到的函数就大不一样。它把训练数据里的偶然细节也当成了规律。表现是训练损失很低，验证损失高得多（过拟合）。</li></ul><p><strong class="h">传统的看法：两者此消彼长。</strong> 模型越大，偏差越小，但方差越大。于是存在一个最合适的大小，过大过小都不好。</p><p><strong class="h">现代的发现：双下降。</strong> 把模型继续加大，大到足以完全记住训练数据之后，测试误差并没有一路变差，而是在升到一个峰值后<strong>再次下降</strong>，最后比那个“最合适的大小”时还低。今天的大模型都处在这个区域：参数量远多于“记住训练数据”所需要的。</p><p>为什么会这样，还没有完全的理论解释。一个常见的说法是：能完全拟合训练数据的函数有很多个，模型越大，可选的越多；而训练算法（从小的初始值出发、用梯度下降）倾向于在其中找到比较平滑的那些，平滑的函数在新数据上表现也好。UDL 第 8 章有这个现象的实验图。</p><p><strong class="h">对实践的意义。</strong></p><ul><li>“模型大了就会过拟合”不是定律。数据足够、训练得当时，更大的模型通常更好。这是大家不断把模型做大的经验基础，也是这门课后面所有系统问题的来源：模型大了，才需要多卡、需要分片、需要高速互联。</li><li>但验证集不能省。无论处在曲线的哪一段，<mark>只有验证集上的表现能告诉你模型是不是真的在变好</mark>。</li></ul></div>
 <p class="i-analogy"><b>打个比方</b>像背题库考试：题库背得滚瓜烂熟，换一套题就露馅。</p>
 <p class="i-impl">所以训练时一定要看验证集曲线：训练损失在降、验证损失在升，就是过拟合。正则化（weight decay、dropout）和更多的数据，都是在控制方差。</p>
 <div class="i-builds">后面会用到 <a href="1-3.html#c-p1-3-guards">权重衰减、dropout、梯度裁剪：各自在防一种具体的毛病</a><a href="1-3.html#c-p1-3-curves">读损失曲线：训练和验证两条线，几种典型的形状</a></div>
@@ -78,13 +78,13 @@
 <a class="next" href="1-3.html"><small>下一单元</small>1.3 训练实践与诊断</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>

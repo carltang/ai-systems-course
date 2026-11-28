@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Victor+Mono:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=44d46eb3">
+<link rel="stylesheet" href="../assets/site.css?v=90eef784">
 </head>
 <body>
 <main class="main">
@@ -65,7 +65,7 @@
 <li class="i-lead">设置都讲完了。训练跑起来之后，怎么知道它进行得好不好？</li>
 <li class="icard" id="c-p1-3-curves"><h3><span class="i-num">4</span>读损失曲线：训练和验证两条线，几种典型的形状</h3>
 <p class="i-essence">把训练集上的损失和验证集上的损失画在一张图上。两条都高且不降，是没学会；训练的低、验证的高而且差距在拉大，是过拟合；突然冲到很高或变成 NaN，是发散；长期走平，是遇到了平台。每种形状指向不同的原因。</p>
-<div class="i-detail"><p><strong class="h">先准备好两份数据。</strong> 训练集用来更新参数。验证集是从同样的来源留出来、不参与训练的一小部分，每隔一段时间在上面算一次损失（在 <code>no_grad</code> 里，2.2）。它代表“没见过的数据”。</p><p><strong class="h">知道起点应该在哪。</strong> 训练开始前，模型的输出接近随机。对一个有 V 个类别的分类问题（语言模型的 V 就是词表大小），<mark>随机猜的交叉熵损失是 ln V</mark>。GPT-2 的词表约 5 万，初始损失应该在 10.8 左右。第一步的损失如果远高于这个数，说明初始化有问题；远低于它，说明数据里有泄漏（比如标签被模型直接看到了）。这是 Karpathy 反复强调的一个检查，只要几秒钟。</p><p><strong class="h">几种形状。</strong></p><table><thead><tr><th>形状</th><th>说明</th><th>先查什么</th></tr></thead><tbody><tr><td>两条线都停在初始值附近</td><td>没有在学</td><td>学习率是否太小；梯度有没有传回去；数据和标签是否对得上</td></tr><tr><td>两条线一起稳定下降，差距很小</td><td>正常，而且还没训够</td><td>继续训，或者加大模型</td></tr><tr><td>训练线继续降，验证线走平后回升</td><td>过拟合</td><td>更多数据、加强正则化、提前停止</td></tr><tr><td>一开始就猛涨或变成 NaN</td><td>发散</td><td>学习率太大、没有预热、数值问题</td></tr><tr><td>训练中途突然出现尖峰，之后恢复</td><td>遇到了异常的 batch 或陡坡</td><td>梯度裁剪是否生效；那个 batch 的数据</td></tr><tr><td>降到某个水平后长期走平</td><td>平台</td><td>学习率是否该衰减；模型容量是否到头</td></tr><tr><td>验证线比训练线还低</td><td>两份数据不同分布，或者 dropout 的影响</td><td>数据的划分方式</td></tr></tbody></table><p><strong class="h">几个容易误读的地方。</strong></p><ul><li>*噪声。* 训练损失是每个 batch 算一次，本身就在抖。看趋势要做平滑（取最近若干步的平均）。但平滑会把尖峰抹掉，所以原始的和平滑的最好都看。</li><li>*横轴。* 比较两次实验时，要想清楚横轴是“步数”还是“处理过的样本数”还是“时间”。batch 大小不同的两次训练，按步数比和按样本数比，结论可能相反。关心系统性能时（0.2），横轴用时间才有意义。</li><li>*周期性的波动。* 损失每隔固定的步数出现规律的起伏，通常是数据没有打乱好，同一类样本聚在了一起。</li></ul><p><strong class="h">损失不是唯一要看的。</strong> 最终关心的是任务指标（准确率、生成质量）。损失下降而指标不动的情况也有。0.2 说过，一次完整的记录包括吞吐、MFU、峰值显存、模型效果四样，这里讲的就是第四样怎么看。</p></div>
+<div class="i-detail"><p><strong class="h">先准备好两份数据。</strong> 训练集用来更新参数。验证集是从同样的来源留出来、不参与训练的一小部分，每隔一段时间在上面算一次损失（在 <code>no_grad</code> 里，2.2）。它代表“没见过的数据”。</p><p><strong class="h">知道起点应该在哪。</strong> 训练开始前，模型的输出接近随机。对一个有 V 个类别的分类问题（语言模型的 V 就是词表大小），<mark>随机猜的交叉熵损失是 ln V</mark>。GPT-2 的词表约 5 万，初始损失应该在 10.8 左右。第一步的损失如果远高于这个数，说明初始化有问题；远低于它，说明数据里有泄漏（比如标签被模型直接看到了）。这是 Karpathy 反复强调的一个检查，只要几秒钟。</p><p><strong class="h">几种形状。</strong></p><table><thead><tr><th>形状</th><th>说明</th><th>先查什么</th></tr></thead><tbody><tr><td>两条线都停在初始值附近</td><td>没有在学</td><td>学习率是否太小；梯度有没有传回去；数据和标签是否对得上</td></tr><tr><td>两条线一起稳定下降，差距很小</td><td>正常，而且还没训够</td><td>继续训，或者加大模型</td></tr><tr><td>训练线继续降，验证线走平后回升</td><td>过拟合</td><td>更多数据、加强正则化、提前停止</td></tr><tr><td>一开始就猛涨或变成 NaN</td><td>发散</td><td>学习率太大、没有预热、数值问题</td></tr><tr><td>训练中途突然出现尖峰，之后恢复</td><td>遇到了异常的 batch 或陡坡</td><td>梯度裁剪是否生效；那个 batch 的数据</td></tr><tr><td>降到某个水平后长期走平</td><td>平台</td><td>学习率是否该衰减；模型容量是否到头</td></tr><tr><td>验证线比训练线还低</td><td>两份数据不同分布，或者 dropout 的影响</td><td>数据的划分方式</td></tr></tbody></table><p><strong class="h">几个容易误读的地方。</strong></p><ul><li><em>噪声。</em> 训练损失是每个 batch 算一次，本身就在抖。看趋势要做平滑（取最近若干步的平均）。但平滑会把尖峰抹掉，所以原始的和平滑的最好都看。</li><li><em>横轴。</em> 比较两次实验时，要想清楚横轴是“步数”还是“处理过的样本数”还是“时间”。batch 大小不同的两次训练，按步数比和按样本数比，结论可能相反。关心系统性能时（0.2），横轴用时间才有意义。</li><li><em>周期性的波动。</em> 损失每隔固定的步数出现规律的起伏，通常是数据没有打乱好，同一类样本聚在了一起。</li></ul><p><strong class="h">损失不是唯一要看的。</strong> 最终关心的是任务指标（准确率、生成质量）。损失下降而指标不动的情况也有。0.2 说过，一次完整的记录包括吞吐、MFU、峰值显存、模型效果四样，这里讲的就是第四样怎么看。</p></div>
 <p class="i-analogy"><b>打个比方</b>像体检时的两项指标要放在一起看：单看一项正常说明不了什么，两项的相对关系才能区分是哪种情况。</p>
 <p class="i-impl">所以训练时一定要留出一份验证数据，并且两条曲线都记。只看训练损失，你既发现不了过拟合，也分不清“模型不行”和“数据有问题”。</p>
 <div class="i-builds">承接 <a href="1-3.html#c-p1-3-guards">权重衰减、dropout、梯度裁剪：各自在防一种具体的毛病</a><a href="1-2.html#c-1-2-likelihood">损失函数不是拍脑袋定的：它来自最大似然</a><a href="1-2.html#c-1-2-generalize">训练误差低不等于学会了：要看没见过的数据</a></div>
@@ -92,13 +92,13 @@
 <a class="next" href="1-4.html"><small>下一单元</small>1.4 Transformer</a>
 </nav></div>
 </main>
-<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.12 版</a><br>
+<footer class="foot"><a href="../index.html">目录</a> · <a href="../about.html">关于这门课</a> · <a href="../about.html#versions">1.13 版</a><br>
 Zongyao Tang、Claude 编著 · © 2026 Zongyao Tang<br>以 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans" target="_blank" rel="noopener license">CC BY-NC-SA 4.0</a> 许可分享：可以转载和改编，须署名、不得商用、改编后以同样的许可分享</footer>
-<script src="../assets/reading.js?v=44d46eb3"></script>
-<script src="../assets/demos.js?v=44d46eb3"></script>
-<script src="../assets/code.js?v=44d46eb3"></script>
-<script src="../assets/motion.js?v=44d46eb3"></script>
-<script src="../assets/theme.js?v=44d46eb3"></script>
+<script src="../assets/reading.js?v=90eef784"></script>
+<script src="../assets/demos.js?v=90eef784"></script>
+<script src="../assets/code.js?v=90eef784"></script>
+<script src="../assets/motion.js?v=90eef784"></script>
+<script src="../assets/theme.js?v=90eef784"></script>
 <script>document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[data-lang]');if(!a)return;try{localStorage.setItem('ka-lang',a.getAttribute('data-lang'))}catch(x){}if(location.hash)a.href=a.href.split('#')[0]+location.hash})</script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(function () {});</script>
 </body>
