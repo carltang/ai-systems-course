@@ -2,6 +2,12 @@
 
 第一次发布是 1.0，之后每更新一次，小版本号加一。The first publication was 1.0; each update since raises the minor number by one.
 
+## 1.14（2026-11-28）
+
+1.1 加上选读“权重共享：一组权重用在很多位置，梯度怎么算”，带一个算出来的例子；正文里那句先说清权重共享是什么。
+
+Unit 1.1 gains a further reading, "weight sharing: one set of weights in many places, and its gradient", with a worked example; the sentence in the lesson now says first what weight sharing is.
+
 ## 1.13（2026-11-28）
 
 选读：讲解里一笔带过、读了会追问的地方，卡片下面加上可以展开的选读，带推导、小例子和能自己跑的代码。先是五处：0.2 的“MFU 为什么到不了 100%”和“MFU 和吞吐什么时候反着走”，0.3 的“共享内存还剩哪些开销”，1.5 的“反向为什么约是前向的两倍”和“6N 在哪里不准”，配两张新图。改正两处不准确的说法（词嵌入让 6N 高估的条件；MFU 的盲区）；列表里的强调不再显示成星号；版本记录补上 1.0 之前的 alpha、beta 两个阶段。
