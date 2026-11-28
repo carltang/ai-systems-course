@@ -2326,8 +2326,11 @@
         var X = 1.5, T = 0.5, N = 7, step = still ? N - 1 : 0, auto = !still, clock = 0;
         p.slider('w1', '权重 w₁', -2, 2, 0.1, 0.6, function (v) { return v.toFixed(1); }, null, 'launch');
         p.slider('w2', '权重 w₂', -2, 2, 0.1, 1.2, function (v) { return v.toFixed(1); }, null, 'launch');
-        p.button('下一步', function () { auto = false; step = (step + 1) % N; });
-        p.button('自动播放', function () { auto = !still; clock = 0; step = still ? N - 1 : 0; }, 'ghost');
+        // the same controls as the ring demo: the button says what a click will do, so it shows the state too
+        var play = p.button('暂停', function (b) { auto = !auto; clock = 0; b.textContent = auto ? '暂停' : '播放'; p.kick && p.kick(); });
+        if (still) { play.style.display = 'none'; auto = false; }                     // with less motion the reader steps through by hand
+        p.button('下一步', function () { auto = false; play.textContent = '播放'; step = (step + 1) % N; }, 'ghost');
+        p.button('重来', function () { clock = 0; step = 0; }, 'ghost');
         p.readout('L', '损失 L', 'ink');
         p.readout('g', '∂L/∂w₁：反向传播算的', 'peers');
         p.readout('fd', '∂L/∂w₁：笨办法（w₁ 挪一点，重算一遍前向）', 'ink');
